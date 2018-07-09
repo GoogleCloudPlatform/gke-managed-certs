@@ -1,4 +1,4 @@
-all: build-dev
+all: build-binary
 
 TAG?=dev
 REGISTRY=eu.gcr.io
@@ -7,9 +7,6 @@ DOCKER_IMAGE=${REGISTRY}/managed-certs-gke/${NAME}:${TAG}
 
 # Builds the managed certs controller binary
 build-binary: clean deps
-	godep go build -o ${NAME}
-
-build-dev: clean deps
 	godep go build ./...
 	godep go build -o ${NAME}
 
