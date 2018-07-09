@@ -1,4 +1,4 @@
-all: build-binary
+all: build-dev
 
 TAG?=dev
 REGISTRY=eu.gcr.io
@@ -6,9 +6,11 @@ NAME=certs-controller
 DOCKER_IMAGE=${REGISTRY}/managed-certs-gke/${NAME}:${TAG}
 
 # Builds the managed certs controller binary
-build-binary: clean deps
-	godep go build ./...
+build-binary: clean deps build-dev
 	godep go build -o ${NAME}
+
+build-dev: clean deps
+	godep go build ./...
 
 # Builds the managed certs controller binary using a docker builder image
 build-binary-in-docker: clean docker-builder
@@ -32,4 +34,4 @@ docker-builder:
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image
 release: build-binary-in-docker docker
 
-.PHONY: all build-binary build-binary-in-docker clean deps docker docker-builder release
+.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder release
