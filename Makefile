@@ -7,7 +7,6 @@ DOCKER_IMAGE=${REGISTRY}/managed-certs-gke/${NAME}:${TAG}
 
 # Builds the managed certs controller binary
 build-binary: clean deps
-	godep go build ./...
 	godep go build -o ${NAME}
 
 # Builds the managed certs controller binary using a docker builder image
