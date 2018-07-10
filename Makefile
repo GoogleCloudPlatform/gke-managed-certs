@@ -1,4 +1,4 @@
-all: build-binary
+all: build-binary-in-docker
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
