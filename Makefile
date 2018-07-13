@@ -24,11 +24,18 @@ docker:
 	docker build --pull -t ${DOCKER_IMAGE} .
 	docker push ${DOCKER_IMAGE}
 
+# Builds and pushes a docker image with managed certs controller binary - for CI, activates a service account before pushing
+docker-ci:
+	docker build --pull -t ${DOCKER_IMAGE} .
+	gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json
+	gcloud auth configure-docker
+	docker push ${DOCKER_IMAGE}
+
 # Builds a builder image, i. e. an image used to later build a managed certs binary.
 docker-builder:
 	docker build -t ${NAME}-builder builder
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
-release-ci: build-binary-in-docker docker
+release-ci: build-binary-in-docker docker-ci
 
-.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder release-ci
+.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release-ci
