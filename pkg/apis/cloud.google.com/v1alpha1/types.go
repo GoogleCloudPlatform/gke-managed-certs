@@ -45,23 +45,20 @@ type ManagedCertificateSpec struct {
 
 // ManagedCertificateStatus provides the current state of the certificate.
 type ManagedCertificateStatus struct {
-	// Specifies a final list of domains for which a certificate is created. This final list is build by merging the contents of the ManagedCertificateSpec.Domains field with domains extracted from matching Ingress configurations.
-	ExpandedDomains []string `json:"expandedDomains" protobuf:"bytes,1,rep,name=expandedDomains"`
-
-	// Specifies the name of the provisioned managed certificate.
+	// Specifies the status of communication with backend (GCE) API.
 	// +optional
-	CertificateName string `json:"certificateName,omitempty" protobuf:"bytes,2,opt,name=certificateName"`
+	BackendStatus string `json:"backendStatus,omitempty" protobuf:"bytes,1,opt,name=backendStatus"`
 
 	// Specifies the status of the managed certificate.
 	// +optional
-	CertificateStatus string `json:"certificateStatus,omitempty" protobuf:"bytes,3,opt,name=certificateStatus"`
+	CertificateStatus string `json:"certificateStatus,omitempty" protobuf:"bytes,2,opt,name=certificateStatus"`
 
 	// Specifies the statuses of certificate provisioning for domains selected by the user.
-	DomainStatus []DomainStatus `json:"domainStatus" protobuf:"bytes,4,rep,name=domainStatus"`
+	DomainStatus []DomainStatus `json:"domainStatus" protobuf:"bytes,3,rep,name=domainStatus"`
 
-	// True if this ManagedCertificate is being migrated to a new SslCertificate resource - happens when a new SslCertificate resource is needed because of changes in configuration that invalidate the previous one.
+	// Specifies the name of the provisioned managed certificate.
 	// +optional
-	Migrating bool `json:"migrating,omitempty" protobuf:"bytes,5,opt,name=migrating`
+	CertificateName string `json:"certificateName,omitempty" protobuf:"bytes,4,opt,name=certificateName"`
 }
 
 // DomainStatus is a pair which associates domain name with status of certificate provisioning for this domain.
