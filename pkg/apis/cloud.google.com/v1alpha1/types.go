@@ -45,10 +45,6 @@ type ManagedCertificateSpec struct {
 
 // ManagedCertificateStatus provides the current state of the certificate.
 type ManagedCertificateStatus struct {
-	// Specifies the status of communication with backend (GCE) API.
-	// +optional
-	BackendStatus string `json:"backendStatus,omitempty" protobuf:"bytes,1,opt,name=backendStatus"`
-
 	// Specifies the status of the managed certificate.
 	// +optional
 	CertificateStatus string `json:"certificateStatus,omitempty" protobuf:"bytes,2,opt,name=certificateStatus"`
