@@ -1,3 +1,10 @@
 #!/bin/bash
 
-echo "1234567890"
+set -o errexit
+set -o nounset
+set -o pipefail
+
+echo -ne "Deploy components for e2e tests"
+./deploy-for-e2e.sh
+
+echo -ne `(kubectl get pods -o yaml)`

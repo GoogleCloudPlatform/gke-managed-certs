@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: certs-controller
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: certs-controller
+    template:
+        metadata:
+            labels:
+                app: certs-controller
+        spec:
+            containers:
+                - name: certs-controller
+                  image: eu.gcr.io/managed-certs-gke/certs-controller:ci_latest
+                  imagePullPolicy: Always
