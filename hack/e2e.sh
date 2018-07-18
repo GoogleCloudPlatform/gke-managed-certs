@@ -10,9 +10,9 @@ echo -ne "Configure registry authentication"
 gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json
 gcloud auth configure-docker
 
-echo -ne "Define context for kubectl\n"
-kubectl config set-context continuous_integration --namespace="continuous_integration"
-kubectl config use-context continuous_integration
+#echo -ne "Define context for kubectl\n"
+#kubectl config set-context continuous_integration --namespace="continuous_integration"
+#kubectl config use-context continuous_integration
 
 echo -ne "Delete components created for e2e tests\n"
 ${SCRIPT_ROOT}/hack/delete-for-e2e.sh
