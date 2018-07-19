@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -8,9 +9,18 @@ import (
 	"managed-certs-gke/pkg/ingress"
 )
 
+const (
+	annotation = "cloud.google.com/managed-certificates"
+)
+
 func (c *Controller) runIngressWorker() {
 	for c.processNextIngress() {
 	}
+}
+
+func parseAnnotation(annotationValue string) (names []string, err error) {
+	err = json.Unmarshal([]byte(annotationValue), &names)
+	return
 }
 
 func (c *Controller) processNextIngress() bool {
@@ -38,9 +48,33 @@ func (c *Controller) processNextIngress() bool {
 				return err
 			}
 
-			glog.Infof("%v", ing)
+			annotationValue, present := ing.ObjectMeta.Annotations[annotation]
+			if !present {
+				// There is no annotation on this ingress
+				return nil
+			}
 
-			//TODO: read annotation and add mcert to queue
+			glog.Infof("Found annotation %s", annotationValue)
+
+			names, err := parseAnnotation(annotationValue)
+			if err != nil {
+				// Unable to parse annotations
+				return err
+			}
+
+			for _, name := range names {
+				// Assume the namespace is the same as ingress's
+				glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
+				mcert, err := c.mcertLister.ManagedCertificates(ns).Get(name)
+
+				if err != nil {
+					// TODO generate k8s event - can't fetch mcert
+					runtime.HandleError(err)
+				} else {
+					glog.Infof("Enqueue managed certificate %s for further processing", name)
+					c.enqueueMcert(mcert)
+				}
+			}
 		}
 
 		c.ingressQueue.Forget(obj)
