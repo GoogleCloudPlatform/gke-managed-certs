@@ -1892,6 +1892,11 @@
 			"Rev": "e5bc2a7bbbdf78f2a331b8c23838d1bbb1c6b40a"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/util/workqueue",
+			"Comment": "kubernetes-1.11.0-beta.0-53-ge5bc2a7b",
+			"Rev": "e5bc2a7bbbdf78f2a331b8c23838d1bbb1c6b40a"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
 			"Rev": "91cfa479c814065e420cee7ed227db0f63a5854e"
 		},

@@ -24,6 +24,12 @@ func NewClient() (client rest.Interface, err error) {
         return v1beta1.NewForConfigOrDie(config).RESTClient(), nil
 }
 
+func Get(client rest.Interface, namespace string, name string) (result *api.Ingress, err error) {
+	result = &api.Ingress{}
+	err = client.Get().Namespace(namespace).Resource(resource).Name(name).Do().Into(result)
+	return
+}
+
 func List(client rest.Interface) (result *api.IngressList, err error) {
 	result = &api.IngressList{}
 	err = client.Get().Resource(resource).Do().Into(result)
