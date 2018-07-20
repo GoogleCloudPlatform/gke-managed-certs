@@ -1,0 +1,10 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+  annotations:
+      cloud.google.com/managed-certificates: '["test-certificate"]'
+spec:
+    backend:
+        serviceName: does-not-exist
+        servicePort: 80
