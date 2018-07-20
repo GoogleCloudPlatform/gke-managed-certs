@@ -1,0 +1,7 @@
+apiVersion: cloud.google.com/v1alpha1
+kind: ManagedCertificate
+metadata:
+    name: test-certificate
+spec:
+    domains:
+        - test.managedcertsgke.certsbridge.com
