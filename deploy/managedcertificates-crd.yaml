@@ -12,30 +12,33 @@ spec:
         kind: ManagedCertificate
         shortNames:
             - mcrt
-validation:
-    openAPIV3Schema:
-        properties:
-            status:
-                properties:
-                    certificateStatus:
-                        type: string
-                    domainStatus:
-                        type: array
-                        items:
-                            type: object
-                            required:
-                                - domain
-                                - status
-                            properties:
-                                domain:
-                                    type: string
-                                status:
-                                    type: string
-                    certificateName:
-                        type: string
-            spec:
-                properties:
-                    domains:
-                        type: array
-                        items:
+    validation:
+        openAPIV3Schema:
+            properties:
+                status:
+                    properties:
+                        certificateStatus:
                             type: string
+                        domainStatus:
+                            type: array
+                            items:
+                                type: object
+                                required:
+                                    - domain
+                                    - status
+                                properties:
+                                    domain:
+                                        type: string
+                                    status:
+                                        type: string
+                        certificateName:
+                            type: string
+                spec:
+                    properties:
+                        domains:
+                            type: array
+                            maxItems: 1
+                            items:
+                                type: string
+                                maxLength: 63
+                                pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
