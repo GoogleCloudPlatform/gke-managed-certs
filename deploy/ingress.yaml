@@ -3,6 +3,7 @@ kind: Ingress
 metadata:
   name: test-ingress
   annotations:
+      kubernetes.io/ingress.global-static-ip-name: test-ip-address
       cloud.google.com/managed-certificates: '["test-certificate"]'
 spec:
     backend:
