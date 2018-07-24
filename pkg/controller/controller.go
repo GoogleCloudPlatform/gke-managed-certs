@@ -21,20 +21,22 @@ func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Client
 			client: ingressClient,
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		},
-		mcertLister: mcertInformer.Lister(),
-		mcertSynced: mcertInformer.Informer().HasSynced,
-		mcertQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
+		Mcert: McertController{
+			lister: mcertInformer.Lister(),
+			synced: mcertInformer.Informer().HasSynced,
+			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
+		},
 	}
 
 	mcertInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			controller.enqueueMcert(obj)
+			controller.Mcert.enqueue(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueMcert(new)
+			controller.Mcert.enqueue(new)
 		},
 		DeleteFunc: func(obj interface{}) {
-			controller.enqueueMcert(obj)
+			controller.Mcert.enqueue(obj)
 		},
 	})
 
@@ -44,21 +46,21 @@ func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Client
 func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
 	defer c.Ingress.queue.ShutDown()
-	defer c.mcertQueue.ShutDown()
+	defer c.Mcert.queue.ShutDown()
 
 	glog.Info("Controller.Run()")
 
 	glog.Info("Waiting for managedcertificate cache sync")
-	if !cache.WaitForCacheSync(stopChannel, c.mcertSynced) {
+	if !cache.WaitForCacheSync(stopChannel, c.Mcert.synced) {
 		return fmt.Errorf("Timed out waiting for cache sync")
 	}
 	glog.Info("Cache synced")
 
 	go c.Ingress.runWatcher()
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
-	go wait.Until(c.runMcertWorker, time.Second, stopChannel)
+	go wait.Until(c.Mcert.runWorker, time.Second, stopChannel)
 	go wait.Until(c.Ingress.enqueueAll, 15*time.Minute, stopChannel)
-	go wait.Until(c.enqueueAllMcerts, 15*time.Minute, stopChannel)
+	go wait.Until(c.Mcert.enqueueAll, 15*time.Minute, stopChannel)
 
 	glog.Info("Waiting for stop signal")
 	<-stopChannel

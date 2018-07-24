@@ -12,9 +12,13 @@ type IngressController struct {
         queue workqueue.RateLimitingInterface
 }
 
+type McertController struct {
+        lister mcertlister.ManagedCertificateLister
+        synced cache.InformerSynced
+        queue workqueue.RateLimitingInterface
+}
+
 type Controller struct {
 	Ingress IngressController
-        mcertLister mcertlister.ManagedCertificateLister
-        mcertSynced cache.InformerSynced
-        mcertQueue workqueue.RateLimitingInterface
+	Mcert McertController
 }

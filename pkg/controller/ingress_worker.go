@@ -113,14 +113,14 @@ func (c *Controller) processNextIngress() bool {
 			for _, name := range names {
 				// Assume the namespace is the same as ingress's
 				glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
-				mcert, err := c.mcertLister.ManagedCertificates(ns).Get(name)
+				mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
 
 				if err != nil {
 					// TODO generate k8s event - can't fetch mcert
 					runtime.HandleError(err)
 				} else {
 					glog.Infof("Enqueue managed certificate %s for further processing", name)
-					c.enqueueMcert(mcert)
+					c.Mcert.enqueue(mcert)
 				}
 			}
 		}

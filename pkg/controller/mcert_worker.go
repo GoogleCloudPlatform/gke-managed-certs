@@ -7,31 +7,31 @@ import (
 	//mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
 )
 
-func (c *Controller) enqueueMcert(obj interface{}) {
+func (c *McertController) enqueue(obj interface{}) {
 	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
 		runtime.HandleError(err)
 	} else {
-		c.mcertQueue.AddRateLimited(key)
+		c.queue.AddRateLimited(key)
 	}
 }
 
-func (c *Controller) runMcertWorker() {
-	for c.processNextMcert() {
+func (c *McertController) runWorker() {
+	for c.processNext() {
 	}
 }
 
-func (c *Controller) processNextMcert() bool {
+func (c *McertController) processNext() bool {
 	return true
 }
 
-func (c *Controller) enqueueAllMcerts() {
-	mcerts, err := c.mcertLister.List(labels.Everything())
+func (c *McertController) enqueueAll() {
+	mcerts, err := c.lister.List(labels.Everything())
 	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
 
 	for _, mcert := range mcerts {
-		c.enqueueMcert(mcert)
+		c.enqueue(mcert)
 	}
 }
