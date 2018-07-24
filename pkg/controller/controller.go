@@ -10,7 +10,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	mcertclient "managed-certs-gke/pkg/client/clientset/versioned"
 	mcertinformer "managed-certs-gke/pkg/client/informers/externalversions"
-	//mcert "managed-certs-gke/pkg/managedcertificate"
 	"time"
 )
 
