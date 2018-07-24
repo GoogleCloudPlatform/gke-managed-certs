@@ -15,16 +15,16 @@ const (
 	annotation = "cloud.google.com/managed-certificates"
 )
 
-func (c *Controller) enqueueIngress(obj interface{}) {
+func (c *IngressController) enqueue(obj interface{}) {
 	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
 		runtime.HandleError(err)
 	} else {
-		c.ingressQueue.AddRateLimited(key)
+		c.queue.AddRateLimited(key)
 	}
 }
 
-func (c *Controller) runIngressWatcher() {
-	ingressWatcher, err := ingress.Watch(c.ingressClient)
+func (c *IngressController) runWatcher() {
+	ingressWatcher, err := ingress.Watch(c.client)
 
 	if err != nil {
 		runtime.HandleError(err)
@@ -35,12 +35,12 @@ func (c *Controller) runIngressWatcher() {
 		select {
 		case event := <-ingressWatcher.ResultChan():
 			if event.Type == watch.Added || event.Type == watch.Modified {
-				c.enqueueIngress(event.Object)
+				c.enqueue(event.Object)
 			}
 		default:
 		}
 
-		if c.ingressQueue.ShuttingDown() {
+		if c.queue.ShuttingDown() {
 			ingressWatcher.Stop()
 			return
 		}
@@ -49,15 +49,15 @@ func (c *Controller) runIngressWatcher() {
 	}
 }
 
-func (c *Controller) enqueueAllIngresses() {
-	ingresses, err := ingress.List(c.ingressClient)
+func (c *IngressController) enqueueAll() {
+	ingresses, err := ingress.List(c.client)
 	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
 
 	for _, ing := range ingresses.Items {
-		c.enqueueIngress(ing)
+		c.enqueue(ing)
 	}
 }
 
@@ -72,17 +72,17 @@ func parseAnnotation(annotationValue string) (names []string, err error) {
 }
 
 func (c *Controller) processNextIngress() bool {
-	obj, shutdown := c.ingressQueue.Get()
+	obj, shutdown := c.Ingress.queue.Get()
 
 	if shutdown {
 		return false
 	}
 
 	err := func(obj interface{}) error {
-		defer c.ingressQueue.Done(obj)
+		defer c.Ingress.queue.Done(obj)
 
 		if key, ok := obj.(string); !ok {
-			c.ingressQueue.Forget(obj)
+			c.Ingress.queue.Forget(obj)
 			return fmt.Errorf("Expected string in ingressQueue but got %#v", obj)
 		} else {
 			ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -91,7 +91,7 @@ func (c *Controller) processNextIngress() bool {
 			}
 			glog.Infof("Handling ingress %s.%s", ns, name)
 
-			ing, err := ingress.Get(c.ingressClient, ns, name)
+			ing, err := ingress.Get(c.Ingress.client, ns, name)
 			if err != nil {
 				return err
 			}
@@ -125,7 +125,7 @@ func (c *Controller) processNextIngress() bool {
 			}
 		}
 
-		c.ingressQueue.Forget(obj)
+		c.Ingress.queue.Forget(obj)
 		return nil
 	}(obj)
 

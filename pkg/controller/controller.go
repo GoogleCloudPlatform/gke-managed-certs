@@ -17,8 +17,10 @@ func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Client
 	mcertInformer := mcertInformerFactory.Cloud().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
-		ingressClient: ingressClient,
-		ingressQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+		Ingress: IngressController{
+			client: ingressClient,
+			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+		},
 		mcertLister: mcertInformer.Lister(),
 		mcertSynced: mcertInformer.Informer().HasSynced,
 		mcertQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
@@ -41,7 +43,7 @@ func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Client
 
 func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
-	defer c.ingressQueue.ShutDown()
+	defer c.Ingress.queue.ShutDown()
 	defer c.mcertQueue.ShutDown()
 
 	glog.Info("Controller.Run()")
@@ -52,10 +54,10 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	}
 	glog.Info("Cache synced")
 
-	go c.runIngressWatcher()
+	go c.Ingress.runWatcher()
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.runMcertWorker, time.Second, stopChannel)
-	go wait.Until(c.enqueueAllIngresses, 15*time.Minute, stopChannel)
+	go wait.Until(c.Ingress.enqueueAll, 15*time.Minute, stopChannel)
 	go wait.Until(c.enqueueAllMcerts, 15*time.Minute, stopChannel)
 
 	glog.Info("Waiting for stop signal")

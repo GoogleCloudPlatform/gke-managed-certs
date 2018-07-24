@@ -7,9 +7,13 @@ import (
 	mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
 )
 
+type IngressController struct {
+        client rest.Interface
+        queue workqueue.RateLimitingInterface
+}
+
 type Controller struct {
-        ingressClient rest.Interface
-        ingressQueue workqueue.RateLimitingInterface
+	Ingress IngressController
         mcertLister mcertlister.ManagedCertificateLister
         mcertSynced cache.InformerSynced
         mcertQueue workqueue.RateLimitingInterface
