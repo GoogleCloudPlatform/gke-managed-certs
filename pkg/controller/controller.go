@@ -10,27 +10,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	mcertclient "managed-certs-gke/pkg/client/clientset/versioned"
 	mcertinformer "managed-certs-gke/pkg/client/informers/externalversions"
-	//mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
-	"managed-certs-gke/pkg/ingress"
 	//mcert "managed-certs-gke/pkg/managedcertificate"
 	"time"
 )
-
-func (c *Controller) enqueueIngress(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
-		runtime.HandleError(err)
-	} else {
-		c.ingressQueue.AddRateLimited(key)
-	}
-}
-
-func (c *Controller) enqueueMcert(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
-		runtime.HandleError(err)
-	} else {
-		c.mcertQueue.AddRateLimited(key)
-	}
-}
 
 func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Clientset, mcertInformerFactory mcertinformer.SharedInformerFactory) *Controller {
 	mcertInformer := mcertInformerFactory.Cloud().V1alpha1().ManagedCertificates()
@@ -74,16 +56,8 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	go c.runIngressWatcher()
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.runMcertWorker, time.Second, stopChannel)
-
-	ingresses, err := ingress.List(c.ingressClient)
-	if err != nil {
-		runtime.HandleError(err)
-		return err
-	}
-
-	for _, x := range ingresses.Items {
-		glog.Infof("%v", x.ObjectMeta.Name)
-	}
+	go wait.Until(c.enqueueAllIngresses, 15*time.Minute, stopChannel)
+	go wait.Until(c.enqueueAllMcerts, 15*time.Minute, stopChannel)
 
 	glog.Info("Waiting for stop signal")
 	<-stopChannel
