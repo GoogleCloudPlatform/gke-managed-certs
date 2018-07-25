@@ -71,6 +71,11 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 	}, nil
 }
 
+func (c *SslClient) Delete(name string) error {
+	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
+	return err
+}
+
 func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
@@ -106,6 +111,10 @@ func (c *SslClient) Insert(domains []string) (string, error) {
 	}
 
 	return sslCertificateName, nil
+}
+
+func (c *SslClient) List() (*compute.SslCertificateList, error) {
+	return c.service.SslCertificates.List(c.projectId).Do()
 }
 
 func createRandomName() (string, error) {
