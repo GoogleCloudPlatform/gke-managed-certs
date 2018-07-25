@@ -24,7 +24,7 @@ func (c *IngressController) enqueue(obj interface{}) {
 }
 
 func (c *IngressController) runWatcher() {
-	ingressWatcher, err := ingress.Watch(c.client)
+	watcher, err := ingress.Watch(c.client)
 
 	if err != nil {
 		runtime.HandleError(err)
@@ -33,7 +33,7 @@ func (c *IngressController) runWatcher() {
 
 	for {
 		select {
-		case event := <-ingressWatcher.ResultChan():
+		case event := <-watcher.ResultChan():
 			if event.Type == watch.Added || event.Type == watch.Modified {
 				c.enqueue(event.Object)
 			}
@@ -41,7 +41,7 @@ func (c *IngressController) runWatcher() {
 		}
 
 		if c.queue.ShuttingDown() {
-			ingressWatcher.Stop()
+			watcher.Stop()
 			return
 		}
 

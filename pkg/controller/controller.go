@@ -5,26 +5,25 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	mcertclient "managed-certs-gke/pkg/client/clientset/versioned"
-	mcertinformer "managed-certs-gke/pkg/client/informers/externalversions"
+	"managed-certs-gke/pkg/config"
 	"time"
 )
 
-func NewController(ingressClient rest.Interface, mcertClient *mcertclient.Clientset, mcertInformerFactory mcertinformer.SharedInformerFactory) *Controller {
-	mcertInformer := mcertInformerFactory.Cloud().V1alpha1().ManagedCertificates()
+func NewController(opts *config.ControllerOptions) *Controller {
+	mcertInformer := opts.McertInformerFactory.Cloud().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
 		Ingress: IngressController{
-			client: ingressClient,
+			client: opts.IngressClient,
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		},
 		Mcert: McertController{
 			lister: mcertInformer.Lister(),
 			synced: mcertInformer.Informer().HasSynced,
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
+			sslClient: opts.SslClient,
 		},
 	}
 
@@ -59,6 +58,7 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	go c.Ingress.runWatcher()
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.Mcert.runWorker, time.Second, stopChannel)
+
 	go wait.Until(c.Ingress.enqueueAll, 15*time.Minute, stopChannel)
 	go wait.Until(c.Mcert.enqueueAll, 15*time.Minute, stopChannel)
 
