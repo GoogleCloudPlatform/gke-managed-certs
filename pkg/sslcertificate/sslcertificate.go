@@ -4,8 +4,9 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/google/uuid"
 	gcfg "gopkg.in/gcfg.v1"
-	compute "google.golang.org/api/compute/v1"
+	compute "google.golang.org/api/compute/v0.alpha"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -15,6 +16,7 @@ import (
 
 const (
 	httpTimeout = 30 * time.Second
+	maxNameLength = 63
 )
 
 type SslClient struct {
@@ -67,4 +69,50 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 		service: service,
 		projectId: projectId,
 	}, nil
+}
+
+func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
+	return c.service.SslCertificates.Get(c.projectId, name).Do()
+}
+
+func (c *SslClient) Insert(domains []string) (string, error) {
+	sslCertificateName, err := createRandomName()
+
+	if err != nil {
+		return "", err
+	}
+
+	_, err = c.Get(sslCertificateName)
+	if err != nil {
+		// Name taken, choose a new one
+		sslCertificateName, err = createRandomName()
+
+		if err != nil {
+			return "", err
+		}
+	}
+
+	sslCertificate := &compute.SslCertificate{
+		Managed: &compute.SslCertificateManagedSslCertificate{
+			Domains: domains,
+		},
+		Name: sslCertificateName,
+		Type: "MANAGED",
+	}
+
+	_, err = c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
+	if err != nil {
+		return "", fmt.Errorf("Failed to insert SslCertificate %v, err: %v", sslCertificate, err)
+	}
+
+	return sslCertificateName, nil
+}
+
+func createRandomName() (string, error) {
+	uid, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("mcert%s", uid.String())[:maxNameLength], nil
 }
