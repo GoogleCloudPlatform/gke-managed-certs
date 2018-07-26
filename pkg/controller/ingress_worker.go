@@ -14,13 +14,6 @@ const (
 	annotation = "cloud.google.com/managed-certificates"
 )
 
-func (c *IngressController) enqueue(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
-		runtime.HandleError(err)
-	} else {
-		c.queue.AddRateLimited(key)
-	}
-}
 
 func (c *IngressController) runWatcher() {
 	watcher, err := c.client.Watch()
@@ -45,18 +38,6 @@ func (c *IngressController) runWatcher() {
 		}
 
 		time.Sleep(time.Second)
-	}
-}
-
-func (c *IngressController) enqueueAll() {
-	ingresses, err := c.client.List()
-	if err != nil {
-		runtime.HandleError(err)
-		return
-	}
-
-	for _, ing := range ingresses.Items {
-		c.enqueue(ing)
 	}
 }
 

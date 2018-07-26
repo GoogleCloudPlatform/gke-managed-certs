@@ -1,19 +1,12 @@
 package controller
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
+	"fmt"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	//mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
 )
-
-func (c *McertController) enqueue(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
-		runtime.HandleError(err)
-	} else {
-		c.queue.AddRateLimited(key)
-	}
-}
 
 func (c *McertController) runWorker() {
 	for c.processNext() {
@@ -21,17 +14,37 @@ func (c *McertController) runWorker() {
 }
 
 func (c *McertController) processNext() bool {
-	return true
-}
+	obj, shutdown := c.queue.Get()
 
-func (c *McertController) enqueueAll() {
-	mcerts, err := c.lister.List(labels.Everything())
+	if shutdown {
+		return false
+	}
+
+	err := func(obj interface{}) error {
+		defer c.queue.Done(obj)
+
+		if key, ok := obj.(string); !ok {
+			c.queue.Forget(obj)
+			return fmt.Errorf("Expected string in mcertQueue but got %#v", obj)
+		} else {
+			ns, name, err := cache.SplitMetaNamespaceKey(key)
+			if err != nil {
+				return err
+			}
+			glog.Infof("Handling ManagedCertificate %s.%s", ns, name)
+
+			_, err = c.lister.ManagedCertificates(ns).Get(name)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}(obj)
+
 	if err != nil {
 		runtime.HandleError(err)
-		return
 	}
 
-	for _, mcert := range mcerts {
-		c.enqueue(mcert)
-	}
+	return true
 }
