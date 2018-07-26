@@ -1,17 +1,18 @@
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"strings"
 	"time"
 )
 
 const (
 	annotation = "cloud.google.com/managed-certificates"
+	splitBy = ","
 )
 
 
@@ -46,9 +47,12 @@ func (c *Controller) runIngressWorker() {
 	}
 }
 
-func parseAnnotation(annotationValue string) (names []string, err error) {
-	err = json.Unmarshal([]byte(annotationValue), &names)
-	return
+func parseAnnotation(annotationValue string) []string {
+	if annotationValue == "" {
+		return []string{}
+	}
+
+	return strings.Split(annotationValue, splitBy)
 }
 
 func (c *Controller) processNextIngress() bool {
@@ -84,13 +88,7 @@ func (c *Controller) processNextIngress() bool {
 
 			glog.Infof("Found annotation %s", annotationValue)
 
-			names, err := parseAnnotation(annotationValue)
-			if err != nil {
-				// Unable to parse annotations
-				return err
-			}
-
-			for _, name := range names {
+			for _, name := range parseAnnotation(annotationValue) {
 				// Assume the namespace is the same as ingress's
 				glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
 				mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
