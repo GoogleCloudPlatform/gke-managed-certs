@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"managed-certs-gke/pkg/ingress"
 	"time"
 )
 
@@ -24,7 +23,7 @@ func (c *IngressController) enqueue(obj interface{}) {
 }
 
 func (c *IngressController) runWatcher() {
-	watcher, err := ingress.Watch(c.client)
+	watcher, err := c.client.Watch()
 
 	if err != nil {
 		runtime.HandleError(err)
@@ -50,7 +49,7 @@ func (c *IngressController) runWatcher() {
 }
 
 func (c *IngressController) enqueueAll() {
-	ingresses, err := ingress.List(c.client)
+	ingresses, err := c.client.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
@@ -91,7 +90,7 @@ func (c *Controller) processNextIngress() bool {
 			}
 			glog.Infof("Handling ingress %s.%s", ns, name)
 
-			ing, err := ingress.Get(c.Ingress.client, ns, name)
+			ing, err := c.Ingress.client.Get(ns, name)
 			if err != nil {
 				return err
 			}

@@ -15,28 +15,34 @@ const (
 	resource = "ingresses"
 )
 
-func NewClient() (client rest.Interface, err error) {
+type Interface struct {
+	client rest.Interface
+}
+
+func NewClient() (client *Interface, err error) {
         config, err := rest.InClusterConfig()
         if err != nil {
                 return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
         }
 
-        return v1beta1.NewForConfigOrDie(config).RESTClient(), nil
+        return &Interface{
+		client: v1beta1.NewForConfigOrDie(config).RESTClient(),
+	}, nil
 }
 
-func Get(client rest.Interface, namespace string, name string) (result *api.Ingress, err error) {
+func (c *Interface) Get(namespace string, name string) (result *api.Ingress, err error) {
 	result = &api.Ingress{}
-	err = client.Get().Namespace(namespace).Resource(resource).Name(name).Do().Into(result)
+	err = c.client.Get().Namespace(namespace).Resource(resource).Name(name).Do().Into(result)
 	return
 }
 
-func List(client rest.Interface) (result *api.IngressList, err error) {
+func (c *Interface) List() (result *api.IngressList, err error) {
 	result = &api.IngressList{}
-	err = client.Get().Resource(resource).Do().Into(result)
+	err = c.client.Get().Resource(resource).Do().Into(result)
 	return
 }
 
-func Watch(client rest.Interface) (watch.Interface, error) {
+func (c *Interface) Watch() (watch.Interface, error) {
 	opts := &v1.ListOptions{Watch: true}
-	return client.Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
+	return c.client.Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
 }

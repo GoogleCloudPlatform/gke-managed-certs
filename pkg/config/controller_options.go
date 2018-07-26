@@ -11,7 +11,7 @@ import (
 
 type ControllerOptions struct {
 	// IngressClient is a rest client which operates on k8s Ingress objects
-	IngressClient rest.Interface
+	IngressClient *ingress.Interface
 
 	// McertInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	McertInformerFactory externalversions.SharedInformerFactory
