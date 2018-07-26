@@ -33,6 +33,12 @@ echo -ne "### Deploy components for e2e tests\n"
 
 echo -ne "### `kubectl get ingress`\n"
 
+echo -ne "### sleep 5 sec\n"
+sleep 5
+
+echo -ne "### list ssl certificates\n"
+gcloud alpha compute ssl-certificates list --uri
+
 ###
 # End of test code
 ###

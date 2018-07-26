@@ -13,6 +13,9 @@ type ControllerOptions struct {
 	// IngressClient is a rest client which operates on k8s Ingress objects
 	IngressClient *ingress.Interface
 
+	// McertClient lets manage ManagedCertificate custom resources
+	McertClient *versioned.Clientset
+
 	// McertInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	McertInformerFactory externalversions.SharedInformerFactory
 
@@ -40,6 +43,7 @@ func NewControllerOptions(cloudConfig string) (*ControllerOptions, error) {
 
 	return &ControllerOptions{
 		IngressClient: ingressClient,
+		McertClient: client,
 		McertInformerFactory: factory,
 		SslClient: sslClient,
 	}, nil

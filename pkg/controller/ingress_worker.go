@@ -55,6 +55,43 @@ func parseAnnotation(annotationValue string) []string {
 	return strings.Split(annotationValue, splitBy)
 }
 
+func (c *Controller) handleIngress(key string) error {
+	ns, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	glog.Infof("Handling ingress %s.%s", ns, name)
+
+	ing, err := c.Ingress.client.Get(ns, name)
+	if err != nil {
+		return err
+	}
+
+	annotationValue, present := ing.ObjectMeta.Annotations[annotation]
+	if !present {
+		// There is no annotation on this ingress
+		return nil
+	}
+
+	glog.Infof("Found annotation %s", annotationValue)
+
+	for _, name := range parseAnnotation(annotationValue) {
+		// Assume the namespace is the same as ingress's
+		glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
+		mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
+
+		if err != nil {
+			// TODO generate k8s event - can't fetch mcert
+			runtime.HandleError(err)
+		} else {
+			glog.Infof("Enqueue managed certificate %s for further processing", name)
+			c.Mcert.enqueue(mcert)
+		}
+	}
+
+	return nil
+}
+
 func (c *Controller) processNextIngress() bool {
 	obj, shutdown := c.Ingress.queue.Get()
 
@@ -65,42 +102,16 @@ func (c *Controller) processNextIngress() bool {
 	err := func(obj interface{}) error {
 		defer c.Ingress.queue.Done(obj)
 
-		if key, ok := obj.(string); !ok {
+		var key string
+		var ok bool
+		if key, ok = obj.(string); !ok {
 			c.Ingress.queue.Forget(obj)
 			return fmt.Errorf("Expected string in ingressQueue but got %#v", obj)
-		} else {
-			ns, name, err := cache.SplitMetaNamespaceKey(key)
-			if err != nil {
-				return err
-			}
-			glog.Infof("Handling ingress %s.%s", ns, name)
+		}
 
-			ing, err := c.Ingress.client.Get(ns, name)
-			if err != nil {
-				return err
-			}
-
-			annotationValue, present := ing.ObjectMeta.Annotations[annotation]
-			if !present {
-				// There is no annotation on this ingress
-				return nil
-			}
-
-			glog.Infof("Found annotation %s", annotationValue)
-
-			for _, name := range parseAnnotation(annotationValue) {
-				// Assume the namespace is the same as ingress's
-				glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
-				mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
-
-				if err != nil {
-					// TODO generate k8s event - can't fetch mcert
-					runtime.HandleError(err)
-				} else {
-					glog.Infof("Enqueue managed certificate %s for further processing", name)
-					c.Mcert.enqueue(mcert)
-				}
-			}
+		if err := c.handleIngress(key); err != nil {
+			c.Ingress.queue.AddRateLimited(obj)
+			return err
 		}
 
 		c.Ingress.queue.Forget(obj)

@@ -19,6 +19,7 @@ func NewController(opts *config.ControllerOptions) *Controller {
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		},
 		Mcert: McertController{
+			client: opts.McertClient,
 			lister: mcertInformer.Lister(),
 			synced: mcertInformer.Informer().HasSynced,
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),

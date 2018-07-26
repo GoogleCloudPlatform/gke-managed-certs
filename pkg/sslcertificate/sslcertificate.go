@@ -4,7 +4,6 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/google/uuid"
 	gcfg "gopkg.in/gcfg.v1"
 	compute "google.golang.org/api/compute/v0.alpha"
 	"golang.org/x/oauth2"
@@ -14,10 +13,7 @@ import (
 	"time"
 )
 
-const (
-	httpTimeout = 30 * time.Second
-	maxNameLength = 63
-)
+const httpTimeout = 30 * time.Second
 
 type SslClient struct {
 	service *compute.Service
@@ -80,23 +76,7 @@ func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
 
-func (c *SslClient) Insert(domains []string) (string, error) {
-	sslCertificateName, err := createRandomName()
-
-	if err != nil {
-		return "", err
-	}
-
-	_, err = c.Get(sslCertificateName)
-	if err != nil {
-		// Name taken, choose a new one
-		sslCertificateName, err = createRandomName()
-
-		if err != nil {
-			return "", err
-		}
-	}
-
+func (c *SslClient) Insert(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -105,23 +85,14 @@ func (c *SslClient) Insert(domains []string) (string, error) {
 		Type: "MANAGED",
 	}
 
-	_, err = c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
+	_, err := c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
 	if err != nil {
-		return "", fmt.Errorf("Failed to insert SslCertificate %v, err: %v", sslCertificate, err)
+		return fmt.Errorf("Failed to insert SslCertificate %v, err: %v", sslCertificate, err)
 	}
 
-	return sslCertificateName, nil
+	return nil
 }
 
 func (c *SslClient) List() (*compute.SslCertificateList, error) {
 	return c.service.SslCertificates.List(c.projectId).Do()
-}
-
-func createRandomName() (string, error) {
-	uid, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("mcert%s", uid.String())[:maxNameLength], nil
 }

@@ -3,14 +3,106 @@ package controller
 import (
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/google/uuid"
+	compute "google.golang.org/api/compute/v0.alpha"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	//mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
 )
 
-func (c *McertController) runWorker() {
-	for c.processNext() {
+const (
+	maxNameLength = 63
+)
+
+func translateDomainStatus(status string) (string, error) {
+	switch status {
+	case "PROVISIONING":
+		return "Provisioning",nil
+	case "FAILED_NOT_VISIBLE":
+		return "FailedNotVisible", nil
+	case "FAILED_CAA_CHECKING":
+		return "FailedCaaChecking", nil
+	case "FAILED_CAA_FORBIDDEN":
+		return "FailedCaaForbidden", nil
+	case "FAILED_RATE_LIMITED":
+		return "FailedRateLimited", nil
+	case "ACTIVE":
+		return "Active", nil
+	default:
+		return "", fmt.Errorf("Unexpected status %v", status)
 	}
+}
+
+func (c *McertController) updateStatus(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) error {
+	switch sslCert.Managed.Status {
+	case "ACTIVE":
+		mcert.Status.CertificateStatus = "Active"
+	case "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED":
+		mcert.Status.CertificateStatus = ""
+	case "PROVISIONING":
+		mcert.Status.CertificateStatus = "Provisioning"
+	case "PROVISIONING_FAILED":
+		mcert.Status.CertificateStatus = "ProvisioningFailed"
+	case "PROVISIONING_FAILED_PERMANENTLY":
+		mcert.Status.CertificateStatus = "ProvisioningFailedPermanently"
+	case "RENEWAL_FAILED":
+		mcert.Status.CertificateStatus = "RenewalFailed"
+	default:
+		return fmt.Errorf("Unexpected status %v of SslCertificate %v", sslCert.Managed.Status, sslCert)
+	}
+
+	var domainStatus []api.DomainStatus
+	for domain, status := range sslCert.Managed.DomainStatus {
+		translatedStatus, err := translateDomainStatus(status)
+		if err != nil {
+			return err
+		}
+
+		domainStatus = append(domainStatus, api.DomainStatus{
+			Domain: domain,
+			Status: translatedStatus,
+		})
+	}
+	mcert.Status.DomainStatus = domainStatus
+
+	_, err := c.client.CloudV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
+	return err
+}
+
+func (c *McertController) handleMcert(key string) error {
+	ns, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	glog.Infof("Handling ManagedCertificate %s.%s", ns, name)
+
+	mcert, err := c.lister.ManagedCertificates(ns).Get(name)
+	if err != nil {
+		return err
+	}
+
+	sslCertificateName, exists := c.state.Get(name)
+	if !exists || sslCertificateName == "" {
+		//State does not have anything for this managed certificate or no SslCertificate is associated with it
+		sslCertificateName, err := c.getRandomName()
+		if err != nil {
+			return err
+		}
+		c.state.Put(name, sslCertificateName)
+	}
+
+	sslCert, err := c.sslClient.Get(sslCertificateName)
+	if err != nil {
+		//SslCertificate is not yet created
+		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
+		if err != nil {
+			return err
+		}
+	}
+
+	c.updateStatus(mcert, sslCert)
+
+	return nil
 }
 
 func (c *McertController) processNext() bool {
@@ -23,22 +115,19 @@ func (c *McertController) processNext() bool {
 	err := func(obj interface{}) error {
 		defer c.queue.Done(obj)
 
-		if key, ok := obj.(string); !ok {
+		var key string
+		var ok bool
+		if key, ok = obj.(string); !ok {
 			c.queue.Forget(obj)
 			return fmt.Errorf("Expected string in mcertQueue but got %#v", obj)
-		} else {
-			ns, name, err := cache.SplitMetaNamespaceKey(key)
-			if err != nil {
-				return err
-			}
-			glog.Infof("Handling ManagedCertificate %s.%s", ns, name)
-
-			_, err = c.lister.ManagedCertificates(ns).Get(name)
-			if err != nil {
-				return err
-			}
 		}
 
+		if err := c.handleMcert(key); err != nil {
+			c.queue.AddRateLimited(obj)
+			return err
+		}
+
+		c.queue.Forget(obj)
 		return nil
 	}(obj)
 
@@ -47,4 +136,36 @@ func (c *McertController) processNext() bool {
 	}
 
 	return true
+}
+
+func (c *McertController) runWorker() {
+	for c.processNext() {
+	}
+}
+
+func createRandomName() (string, error) {
+	uid, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("mcert%s", uid.String())[:maxNameLength], nil
+}
+
+func (c *McertController) getRandomName() (string, error) {
+	name, err := createRandomName()
+	if err != nil {
+		return "", err
+	}
+
+	_, err = c.sslClient.Get(name)
+	if err == nil {
+		//Name taken, choose a new one
+		name, err = createRandomName()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return name, nil
 }

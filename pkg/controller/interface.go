@@ -3,6 +3,7 @@ package controller
 import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"managed-certs-gke/pkg/client/clientset/versioned"
 	mcertlister "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
 	"managed-certs-gke/pkg/ingress"
 	"managed-certs-gke/pkg/sslcertificate"
@@ -27,7 +28,21 @@ func newMcertState() *McertState {
 	}
 }
 
+func (state *McertState) Get(key string) (value string, exists bool) {
+	state.RLock()
+	defer state.RUnlock()
+	value, exists = state.m[key]
+	return
+}
+
+func (state *McertState) Put(key string, value string) {
+	state.Lock()
+	defer state.Unlock()
+	state.m[key] = value
+}
+
 type McertController struct {
+	client *versioned.Clientset
         lister mcertlister.ManagedCertificateLister
         synced cache.InformerSynced
         queue workqueue.RateLimitingInterface
