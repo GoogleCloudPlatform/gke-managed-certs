@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -24,6 +23,7 @@ func NewController(opts *config.ControllerOptions) *Controller {
 			synced: mcertInformer.Informer().HasSynced,
 			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
 			sslClient: opts.SslClient,
+			state: newMcertState(),
 		},
 	}
 
@@ -44,28 +44,34 @@ func NewController(opts *config.ControllerOptions) *Controller {
 
 func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
-	defer c.Ingress.queue.ShutDown()
-	defer c.Mcert.queue.ShutDown()
 
 	glog.Info("Controller.Run()")
 
-	glog.Info("Waiting for managedcertificate cache sync")
-	if !cache.WaitForCacheSync(stopChannel, c.Mcert.synced) {
-		return fmt.Errorf("Timed out waiting for cache sync")
-	}
-	glog.Info("Cache synced")
+	errors := make(chan error)
 
-	go c.Ingress.runWatcher()
+	mcertStopChannel := make(chan struct{})
+	go c.Mcert.Run(mcertStopChannel, errors)
+
+	ingressStopChannel := make(chan struct{})
+	go c.Ingress.Run(ingressStopChannel)
+
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
-	go wait.Until(c.Mcert.runWorker, time.Second, stopChannel)
 
-	go wait.Until(c.Ingress.enqueueAll, 15*time.Minute, stopChannel)
-	go wait.Until(c.Mcert.enqueueAll, 15*time.Minute, stopChannel)
-
-	glog.Info("Waiting for stop signal")
-	<-stopChannel
-	glog.Info("Received stop signal")
+	glog.Info("Waiting for stop signal or error")
+	select{
+		case <-stopChannel:
+			glog.Info("Received stop signal")
+			quit(mcertStopChannel, ingressStopChannel)
+		case err := <-errors:
+			runtime.HandleError(err)
+			quit(mcertStopChannel, ingressStopChannel)
+	}
 
 	glog.Info("Shutting down")
 	return nil
+}
+
+func quit(mcertStopChannel, ingressStopChannel chan<- struct{}) {
+	mcertStopChannel <- struct{}{}
+	ingressStopChannel <- struct{}{}
 }

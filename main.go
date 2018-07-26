@@ -8,12 +8,9 @@ import (
 	"managed-certs-gke/pkg/controller"
 )
 
-const (
-	managedCertificatesVersion = "0.0.1"
-)
-var (
-	cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-)
+const managedCertificatesVersion = "0.0.1"
+
+var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 func main() {
 	glog.V(1).Infof("Managed certificates %s controller starting", managedCertificatesVersion)
