@@ -1,3 +1,6 @@
 FROM golang
-COPY certs-controller /
-ENTRYPOINT /certs-controller
+
+COPY managed-certs-controller /
+COPY run.sh /
+
+CMD /run.sh

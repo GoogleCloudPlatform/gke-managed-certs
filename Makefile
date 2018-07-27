@@ -2,7 +2,7 @@ all: build-binary-in-docker
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
-NAME=certs-controller
+NAME=managed-certs-controller
 DOCKER_IMAGE=${REGISTRY}/${NAME}:${TAG}
 
 # Builds the managed certs controller binary

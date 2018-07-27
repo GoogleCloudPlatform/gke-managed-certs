@@ -12,7 +12,7 @@ for uri in `gcloud alpha compute ssl-certificates list --uri`; do
 done
 
 echo -ne "### Delete ManagedCertificatesController\n"
-kubectl delete -f ${SCRIPT_ROOT}/deploy/certs-controller.yaml --ignore-not-found=true
+kubectl delete -f ${SCRIPT_ROOT}/deploy/managed-certs-controller.yaml --ignore-not-found=true
 
 echo -ne "### Delete CRD\n"
 kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true

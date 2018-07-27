@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: managed-certs-controller
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: managed-certs-controller
+    template:
+        metadata:
+            labels:
+                app: managed-certs-controller
+        spec:
+            serviceAccountName: test-account
+            containers:
+                - name: managed-certs-controller
+                  image: eu.gcr.io/managed-certs-gke/managed-certs-controller:release_ci
+                  imagePullPolicy: Always
+                  volumeMounts:
+                      - name: logfile
+                        mountPath: "/var/log/managed_certs_controller.log"
+                        readOnly: false
+            volumes:
+                - name: logfile
+                  hostPath:
+                      path: "/var/log/managed_certs_controller.log"
+                      type: FileOrCreate
