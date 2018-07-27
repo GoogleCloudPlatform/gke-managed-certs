@@ -1395,6 +1395,11 @@
 			"Rev": "bbe59c0dd4515a61c300651457dbb36c1a4abc51"
 		},
 		{
+			"ImportPath": "k8s.io/apiserver/pkg/util/flag",
+			"Comment": "kubernetes-1.10.0-alpha.3-383-gbbe59c0d",
+			"Rev": "bbe59c0dd4515a61c300651457dbb36c1a4abc51"
+		},
+		{
 			"ImportPath": "k8s.io/apiserver/pkg/util/flushwriter",
 			"Comment": "kubernetes-1.10.0-alpha.3-383-gbbe59c0d",
 			"Rev": "bbe59c0dd4515a61c300651457dbb36c1a4abc51"

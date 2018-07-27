@@ -1,6 +1,9 @@
-FROM golang
+FROM k8s.gcr.io/debian-base-amd64:0.3
 
-COPY managed-certs-controller /
-COPY run.sh /
+ENV DEBIAN_FRONTEND noninteractive
+RUN clean-install ca-certificates
 
-CMD /run.sh
+ADD managed-certs-controller /managed-certs-controller
+ADD run.sh /run.sh
+
+CMD ./run.sh
