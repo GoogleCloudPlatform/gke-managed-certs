@@ -68,9 +68,31 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 		})
 	}
 	mcert.Status.DomainStatus = domainStatus
+	mcert.Status.CertificateName = sslCert.Name
 
 	_, err = c.client.CloudV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
 	return err
+}
+
+func (c *McertController) createSslCertificateIfNecessary(mcert *api.ManagedCertificate) error {
+	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
+	if !exists {
+		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
+	}
+
+	sslCert, err := c.sslClient.Get(sslCertificateName)
+	glog.Infof("Tried to fetch sslCert with name %v, result: %v, err: %v", sslCertificateName, sslCert, err)
+
+	if err != nil {
+		//SslCertificate does not yet exist, create it
+		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, mcert.ObjectMeta.Name)
+		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *McertController) createSslCertificateNameIfNecessary(name string) error {
@@ -84,27 +106,6 @@ func (c *McertController) createSslCertificateNameIfNecessary(name string) error
 
 		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v", sslCertificateName, name)
 		c.state.Put(name, sslCertificateName)
-	}
-
-	return nil
-}
-
-func (c *McertController) createSslCertificateIfNecessary(name string, domains []string) error {
-	sslCertificateName, exists := c.state.Get(name)
-	if !exists {
-		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", name)
-	}
-
-	sslCert, err := c.sslClient.Get(sslCertificateName)
-	glog.Infof("Tried to fetch sslCert with name %v, result: %v, err: %v", sslCertificateName, sslCert, err)
-
-	if err != nil {
-		//SslCertificate does not yet exist, create it
-		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, name)
-		err := c.sslClient.Insert(sslCertificateName, domains)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -127,7 +128,7 @@ func (c *McertController) handleMcert(key string) error {
 		return err
 	}
 
-	err = c.createSslCertificateIfNecessary(name, mcert.Spec.Domains)
+	err = c.createSslCertificateIfNecessary(mcert)
 	if err != nil {
 		return err
 	}
