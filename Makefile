@@ -35,7 +35,10 @@ docker-ci:
 docker-builder:
 	docker build -t ${NAME}-builder builder
 
+# Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
+release: build-binary-in-docker docker
+
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
 release-ci: build-binary-in-docker docker-ci
 
-.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release-ci
+.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release release-ci

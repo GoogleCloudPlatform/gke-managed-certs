@@ -149,6 +149,11 @@ func createRandomName() (string, error) {
 		return "", err
 	}
 
+	glog.Infof("uid: %v", uid)
+	glog.Infof("uid.String(): %v", uid.String())
+	glog.Infof("fmt.Sprintf('mcert%s', uid.String())", fmt.Sprintf("mcert%s", uid.String()))
+	glog.Infof("fmt.Sprintf('mcert%s', uid.String())[:maxNameLength]", fmt.Sprintf("mcert%s", uid.String())[:maxNameLength])
+
 	return fmt.Sprintf("mcert%s", uid.String())[:maxNameLength], nil
 }
 
