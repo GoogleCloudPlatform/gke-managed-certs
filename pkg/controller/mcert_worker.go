@@ -143,18 +143,23 @@ func (c *McertController) runWorker() {
 	}
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
 func createRandomName() (string, error) {
 	uid, err := uuid.NewRandom()
 	if err != nil {
 		return "", err
 	}
 
-	glog.Infof("uid: %v", uid)
-	glog.Infof("uid.String(): %v", uid.String())
-	glog.Infof("fmt.Sprintf('mcert%s', uid.String())", fmt.Sprintf("mcert%s", uid.String()))
-	glog.Infof("fmt.Sprintf('mcert%s', uid.String())[:maxNameLength]", fmt.Sprintf("mcert%s", uid.String())[:maxNameLength])
-
-	return fmt.Sprintf("mcert%s", uid.String())[:maxNameLength], nil
+	generatedName := fmt.Sprintf("mcert%s", uid.String())
+	maxLength := min(len(generatedName), maxNameLength)
+	return generatedName[:maxLength], nil
 }
 
 func (c *McertController) getRandomName() (string, error) {
