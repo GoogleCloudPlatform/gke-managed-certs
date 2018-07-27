@@ -47,12 +47,16 @@ func (c *Controller) runIngressWorker() {
 	}
 }
 
-func parseAnnotation(annotationValue string) []string {
+func parseAnnotation(annotationValue string) (result []string) {
 	if annotationValue == "" {
-		return []string{}
+		return
 	}
 
-	return strings.Split(annotationValue, splitBy)
+	for _, value := range strings.Split(annotationValue, splitBy) {
+		result = append(result, strings.TrimSpace(value))
+	}
+
+	return
 }
 
 func (c *Controller) handleIngress(key string) error {

@@ -88,12 +88,15 @@ func (c *McertController) handleMcert(key string) error {
 		if err != nil {
 			return err
 		}
+
+		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v", sslCertificateName, name)
 		c.state.Put(name, sslCertificateName)
 	}
 
 	sslCert, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
-		//SslCertificate is not yet created
+		//SslCertificate does not yet exist, create it
+		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, name)
 		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
 		if err != nil {
 			return err
