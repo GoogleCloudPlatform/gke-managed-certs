@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"github.com/golang/glog"
+	api "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -27,8 +28,10 @@ func (c *IngressController) runWatcher() {
 	for {
 		select {
 		case event := <-watcher.ResultChan():
-			if event.Type == watch.Added || event.Type == watch.Modified {
-				c.enqueue(event.Object)
+			if ing, ok := event.Object.(*api.Ingress); !ok {
+				runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %v instead, event: %v", event.Object, event))
+			} else if event.Type == watch.Added || event.Type == watch.Modified {
+				c.enqueue(ing)
 			}
 		default:
 		}

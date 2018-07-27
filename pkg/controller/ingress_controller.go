@@ -32,6 +32,6 @@ func (c *IngressController) enqueueAll() {
 	}
 
 	for _, ing := range ingresses.Items {
-		c.enqueue(ing)
+		c.enqueue(&ing)
 	}
 }

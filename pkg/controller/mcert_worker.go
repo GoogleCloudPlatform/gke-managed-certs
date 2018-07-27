@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
-	compute "google.golang.org/api/compute/v0.alpha"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
@@ -33,7 +32,12 @@ func translateDomainStatus(status string) (string, error) {
 	}
 }
 
-func (c *McertController) updateStatus(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) error {
+func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
+	sslCert, err := c.sslClient.Get(mcert.ObjectMeta.Name)
+	if err != nil {
+		return err
+	}
+
 	switch sslCert.Managed.Status {
 	case "ACTIVE":
 		mcert.Status.CertificateStatus = "Active"
@@ -65,8 +69,45 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate, sslCert *c
 	}
 	mcert.Status.DomainStatus = domainStatus
 
-	_, err := c.client.CloudV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
+	_, err = c.client.CloudV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
 	return err
+}
+
+func (c *McertController) createSslCertificateNameIfNecessary(name string) error {
+	sslCertificateName, exists := c.state.Get(name)
+	if !exists || sslCertificateName == "" {
+		//State does not have anything for this managed certificate or no SslCertificate is associated with it
+		sslCertificateName, err := c.getRandomName()
+		if err != nil {
+			return err
+		}
+
+		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v", sslCertificateName, name)
+		c.state.Put(name, sslCertificateName)
+	}
+
+	return nil
+}
+
+func (c *McertController) createSslCertificateIfNecessary(name string, domains []string) error {
+	sslCertificateName, exists := c.state.Get(name)
+	if !exists {
+		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", name)
+	}
+
+	sslCert, err := c.sslClient.Get(sslCertificateName)
+	glog.Infof("Tried to fetch sslCert with name %v, result: %v, err: %v", sslCertificateName, sslCert, err)
+
+	if err != nil {
+		//SslCertificate does not yet exist, create it
+		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, name)
+		err := c.sslClient.Insert(sslCertificateName, domains)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *McertController) handleMcert(key string) error {
@@ -81,31 +122,17 @@ func (c *McertController) handleMcert(key string) error {
 		return err
 	}
 
-	sslCertificateName, exists := c.state.Get(name)
-	if !exists || sslCertificateName == "" {
-		//State does not have anything for this managed certificate or no SslCertificate is associated with it
-		sslCertificateName, err := c.getRandomName()
-		if err != nil {
-			return err
-		}
-
-		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v", sslCertificateName, name)
-		c.state.Put(name, sslCertificateName)
-	}
-
-	sslCert, err := c.sslClient.Get(sslCertificateName)
+	err = c.createSslCertificateNameIfNecessary(name)
 	if err != nil {
-		//SslCertificate does not yet exist, create it
-		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, name)
-		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
-	c.updateStatus(mcert, sslCert)
+	err = c.createSslCertificateIfNecessary(name, mcert.Spec.Domains)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return c.updateStatus(mcert)
 }
 
 func (c *McertController) processNext() bool {
