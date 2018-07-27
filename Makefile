@@ -1,4 +1,4 @@
-all: build-binary-in-docker
+all: build-binary-in-docker test
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
@@ -10,7 +10,7 @@ build-binary: clean deps
 	godep go build -o ${NAME}
 
 # Builds the managed certs controller binary using a docker builder image
-build-binary-in-docker: clean docker-builder test
+build-binary-in-docker: clean docker-builder
 	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make build-binary'
 
 clean:
