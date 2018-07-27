@@ -33,8 +33,20 @@ echo -ne "### Deploy components for e2e tests\n"
 
 echo -ne "### `kubectl get ingress`\n"
 
-echo -ne "### sleep 5 sec\n"
-sleep 5
+echo -ne "### sleep 60 sec\n"
+sleep 60
+
+echo -ne "### all logs\n"
+for p in $(kubectl get pods -o go-template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}'); do kubectl logs $p; done
+
+echo -ne "### list ssl certificates\n"
+gcloud alpha compute ssl-certificates list --uri
+
+echo -ne "sleep 5 minutes\n"
+sleep 300
+
+echo -ne "### all logs\n"
+for p in $(kubectl get pods -o go-template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}'); do kubectl logs $p; done
 
 echo -ne "### list ssl certificates\n"
 gcloud alpha compute ssl-certificates list --uri
