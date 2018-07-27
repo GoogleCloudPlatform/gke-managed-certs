@@ -85,7 +85,7 @@ func (c *McertController) createSslCertificateIfNecessary(mcert *api.ManagedCert
 		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
 	}
 
-	sslCert, err := c.sslClient.Get(sslCertificateName)
+	_, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, mcert.ObjectMeta.Name)
