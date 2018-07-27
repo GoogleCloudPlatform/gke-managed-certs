@@ -33,7 +33,12 @@ func translateDomainStatus(status string) (string, error) {
 }
 
 func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
-	sslCert, err := c.sslClient.Get(mcert.ObjectMeta.Name)
+	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
+	if !exists {
+		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
+	}
+
+	sslCert, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
 		return err
 	}
@@ -81,8 +86,6 @@ func (c *McertController) createSslCertificateIfNecessary(mcert *api.ManagedCert
 	}
 
 	sslCert, err := c.sslClient.Get(sslCertificateName)
-	glog.Infof("Tried to fetch sslCert with name %v, result: %v, err: %v", sslCertificateName, sslCert, err)
-
 	if err != nil {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, mcert.ObjectMeta.Name)
