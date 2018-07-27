@@ -6,6 +6,9 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
+echo -ne "### Deploy RBAC\n"
+kubectl create -f ${SCRIPT_ROOT}/deploy/rbac.yaml
+
 echo -ne "### Deploy CRD\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
 

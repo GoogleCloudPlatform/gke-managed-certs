@@ -12,6 +12,7 @@ spec:
             labels:
                 app: certs-controller
         spec:
+            serviceAccountName: test-account
             containers:
                 - name: certs-controller
                   image: eu.gcr.io/managed-certs-gke/certs-controller:ci_latest
