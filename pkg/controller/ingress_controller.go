@@ -11,7 +11,7 @@ func (c *IngressController) Run(stopChannel <-chan struct{}) {
 	defer c.queue.ShutDown()
 
 	go c.runWatcher()
-	go wait.Until(c.enqueueAll, 15*time.Minute, stopChannel)
+	go wait.Until(c.enqueueAll, 1*time.Minute, stopChannel)
 
 	<-stopChannel
 }

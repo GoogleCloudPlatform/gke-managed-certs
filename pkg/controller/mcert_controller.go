@@ -27,7 +27,7 @@ func (c *McertController) Run(stopChannel <-chan struct{}, errors chan<- error) 
 	}
 
 	go wait.Until(c.runWorker, time.Second, stopChannel)
-	go wait.Until(c.enqueueAll, 15*time.Minute, stopChannel)
+	go wait.Until(c.enqueueAll, 1*time.Minute, stopChannel)
 
 	<-stopChannel
 }
