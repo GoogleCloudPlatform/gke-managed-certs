@@ -1,4 +1,4 @@
-all: build-binary-in-docker
+all: build-binary-in-docker run-test-in-docker
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
@@ -10,7 +10,7 @@ build-binary: clean deps
 	godep go build -o ${NAME}
 
 # Builds the managed certs controller binary using a docker builder image
-build-binary-in-docker: clean docker-builder test
+build-binary-in-docker: docker-builder
 	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make build-binary'
 
 clean:
@@ -36,12 +36,15 @@ docker-builder:
 	docker build -t ${NAME}-builder builder
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
-release: build-binary-in-docker docker
+release: build-binary-in-docker run-test-in-docker docker
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
-release-ci: build-binary-in-docker docker-ci
+release-ci: build-binary-in-docker run-test-in-docker docker-ci
+
+run-test-in-docker: docker-builder
+	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make test'
 
 test:
 	find pkg -name '*_test.go' -exec dirname '{}' \; | sed -e 's/\(.*\)/.\/\1/g' | xargs godep go test
 
-.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release release-ci test
+.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release release-ci run-test-in-docker test
