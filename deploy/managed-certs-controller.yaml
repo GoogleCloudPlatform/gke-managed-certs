@@ -15,7 +15,7 @@ spec:
             serviceAccountName: test-account
             containers:
                 - name: managed-certs-controller
-                  image: eu.gcr.io/managed-certs-gke/managed-certs-controller:dev
+                  image: eu.gcr.io/managed-certs-gke/managed-certs-controller:release_ci
                   imagePullPolicy: Always
                   volumeMounts:
                       - name: ssl-certs
