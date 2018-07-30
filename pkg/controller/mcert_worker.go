@@ -60,7 +60,7 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 		return fmt.Errorf("Unexpected status %v of SslCertificate %v", sslCert.Managed.Status, sslCert)
 	}
 
-	var domainStatus []api.DomainStatus
+	domainStatus := make([]api.DomainStatus, len(sslCert.Managed.DomainStatus))
 	for domain, status := range sslCert.Managed.DomainStatus {
 		translatedStatus, err := translateDomainStatus(status)
 		if err != nil {
