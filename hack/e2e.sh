@@ -31,19 +31,7 @@ echo -ne "### Deploy components for e2e tests\n"
 # Invoke test code
 ###
 
-echo -ne "### `kubectl get ingress`\n"
-
-echo -ne "### sleep 60 sec\n"
-sleep 60
-
-echo -ne "### list ssl certificates\n"
-gcloud alpha compute ssl-certificates list --uri
-
-echo -ne "sleep 5 minutes\n"
-sleep 300
-
-echo -ne "### list ssl certificates\n"
-gcloud alpha compute ssl-certificates list --uri
+./e2e-test.sh && exitcode=$? || exitcode=$?
 
 ###
 # End of test code
@@ -51,3 +39,5 @@ gcloud alpha compute ssl-certificates list --uri
 
 echo -ne "### Delete components created for e2e tests\n"
 ./e2e-down.sh
+
+exit $exitcode
