@@ -28,10 +28,12 @@ func (c *IngressController) runWatcher() {
 	for {
 		select {
 		case event := <-watcher.ResultChan():
-			if ing, ok := event.Object.(*api.Ingress); !ok {
-				runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %v instead, event: %v", event.Object, event))
-			} else if event.Type == watch.Added || event.Type == watch.Modified {
-				c.enqueue(ing)
+			if event.Object != nil {
+				if ing, ok := event.Object.(*api.Ingress); !ok {
+					runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %v instead, event: %v", event.Object, event))
+				} else if event.Type == watch.Added || event.Type == watch.Modified {
+					c.enqueue(ing)
+				}
 			}
 		default:
 		}

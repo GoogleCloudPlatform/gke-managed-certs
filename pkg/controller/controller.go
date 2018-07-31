@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,6 +48,12 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
 
 	glog.Info("Controller.Run()")
+
+	glog.Info("Waiting for managedcertificate cache sync")
+	if !cache.WaitForCacheSync(stopChannel, c.Mcert.synced) {
+		return fmt.Errorf("Timed out waiting for cache sync")
+	}
+	glog.Info("Cache synced")
 
 	errors := make(chan error)
 

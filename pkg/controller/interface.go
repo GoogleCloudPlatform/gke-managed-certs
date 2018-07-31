@@ -28,10 +28,42 @@ func newMcertState() *McertState {
 	}
 }
 
+func (state *McertState) Delete(key string) {
+	state.Lock()
+	defer state.Unlock()
+	delete(state.m, key)
+}
+
 func (state *McertState) Get(key string) (value string, exists bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists = state.m[key]
+	return
+}
+
+func (state *McertState) GetAllManagedCertificates() (values []string) {
+	values = make([]string, 0)
+
+	state.RLock()
+	defer state.RUnlock()
+
+	for _, key := range state.m {
+		values = append(values, key)
+	}
+
+	return
+}
+
+func (state *McertState) GetAllSslCertificates() (values []string) {
+	values = make([]string, 0)
+
+	state.RLock()
+	defer state.RUnlock()
+
+	for _, key := range state.m {
+		values = append(values, state.m[key])
+	}
+
 	return
 }
 

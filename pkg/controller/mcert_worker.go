@@ -38,6 +38,10 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
 	}
 
+	if sslCertificateName == "" {
+		return nil
+	}
+
 	sslCert, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
 		return err
@@ -46,7 +50,7 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	switch sslCert.Managed.Status {
 	case "ACTIVE":
 		mcert.Status.CertificateStatus = "Active"
-	case "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED":
+	case "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED", "":
 		mcert.Status.CertificateStatus = ""
 	case "PROVISIONING":
 		mcert.Status.CertificateStatus = "Provisioning"
@@ -88,7 +92,7 @@ func (c *McertController) createSslCertificateIfNecessary(mcert *api.ManagedCert
 	_, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
 		//SslCertificate does not yet exist, create it
-		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v", sslCertificateName, mcert.ObjectMeta.Name)
+		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v, based on state", sslCertificateName, mcert.ObjectMeta.Name)
 		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
 		if err != nil {
 			return err
@@ -107,7 +111,7 @@ func (c *McertController) createSslCertificateNameIfNecessary(name string) error
 			return err
 		}
 
-		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v", sslCertificateName, name)
+		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v to state", sslCertificateName, name)
 		c.state.Put(name, sslCertificateName)
 	}
 

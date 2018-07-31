@@ -11,7 +11,7 @@ func (c *IngressController) Run(stopChannel <-chan struct{}) {
 	defer c.queue.ShutDown()
 
 	go c.runWatcher()
-	go wait.Until(c.enqueueAll, 1*time.Minute, stopChannel)
+	go wait.Until(c.synchronizeAllIngresses, time.Minute, stopChannel)
 
 	<-stopChannel
 }
@@ -24,7 +24,7 @@ func (c *IngressController) enqueue(obj interface{}) {
 	}
 }
 
-func (c *IngressController) enqueueAll() {
+func (c *IngressController) synchronizeAllIngresses() {
 	ingresses, err := c.client.List()
 	if err != nil {
 		runtime.HandleError(err)
