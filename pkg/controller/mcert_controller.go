@@ -33,6 +33,7 @@ func (c *McertController) initializeState() error {
 	}
 
 	for _, mcert := range mcerts {
+		glog.Infof("Initializing state, map managed certificate %s to ssl certificate %s", mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 		c.state.Put(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 	}
 
