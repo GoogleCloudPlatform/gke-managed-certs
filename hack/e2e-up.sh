@@ -13,7 +13,7 @@ echo -ne "### Deploy CRD\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
 
 echo -ne "### Deploy ManagedCertificatesController\n"
-kubectl create -f ${SCRIPT_ROOT}/deploy/managed-certs-controller.yaml
+kubectl create -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml
 
 echo -ne "### Deploy test1-certificate and test2-certificate ManagedCertificate custom objects\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/test1-certificate.yaml

@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: managed-certs-controller
+    name: managed-certificate-controller
 spec:
     replicas: 1
     selector:
         matchLabels:
-            app: managed-certs-controller
+            app: managed-certificate-controller
     template:
         metadata:
             labels:
-                app: managed-certs-controller
+                app: managed-certificate-controller
         spec:
             serviceAccountName: test-account
             containers:
-                - name: managed-certs-controller
-                  image: eu.gcr.io/managed-certs-gke/managed-certs-controller:release_ci
+                - name: managed-certificate-controller
+                  image: eu.gcr.io/managed-certs-gke/managed-certificate-controller:dev
                   imagePullPolicy: Always
                   volumeMounts:
                       - name: ssl-certs
@@ -25,7 +25,7 @@ spec:
                         mountPath: "/usr/share/ca-certificates"
                         readOnly: true
                       - name: logfile
-                        mountPath: "/var/log/managed_certs_controller.log"
+                        mountPath: "/var/log/managed_certificate_controller.log"
                         readOnly: false
             volumes:
                 - name: ssl-certs
@@ -36,5 +36,5 @@ spec:
                       path: "/usr/share/ca-certificates"
                 - name: logfile
                   hostPath:
-                      path: "/var/log/managed_certs_controller.log"
+                      path: "/var/log/managed_certificate_controller.log"
                       type: FileOrCreate

@@ -7,7 +7,7 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
 echo -ne "### Delete ManagedCertificatesController\n"
-kubectl delete -f ${SCRIPT_ROOT}/deploy/managed-certs-controller.yaml --ignore-not-found=true
+kubectl delete -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml --ignore-not-found=true
 
 echo -ne "### Delete CRD\n"
 kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true

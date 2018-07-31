@@ -1,10 +1,10 @@
 #!/bin/sh
 
 if [ -z "$LOG_OUTPUT" ]; then
-  LOG_OUTPUT="/var/log/managed_certs_controller.log"
+  LOG_OUTPUT="/var/log/managed_certificate_controller.log"
 fi
 
-/managed-certs-controller $@ --alsologtostderr -v 3 1>>$LOG_OUTPUT 2>&1 &
+/managed-certificate-controller $@ --alsologtostderr -v 3 1>>$LOG_OUTPUT 2>&1 &
 pid="$!"
 trap "kill -15 $pid" 15
 
