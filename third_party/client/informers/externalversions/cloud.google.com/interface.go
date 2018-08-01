@@ -19,9 +19,9 @@ limitations under the License.
 package cloud
 
 import (
-	internalinterfaces "managed-certs-gke/pkg/client/informers/externalversions/internalinterfaces"
+	internalinterfaces "managed-certs-gke/third_party/client/informers/externalversions/internalinterfaces"
 
-	v1alpha1 "managed-certs-gke/pkg/client/informers/externalversions/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/third_party/client/informers/externalversions/cloud.google.com/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

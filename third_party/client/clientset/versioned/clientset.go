@@ -22,7 +22,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	cloudv1alpha1 "managed-certs-gke/pkg/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
+	cloudv1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
 )
 
 type Interface interface {

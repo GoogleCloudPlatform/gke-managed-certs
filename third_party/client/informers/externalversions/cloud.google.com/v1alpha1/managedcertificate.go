@@ -19,8 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	versioned "managed-certs-gke/pkg/client/clientset/versioned"
-	internalinterfaces "managed-certs-gke/pkg/client/informers/externalversions/internalinterfaces"
+	versioned "managed-certs-gke/third_party/client/clientset/versioned"
+	internalinterfaces "managed-certs-gke/third_party/client/informers/externalversions/internalinterfaces"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 	cloudgooglecomv1alpha1 "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
-	v1alpha1 "managed-certs-gke/pkg/client/listers/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/third_party/client/listers/cloud.google.com/v1alpha1"
 )
 
 // ManagedCertificateInformer provides access to a shared informer and lister for

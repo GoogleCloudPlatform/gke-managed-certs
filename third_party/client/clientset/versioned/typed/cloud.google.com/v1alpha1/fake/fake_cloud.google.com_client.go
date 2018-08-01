@@ -21,7 +21,7 @@ package fake
 import (
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "managed-certs-gke/pkg/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
 )
 
 type FakeCloudV1alpha1 struct {

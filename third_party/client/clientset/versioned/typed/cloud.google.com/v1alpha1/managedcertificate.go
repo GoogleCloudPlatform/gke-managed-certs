@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	scheme "managed-certs-gke/pkg/client/clientset/versioned/scheme"
+	scheme "managed-certs-gke/third_party/client/clientset/versioned/scheme"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

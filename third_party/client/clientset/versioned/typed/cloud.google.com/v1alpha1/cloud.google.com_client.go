@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"managed-certs-gke/pkg/client/clientset/versioned/scheme"
+	"managed-certs-gke/third_party/client/clientset/versioned/scheme"
 
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"

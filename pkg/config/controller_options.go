@@ -19,10 +19,10 @@ package config
 import (
 	"fmt"
 	"k8s.io/client-go/rest"
-	"managed-certs-gke/pkg/client/clientset/versioned"
-	"managed-certs-gke/pkg/client/informers/externalversions"
 	"managed-certs-gke/pkg/ingress"
 	"managed-certs-gke/pkg/sslcertificate"
+	"managed-certs-gke/third_party/client/clientset/versioned"
+	"managed-certs-gke/third_party/client/informers/externalversions"
 )
 
 type ControllerOptions struct {
