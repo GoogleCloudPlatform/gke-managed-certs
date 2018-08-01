@@ -1,4 +1,4 @@
-all: build-binary-in-docker run-test-in-docker
+all: build-binary-in-docker run-test-in-docker cross
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
