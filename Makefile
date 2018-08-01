@@ -16,6 +16,9 @@ build-binary-in-docker: docker-builder
 clean:
 	rm -f ${NAME}
 
+cross:
+	/google/data/ro/teams/opensource/cross .
+
 deps:
 	go get github.com/tools/godep
 
@@ -47,4 +50,4 @@ run-test-in-docker: docker-builder
 test:
 	find pkg -name '*_test.go' -exec dirname '{}' \; | sed -e 's/\(.*\)/.\/\1/g' | xargs godep go test
 
-.PHONY: all build-binary build-binary-in-docker build-dev clean deps docker docker-builder docker-ci release release-ci run-test-in-docker test
+.PHONY: all build-binary build-binary-in-docker build-dev clean cross deps docker docker-builder docker-ci release release-ci run-test-in-docker test

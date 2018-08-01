@@ -98,18 +98,18 @@ func (c *Controller) handleIngress(key string) error {
 		return nil
 	}
 
-	glog.Infof("Found annotation %s", annotationValue)
+	glog.Infof("Found annotation %s on ingress", annotationValue)
 
 	for _, name := range parseAnnotation(annotationValue) {
 		// Assume the namespace is the same as ingress's
-		glog.Infof("Looking up managed certificate %s in namespace %s", name, ns)
+		glog.Infof("Looking up Managed Certificate %s in namespace %s", name, ns)
 		mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
 
 		if err != nil {
 			// TODO generate k8s event - can't fetch mcert
 			runtime.HandleError(err)
 		} else {
-			glog.Infof("Enqueue managed certificate %s for further processing", name)
+			glog.Infof("Enqueue Managed Certificate %s for further processing", name)
 			c.Mcert.enqueue(mcert)
 		}
 	}

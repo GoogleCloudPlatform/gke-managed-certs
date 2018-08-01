@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	"strings"
 	"time"
 )
 
@@ -48,10 +49,13 @@ func (c *McertController) initializeState() error {
 		return err
 	}
 
-	glog.Infof("Initializing state, managed certificates found: %+v", mcerts)
+	var mcertsString []string
+	for _, mcert := range mcerts {
+		mcertsString = append(mcertsString, fmt.Sprintf("%+v", mcert))
+	}
+	glog.Infof("McertController initializing state, managed certificates found: %+v", strings.Join(mcertsString, ", "))
 
 	for _, mcert := range mcerts {
-		glog.Infof("Initializing state, map managed certificate %s to ssl certificate %s", mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 		c.state.Put(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 	}
 
@@ -83,20 +87,20 @@ func (c *McertController) getAllMcertsInCluster() (result map[string]*api.Manage
 func (c *McertController) deleteObsoleteMcertsFromState(allMcertsInCluster map[string]*api.ManagedCertificate) {
 	allKnownMcerts := c.state.GetAllManagedCertificates()
 
-	glog.Infof("Deleting obsolete managed certificates, managed certificates in state: %+v", allKnownMcerts)
+	glog.Infof("McertController deleting obsolete managed certificates from state, all known in state: %+v", allKnownMcerts)
 
 	for _, knownMcert := range allKnownMcerts {
 		if _, exists := allMcertsInCluster[knownMcert]; !exists {
 			// A managed certificate exists in state, but does not exist as a custom object in cluster, probably was deleted by the user - delete it from the state.
 			c.state.Delete(knownMcert)
-			glog.Infof("Deleted %s managed certificate from state, because such custom object does not exist in the cluster (any more?)", knownMcert)
+			glog.Infof("McertController deleted managed certificate %s from state - not found in cluster", knownMcert)
 		}
 	}
 }
 
 func (c* McertController) deleteObsoleteSslCertificates() error {
 	allKnownSslCerts := c.state.GetAllSslCertificates()
-	glog.Infof("Deleting obsolete SslCertificates, all SslCertificates in state: %+v", allKnownSslCerts)
+	glog.Infof("McertController deleting obsolete SslCertificates from project, all known in state: %+v", allKnownSslCerts)
 
 	allKnownSslCertsSet := make(map[string]bool, len(allKnownSslCerts))
 
@@ -109,12 +113,17 @@ func (c* McertController) deleteObsoleteSslCertificates() error {
 		return err
 	}
 
-	glog.Infof("Deleting obsolete SslCertificates, all SslCertificates in project: %+v", sslCerts)
+	var sslCertsString []string
+	for _, sslCert := range sslCerts.Items {
+		sslCertsString = append(sslCertsString, fmt.Sprintf("%+v", sslCert))
+	}
+
+	glog.Infof("McertController deleting obsolete SslCertificates from project, all existing in project: %+v", sslCertsString)
 
 	for _, sslCert := range sslCerts.Items {
 		if known, exists := allKnownSslCertsSet[sslCert.Name]; !exists || !known {
 			c.sslClient.Delete(sslCert.Name)
-			glog.Infof("Deleted %s SslCertificate resource, because there is no such ssl certificate in state", sslCert.Name)
+			glog.Infof("McertController deleted SslCertificate %s from project - not found in state", sslCert.Name)
 		}
 	}
 
@@ -128,7 +137,7 @@ func (c *McertController) synchronizeAllMcerts() {
 		return
 	}
 
-	glog.Infof("Synchronizing managed certificates, all managed certificates found in cluster: %+v", allMcertsInCluster)
+	glog.Infof("McertController synchronizing managed certificates, all found in cluster: %+v", allMcertsInCluster)
 
 	c.deleteObsoleteMcertsFromState(allMcertsInCluster)
 

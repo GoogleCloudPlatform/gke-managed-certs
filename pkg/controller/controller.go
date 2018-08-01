@@ -65,11 +65,11 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 
 	glog.Info("Controller.Run()")
 
-	glog.Info("Waiting for managedcertificate cache sync")
+	glog.Info("Waiting for Managed Certificate cache sync")
 	if !cache.WaitForCacheSync(stopChannel, c.Mcert.synced) {
-		return fmt.Errorf("Timed out waiting for cache sync")
+		return fmt.Errorf("Timed out waiting for Managed Certificate cache sync")
 	}
-	glog.Info("Cache synced")
+	glog.Info("Managed Certifiate cache synced")
 
 	errors := make(chan error)
 
@@ -81,17 +81,17 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 
-	glog.Info("Waiting for stop signal or error")
+	glog.Info("Controller waiting for stop signal or error")
 	select{
 		case <-stopChannel:
-			glog.Info("Received stop signal")
+			glog.Info("Controller received stop signal")
 			quit(mcertStopChannel, ingressStopChannel)
 		case err := <-errors:
 			runtime.HandleError(err)
 			quit(mcertStopChannel, ingressStopChannel)
 	}
 
-	glog.Info("Shutting down")
+	glog.Info("Controller shutting down")
 	return nil
 }
 

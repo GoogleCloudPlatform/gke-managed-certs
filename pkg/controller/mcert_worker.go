@@ -51,7 +51,7 @@ func translateDomainStatus(status string) (string, error) {
 func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
 	if !exists {
-		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
+		return fmt.Errorf("Failed to find in state a name for SslCertificate associated with Managed Certificate %v", mcert.ObjectMeta.Name)
 	}
 
 	if sslCertificateName == "" {
@@ -102,13 +102,13 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 func (c *McertController) createSslCertificateIfNecessary(mcert *api.ManagedCertificate) error {
 	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
 	if !exists {
-		return fmt.Errorf("There should be a name for SslCertificate associated with ManagedCertificate %v, but it is missing", mcert.ObjectMeta.Name)
+		return fmt.Errorf("Failed to find in state a name for SslCertificate associated with Managed Certificate %v", mcert.ObjectMeta.Name)
 	}
 
 	_, err := c.sslClient.Get(sslCertificateName)
 	if err != nil {
 		//SslCertificate does not yet exist, create it
-		glog.Infof("Create a new SslCertificate %v associated with ManagedCertificate %v, based on state", sslCertificateName, mcert.ObjectMeta.Name)
+		glog.Infof("McertController creates a new SslCertificate %v associated with Managed Certificate %v, based on state", sslCertificateName, mcert.ObjectMeta.Name)
 		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func (c *McertController) createSslCertificateNameIfNecessary(name string) error
 			return err
 		}
 
-		glog.Infof("Add new SslCertificate name %v associated with ManagedCertificate %v to state", sslCertificateName, name)
+		glog.Infof("McertController adds to state new SslCertificate name %v associated with Managed Certificate %v", sslCertificateName, name)
 		c.state.Put(name, sslCertificateName)
 	}
 
@@ -139,7 +139,7 @@ func (c *McertController) handleMcert(key string) error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("Handling ManagedCertificate %s.%s", ns, name)
+	glog.Infof("McertController handling Managed Certificate %s.%s", ns, name)
 
 	mcert, err := c.lister.ManagedCertificates(ns).Get(name)
 	if err != nil {
