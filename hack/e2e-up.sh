@@ -26,7 +26,7 @@ kubectl create -f ${SCRIPT_ROOT}/deploy/rbac.yaml
 echo -ne "### Deploy CRD\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
 
-echo -ne "### Deploy ManagedCertificatesController\n"
+echo -ne "### Deploy managed-certificate-controller\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml
 
 echo -ne "### Deploy test1-certificate and test2-certificate ManagedCertificate custom objects\n"
