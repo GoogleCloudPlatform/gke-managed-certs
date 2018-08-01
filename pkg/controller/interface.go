@@ -54,6 +54,7 @@ func (state *McertState) Get(key string) (value string, exists bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists = state.m[key]
+
 	return
 }
 
@@ -63,7 +64,7 @@ func (state *McertState) GetAllManagedCertificates() (values []string) {
 	state.RLock()
 	defer state.RUnlock()
 
-	for _, key := range state.m {
+	for key := range state.m {
 		values = append(values, key)
 	}
 
@@ -76,14 +77,14 @@ func (state *McertState) GetAllSslCertificates() (values []string) {
 	state.RLock()
 	defer state.RUnlock()
 
-	for _, key := range state.m {
-		values = append(values, state.m[key])
+	for _, value := range state.m {
+		values = append(values, value)
 	}
 
 	return
 }
 
-func (state *McertState) Put(key string, value string) {
+func (state *McertState) Put(key, value string) {
 	state.Lock()
 	defer state.Unlock()
 	state.m[key] = value

@@ -32,7 +32,7 @@ func (c *McertController) Run(stopChannel <-chan struct{}, errors chan<- error) 
 
 	err := c.initializeState()
 	if err != nil {
-		errors <- fmt.Errorf("Cnuld not intialize state: %v", err)
+		errors <- fmt.Errorf("Could not intialize state: %v", err)
 		return
 	}
 
@@ -47,6 +47,8 @@ func (c *McertController) initializeState() error {
 	if err != nil {
 		return err
 	}
+
+	glog.Infof("Initializing state, managed certificates found: %+v", mcerts)
 
 	for _, mcert := range mcerts {
 		glog.Infof("Initializing state, map managed certificate %s to ssl certificate %s", mcert.ObjectMeta.Name, mcert.Status.CertificateName)
@@ -80,6 +82,9 @@ func (c *McertController) getAllMcertsInCluster() (result map[string]*api.Manage
 
 func (c *McertController) deleteObsoleteMcertsFromState(allMcertsInCluster map[string]*api.ManagedCertificate) {
 	allKnownMcerts := c.state.GetAllManagedCertificates()
+
+	glog.Infof("Deleting obsolete managed certificates, managed certificates in state: %+v", allKnownMcerts)
+
 	for _, knownMcert := range allKnownMcerts {
 		if _, exists := allMcertsInCluster[knownMcert]; !exists {
 			// A managed certificate exists in state, but does not exist as a custom object in cluster, probably was deleted by the user - delete it from the state.
@@ -91,6 +96,8 @@ func (c *McertController) deleteObsoleteMcertsFromState(allMcertsInCluster map[s
 
 func (c* McertController) deleteObsoleteSslCertificates() error {
 	allKnownSslCerts := c.state.GetAllSslCertificates()
+	glog.Infof("Deleting obsolete SslCertificates, all SslCertificates in state: %+v", allKnownSslCerts)
+
 	allKnownSslCertsSet := make(map[string]bool, len(allKnownSslCerts))
 
 	for _, knownSslCert := range allKnownSslCerts {
@@ -101,6 +108,8 @@ func (c* McertController) deleteObsoleteSslCertificates() error {
 	if err != nil {
 		return err
 	}
+
+	glog.Infof("Deleting obsolete SslCertificates, all SslCertificates in project: %+v", sslCerts)
 
 	for _, sslCert := range sslCerts.Items {
 		if known, exists := allKnownSslCertsSet[sslCert.Name]; !exists || !known {
@@ -118,6 +127,8 @@ func (c *McertController) synchronizeAllMcerts() {
 		runtime.HandleError(err)
 		return
 	}
+
+	glog.Infof("Synchronizing managed certificates, all managed certificates found in cluster: %+v", allMcertsInCluster)
 
 	c.deleteObsoleteMcertsFromState(allMcertsInCluster)
 
