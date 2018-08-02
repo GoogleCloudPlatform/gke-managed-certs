@@ -19,14 +19,10 @@ package controller
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
-)
-
-const (
-	maxNameLength = 63
+	"managed-certs-gke/pkg/utils"
 )
 
 func translateDomainStatus(status string) (string, error) {
@@ -122,7 +118,7 @@ func (c *McertController) createSslCertificateNameIfNecessary(name string) error
 	sslCertificateName, exists := c.state.Get(name)
 	if !exists || sslCertificateName == "" {
 		//State does not have anything for this managed certificate or no SslCertificate is associated with it
-		sslCertificateName, err := c.getRandomName()
+		sslCertificateName, err := c.randomName()
 		if err != nil {
 			return err
 		}
@@ -197,27 +193,8 @@ func (c *McertController) runWorker() {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
-func createRandomName() (string, error) {
-	uid, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-
-	generatedName := fmt.Sprintf("mcert%s", uid.String())
-	maxLength := min(len(generatedName), maxNameLength)
-	return generatedName[:maxLength], nil
-}
-
-func (c *McertController) getRandomName() (string, error) {
-	name, err := createRandomName()
+func (c *McertController) randomName() (string, error) {
+	name, err := utils.RandomName()
 	if err != nil {
 		return "", err
 	}
@@ -225,7 +202,7 @@ func (c *McertController) getRandomName() (string, error) {
 	_, err = c.sslClient.Get(name)
 	if err == nil {
 		//Name taken, choose a new one
-		name, err = createRandomName()
+		name, err = utils.RandomName()
 		if err != nil {
 			return "", err
 		}

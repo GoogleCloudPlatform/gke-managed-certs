@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package utils
 
 import (
 	"testing"
 )
 
-func TestCreateRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.T) {
-	name, err := createRandomName()
+func TestRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.T) {
+	name, err := RandomName()
 
 	if err != nil {
 		t.Errorf("Failed to create random name: %v", err)
@@ -32,14 +32,14 @@ func TestCreateRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.
 	}
 }
 
-func TestCreateRandomName_calledTwiceReturnsDifferentNames(t *testing.T) {
-	name1, err := createRandomName()
+func TestRandomName_calledTwiceReturnsDifferentNames(t *testing.T) {
+	name1, err := RandomName()
 
 	if err != nil {
 		t.Errorf("Failed to create random name1: %v", err)
 	}
 
-	name2, err := createRandomName()
+	name2, err := RandomName()
 	if err != nil {
 		t.Errorf("Failed to create random name2 %v", err)
 	}
