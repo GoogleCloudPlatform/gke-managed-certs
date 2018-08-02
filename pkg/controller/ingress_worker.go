@@ -23,15 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"strings"
+	"managed-certs-gke/pkg/utils"
 	"time"
 )
-
-const (
-	annotation = "cloud.google.com/managed-certificates"
-	splitBy = ","
-)
-
 
 func (c *IngressController) runWatcher() {
 	watcher, err := c.client.Watch()
@@ -68,18 +62,6 @@ func (c *Controller) runIngressWorker() {
 	}
 }
 
-func parseAnnotation(annotationValue string) (result []string) {
-	if annotationValue == "" {
-		return
-	}
-
-	for _, value := range strings.Split(annotationValue, splitBy) {
-		result = append(result, strings.TrimSpace(value))
-	}
-
-	return
-}
-
 func (c *Controller) handleIngress(key string) error {
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -92,15 +74,13 @@ func (c *Controller) handleIngress(key string) error {
 		return err
 	}
 
-	annotationValue, present := ing.ObjectMeta.Annotations[annotation]
+	mcertNames, present := utils.ParseAnnotation(ing)
 	if !present {
 		// There is no annotation on this ingress
 		return nil
 	}
 
-	glog.Infof("Found annotation %s on ingress", annotationValue)
-
-	for _, name := range parseAnnotation(annotationValue) {
+	for _, name := range mcertNames {
 		// Assume the namespace is the same as ingress's
 		glog.Infof("Looking up Managed Certificate %s in namespace %s", name, ns)
 		mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)

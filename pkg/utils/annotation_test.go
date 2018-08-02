@@ -14,14 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package utils
 
 import (
+	api "k8s.io/api/extensions/v1beta1"
+        "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
 
+func newIngress(annotationValue string) *api.Ingress {
+	return &api.Ingress {
+		ObjectMeta: v1.ObjectMeta {
+			Annotations: map[string]string{annotation: annotationValue},
+		},
+	}
+}
+
+func TestParseAnnotation_annotationMissing(t *testing.T) {
+	_, exists := ParseAnnotation(&api.Ingress{})
+
+	if exists {
+		t.Errorf("Empty ingress should not have annotation")
+	}
+}
+
 func TestParseAnnotation_empty(t *testing.T) {
-	names := parseAnnotation("")
+	names, exists := ParseAnnotation(newIngress(""))
+
+	if !exists {
+		t.Errorf("Annotation should be present")
+	}
 
 	if len(names) != 0 {
 		t.Errorf("Empty value annotation \"\" should be parsed into empty array, is instead: %v.", names)
@@ -29,7 +51,11 @@ func TestParseAnnotation_empty(t *testing.T) {
 }
 
 func TestParseAnnotation_oneElement(t *testing.T) {
-	names := parseAnnotation("xyz")
+	names, exists := ParseAnnotation(newIngress("xyz"))
+
+	if !exists {
+		t.Errorf("Annotation should be present")
+	}
 
 	if len(names) != 1 || names[0] != "xyz" {
 		t.Errorf("One element annotation \"xyz\" should be parsed into one element array with value xyz, is instead: %v.", names)
@@ -37,7 +63,11 @@ func TestParseAnnotation_oneElement(t *testing.T) {
 }
 
 func TestParseAnnotation_oneElementWithWhitespace(t *testing.T) {
-	names := parseAnnotation(" xyz ")
+	names, exists := ParseAnnotation(newIngress(" xyz "))
+
+	if !exists {
+		t.Errorf("Annotation should be present")
+	}
 
 	if len(names) != 1 || names[0] != "xyz" {
 		t.Errorf("One element annotation with whitespace \" xyz \" should be parsed into one element array with value xyz, is instead: %v.", names)
@@ -45,7 +75,11 @@ func TestParseAnnotation_oneElementWithWhitespace(t *testing.T) {
 }
 
 func TestParseAnnotation_multiElement(t *testing.T) {
-	names := parseAnnotation("xyz,abc")
+	names, exists := ParseAnnotation(newIngress("xyz,abc"))
+
+	if !exists {
+		t.Errorf("Annotation should be present")
+	}
 
 	if len(names) != 2 || names[0] != "xyz" || names[1] != "abc" {
 		t.Errorf("Multi element annotation \"xyz,abc\" should be parsed into two element array with values xyz, abc, is instead: %v.", names)
@@ -53,7 +87,11 @@ func TestParseAnnotation_multiElement(t *testing.T) {
 }
 
 func TestParseAnnotation_multiElementWithWhitespace(t *testing.T) {
-	names := parseAnnotation(" xyz, abc ")
+	names, exists := ParseAnnotation(newIngress(" xyz, abc "))
+
+	if !exists {
+		t.Errorf("Annotation should be present")
+	}
 
 	if len(names) != 2 || names[0] != "xyz" || names[1] != "abc" {
 		t.Errorf("Multi element annotation with whitespace \" xyz , abc \" should be parsed into two element array with values xyz, abc, is instead: %v.", names)
