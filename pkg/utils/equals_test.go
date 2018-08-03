@@ -54,6 +54,10 @@ func TestEquals_differentLengths(t *testing.T) {
 	if Equals(mcert, sslCert) {
 		t.Errorf("Objects of different length should not be equal")
 	}
+
+	if len(mcert.Spec.Domains) != 1 || mcert.Spec.Domains[0] != "abc" || len(sslCert.Managed.Domains) != 0 {
+		t.Errorf("Equals modified passed objects")
+	}
 }
 
 func TestEquals_differentOrder(t *testing.T) {
@@ -62,5 +66,9 @@ func TestEquals_differentOrder(t *testing.T) {
 
 	if !Equals(mcert, sslCert) {
 		t.Errorf("Objects of different order should be equal")
+	}
+
+	if len(mcert.Spec.Domains) != 2 || mcert.Spec.Domains[0] != "abc" || mcert.Spec.Domains[1] != "def" || len(sslCert.Managed.Domains) != 2 || sslCert.Managed.Domains[0] != "def" || sslCert.Managed.Domains[1] != "abc" {
+		t.Errorf("Equals modified passed objects")
 	}
 }

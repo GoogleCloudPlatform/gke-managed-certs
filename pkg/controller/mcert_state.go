@@ -20,16 +20,22 @@ import (
 	"sync"
 )
 
+// SslCertificateState contains: Current, the name of associated SslCertificate and New, the name of a new SslCertificate if update is in progress
+type SslCertificateState struct {
+	Current string
+	New string
+}
+
 type McertState struct {
 	sync.RWMutex
 
-	// Maps ManagedCertificate name to SslCertificate name
-	m map[string]string
+	// Maps Managed Certificate name to SslCertificateState
+	m map[string]SslCertificateState
 }
 
 func newMcertState() *McertState {
 	return &McertState{
-		m: make(map[string]string),
+		m: make(map[string]SslCertificateState),
 	}
 }
 
@@ -39,12 +45,11 @@ func (state *McertState) Delete(key string) {
 	delete(state.m, key)
 }
 
-func (state *McertState) Get(key string) (value string, exists bool) {
+func (state *McertState) Get(key string) (SslCertificateState, bool) {
 	state.RLock()
 	defer state.RUnlock()
-	value, exists = state.m[key]
-
-	return
+	value, exists := state.m[key]
+	return value, exists
 }
 
 func (state *McertState) GetAllManagedCertificates() (values []string) {
@@ -67,14 +72,28 @@ func (state *McertState) GetAllSslCertificates() (values []string) {
 	defer state.RUnlock()
 
 	for _, value := range state.m {
-		values = append(values, value)
+		values = append(values, value.Current)
+
+		if value.New != "" {
+			values = append(values, value.New)
+		}
 	}
 
 	return
 }
 
-func (state *McertState) Put(key, value string) {
+func (state *McertState) PutCurrent(key, value string) {
 	state.Lock()
 	defer state.Unlock()
-	state.m[key] = value
+
+	state.m[key] = SslCertificateState{
+		Current: value,
+		New: "",
+	}
+}
+
+func (state *McertState) PutState(key string, sslState SslCertificateState) {
+	state.Lock()
+	defer state.Unlock()
+	state.m[key] = sslState
 }

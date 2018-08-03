@@ -28,11 +28,11 @@ func Equals(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) bool
 	}
 
 	mDomains := make([]string, len(mcert.Spec.Domains))
-	copy(mcert.Spec.Domains, mDomains)
+	copy(mDomains, mcert.Spec.Domains)
 	sort.Strings(mDomains)
 
 	sDomains := make([]string, len(sslCert.Managed.Domains))
-	copy(sslCert.Managed.Domains, sDomains)
+	copy(sDomains, sslCert.Managed.Domains)
 	sort.Strings(sDomains)
 
 	for i, v := range mDomains {

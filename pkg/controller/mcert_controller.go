@@ -49,14 +49,14 @@ func (c *McertController) initializeState() error {
 		return err
 	}
 
-	var mcertsString []string
+	var mcertsNames []string
 	for _, mcert := range mcerts {
-		mcertsString = append(mcertsString, fmt.Sprintf("%+v", mcert))
+		mcertsNames = append(mcertsNames, mcert.ObjectMeta.Name)
 	}
-	glog.Infof("McertController initializing state, managed certificates found: %+v", strings.Join(mcertsString, ", "))
+	glog.Infof("McertController initializing state, managed certificates found: %+v", strings.Join(mcertsNames, ", "))
 
 	for _, mcert := range mcerts {
-		c.state.Put(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
+		c.state.PutCurrent(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 	}
 
 	return nil
@@ -115,7 +115,7 @@ func (c* McertController) deleteObsoleteSslCertificates() error {
 
 	var sslCertsString []string
 	for _, sslCert := range sslCerts.Items {
-		sslCertsString = append(sslCertsString, fmt.Sprintf("%+v", sslCert))
+		sslCertsString = append(sslCertsString, sslCert.Name)
 	}
 
 	glog.Infof("McertController deleting obsolete SslCertificates from project, all existing in project: %+v", sslCertsString)
@@ -137,7 +137,11 @@ func (c *McertController) synchronizeAllMcerts() {
 		return
 	}
 
-	glog.Infof("McertController synchronizing managed certificates, all found in cluster: %+v", allMcertsInCluster)
+	var mcerts []string
+	for mcertName := range allMcertsInCluster {
+		mcerts = append(mcerts, mcertName)
+	}
+	glog.Infof("McertController synchronizing managed certificates, all found in cluster: %+v", mcerts)
 
 	c.deleteObsoleteMcertsFromState(allMcertsInCluster)
 
