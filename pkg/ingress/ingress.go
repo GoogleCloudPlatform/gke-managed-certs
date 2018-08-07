@@ -58,6 +58,12 @@ func (c *Interface) List() (result *api.IngressList, err error) {
 	return
 }
 
+func (c *Interface) Update(ingress *api.Ingress) (result *api.Ingress, err error) {
+	result = &api.Ingress{}
+	err = c.client.Put().Namespace(ingress.ObjectMeta.Namespace).Resource(resource).Name(ingress.Name).Body(ingress).Do().Into(result)
+	return
+}
+
 func (c *Interface) Watch() (watch.Interface, error) {
 	opts := &v1.ListOptions{Watch: true}
 	return c.client.Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()

@@ -12,14 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-apiVersion: extensions/v1beta1
-kind: Ingress
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: test-ingress
-  annotations:
-    kubernetes.io/ingress.global-static-ip-name: test-ip-address
-    cloud.google.com/managed-certificates: test1-certificate,test2-certificate
+  name: http-hello
 spec:
-  backend:
-    serviceName: http-hello
-    servicePort: 8080
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-hello
+  template:
+    metadata:
+      labels:
+        app: http-hello
+    spec:
+      containers:
+        - name: http-hello
+          image: eu.gcr.io/krzyk-205712/http-hello:v1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-hello
+  labels:
+    app: http-hello
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+  selector:
+    app: http-hello

@@ -33,5 +33,8 @@ echo -ne "### Deploy test1-certificate and test2-certificate ManagedCertificate 
 kubectl create -f ${SCRIPT_ROOT}/deploy/test1-certificate.yaml
 kubectl create -f ${SCRIPT_ROOT}/deploy/test2-certificate.yaml
 
+echo -ne "### Deploy http-hello service\n"
+kubectl create -f ${SCRIPT_ROOT}/deploy/http-hello.yaml
+
 echo -ne "### Deploy ingress\n"
 kubectl create -f ${SCRIPT_ROOT}/deploy/ingress.yaml

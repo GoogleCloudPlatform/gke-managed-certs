@@ -29,6 +29,9 @@ kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-no
 echo -ne "### Delete ingress\n"
 kubectl delete -f ${SCRIPT_ROOT}/deploy/ingress.yaml --ignore-not-found=true
 
+echo -ne "### Delete http-hello service\n"
+kubectl delete -f ${SCRIPT_ROOT}/deploy/http-hello.yaml --ignore-not-found=true
+
 echo -ne "### Remove RBAC\n"
 kubectl delete -f ${SCRIPT_ROOT}/deploy/rbac.yaml --ignore-not-found=true
 
