@@ -18,7 +18,7 @@ package utils
 
 import (
 	compute "google.golang.org/api/compute/v0.alpha"
-	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 	"sort"
 )
 

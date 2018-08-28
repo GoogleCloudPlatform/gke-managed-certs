@@ -25,18 +25,18 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
 // FakeManagedCertificates implements ManagedCertificateInterface
 type FakeManagedCertificates struct {
-	Fake *FakeCloudV1alpha1
+	Fake *FakeAlphaV1alpha1
 	ns   string
 }
 
-var managedcertificatesResource = schema.GroupVersionResource{Group: "cloud.google.com", Version: "v1alpha1", Resource: "managedcertificates"}
+var managedcertificatesResource = schema.GroupVersionResource{Group: "alpha.cloud.google.com", Version: "v1alpha1", Resource: "managedcertificates"}
 
-var managedcertificatesKind = schema.GroupVersionKind{Group: "cloud.google.com", Version: "v1alpha1", Kind: "ManagedCertificate"}
+var managedcertificatesKind = schema.GroupVersionKind{Group: "alpha.cloud.google.com", Version: "v1alpha1", Kind: "ManagedCertificate"}
 
 // Get takes name of the managedCertificate, and returns the corresponding managedCertificate object, and an error if there is any.
 func (c *FakeManagedCertificates) Get(name string, options v1.GetOptions) (result *v1alpha1.ManagedCertificate, err error) {

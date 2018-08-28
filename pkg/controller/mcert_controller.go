@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	api "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 	"strings"
 	"time"
 )

@@ -28,7 +28,7 @@ import (
 )
 
 func NewController(opts *config.ControllerOptions) *Controller {
-	mcertInformer := opts.McertInformerFactory.Cloud().V1alpha1().ManagedCertificates()
+	mcertInformer := opts.McertInformerFactory.Alpha().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
 		Ingress: IngressController{

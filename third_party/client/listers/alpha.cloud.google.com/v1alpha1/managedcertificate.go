@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1alpha1 "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
 // ManagedCertificateLister helps list ManagedCertificates.

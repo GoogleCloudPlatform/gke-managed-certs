@@ -22,7 +22,7 @@ import (
 	"managed-certs-gke/pkg/ingress"
 	"managed-certs-gke/pkg/sslcertificate"
 	"managed-certs-gke/third_party/client/clientset/versioned"
-	mcertlister "managed-certs-gke/third_party/client/listers/cloud.google.com/v1alpha1"
+	mcertlister "managed-certs-gke/third_party/client/listers/alpha.cloud.google.com/v1alpha1"
 )
 
 type IngressController struct {

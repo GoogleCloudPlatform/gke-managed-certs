@@ -22,32 +22,32 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	cloudv1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
+	alphav1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/alpha.cloud.google.com/v1alpha1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	CloudV1alpha1() cloudv1alpha1.CloudV1alpha1Interface
+	AlphaV1alpha1() alphav1alpha1.AlphaV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Cloud() cloudv1alpha1.CloudV1alpha1Interface
+	Alpha() alphav1alpha1.AlphaV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	cloudV1alpha1 *cloudv1alpha1.CloudV1alpha1Client
+	alphaV1alpha1 *alphav1alpha1.AlphaV1alpha1Client
 }
 
-// CloudV1alpha1 retrieves the CloudV1alpha1Client
-func (c *Clientset) CloudV1alpha1() cloudv1alpha1.CloudV1alpha1Interface {
-	return c.cloudV1alpha1
+// AlphaV1alpha1 retrieves the AlphaV1alpha1Client
+func (c *Clientset) AlphaV1alpha1() alphav1alpha1.AlphaV1alpha1Interface {
+	return c.alphaV1alpha1
 }
 
-// Deprecated: Cloud retrieves the default version of CloudClient.
+// Deprecated: Alpha retrieves the default version of AlphaClient.
 // Please explicitly pick a version.
-func (c *Clientset) Cloud() cloudv1alpha1.CloudV1alpha1Interface {
-	return c.cloudV1alpha1
+func (c *Clientset) Alpha() alphav1alpha1.AlphaV1alpha1Interface {
+	return c.alphaV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -66,7 +66,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.cloudV1alpha1, err = cloudv1alpha1.NewForConfig(&configShallowCopy)
+	cs.alphaV1alpha1, err = alphav1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.cloudV1alpha1 = cloudv1alpha1.NewForConfigOrDie(c)
+	cs.alphaV1alpha1 = alphav1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -91,7 +91,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.cloudV1alpha1 = cloudv1alpha1.New(c)
+	cs.alphaV1alpha1 = alphav1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

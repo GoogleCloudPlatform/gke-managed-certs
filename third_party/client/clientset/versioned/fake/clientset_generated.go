@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	cloudv1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/cloud.google.com/v1alpha1"
-	fakecloudv1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/cloud.google.com/v1alpha1/fake"
+	alphav1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/alpha.cloud.google.com/v1alpha1"
+	fakealphav1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/alpha.cloud.google.com/v1alpha1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -72,12 +72,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// CloudV1alpha1 retrieves the CloudV1alpha1Client
-func (c *Clientset) CloudV1alpha1() cloudv1alpha1.CloudV1alpha1Interface {
-	return &fakecloudv1alpha1.FakeCloudV1alpha1{Fake: &c.Fake}
+// AlphaV1alpha1 retrieves the AlphaV1alpha1Client
+func (c *Clientset) AlphaV1alpha1() alphav1alpha1.AlphaV1alpha1Interface {
+	return &fakealphav1alpha1.FakeAlphaV1alpha1{Fake: &c.Fake}
 }
 
-// Cloud retrieves the CloudV1alpha1Client
-func (c *Clientset) Cloud() cloudv1alpha1.CloudV1alpha1Interface {
-	return &fakecloudv1alpha1.FakeCloudV1alpha1{Fake: &c.Fake}
+// Alpha retrieves the AlphaV1alpha1Client
+func (c *Clientset) Alpha() alphav1alpha1.AlphaV1alpha1Interface {
+	return &fakealphav1alpha1.FakeAlphaV1alpha1{Fake: &c.Fake}
 }

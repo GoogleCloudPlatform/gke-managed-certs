@@ -29,7 +29,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	cloudgooglecom "managed-certs-gke/third_party/client/informers/externalversions/cloud.google.com"
+	alphacloudgooglecom "managed-certs-gke/third_party/client/informers/externalversions/alpha.cloud.google.com"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Cloud() cloudgooglecom.Interface
+	Alpha() alphacloudgooglecom.Interface
 }
 
-func (f *sharedInformerFactory) Cloud() cloudgooglecom.Interface {
-	return cloudgooglecom.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Alpha() alphacloudgooglecom.Interface {
+	return alphacloudgooglecom.New(f, f.namespace, f.tweakListOptions)
 }

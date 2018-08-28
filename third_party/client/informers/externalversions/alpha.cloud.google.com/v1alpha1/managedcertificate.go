@@ -27,8 +27,8 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	cloudgooglecomv1alpha1 "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
-	v1alpha1 "managed-certs-gke/third_party/client/listers/cloud.google.com/v1alpha1"
+	alphacloudgooglecomv1alpha1 "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/third_party/client/listers/alpha.cloud.google.com/v1alpha1"
 )
 
 // ManagedCertificateInformer provides access to a shared informer and lister for
@@ -61,16 +61,16 @@ func NewFilteredManagedCertificateInformer(client versioned.Interface, namespace
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CloudV1alpha1().ManagedCertificates(namespace).List(options)
+				return client.AlphaV1alpha1().ManagedCertificates(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CloudV1alpha1().ManagedCertificates(namespace).Watch(options)
+				return client.AlphaV1alpha1().ManagedCertificates(namespace).Watch(options)
 			},
 		},
-		&cloudgooglecomv1alpha1.ManagedCertificate{},
+		&alphacloudgooglecomv1alpha1.ManagedCertificate{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *managedCertificateInformer) defaultInformer(client versioned.Interface,
 }
 
 func (f *managedCertificateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&cloudgooglecomv1alpha1.ManagedCertificate{}, f.defaultInformer)
+	return f.factory.InformerFor(&alphacloudgooglecomv1alpha1.ManagedCertificate{}, f.defaultInformer)
 }
 
 func (f *managedCertificateInformer) Lister() v1alpha1.ManagedCertificateLister {

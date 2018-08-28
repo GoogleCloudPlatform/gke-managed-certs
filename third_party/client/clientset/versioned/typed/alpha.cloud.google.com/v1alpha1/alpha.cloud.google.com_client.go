@@ -23,25 +23,25 @@ import (
 
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "managed-certs-gke/pkg/apis/cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
-type CloudV1alpha1Interface interface {
+type AlphaV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ManagedCertificatesGetter
 }
 
-// CloudV1alpha1Client is used to interact with features provided by the cloud.google.com group.
-type CloudV1alpha1Client struct {
+// AlphaV1alpha1Client is used to interact with features provided by the alpha.cloud.google.com group.
+type AlphaV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *CloudV1alpha1Client) ManagedCertificates(namespace string) ManagedCertificateInterface {
+func (c *AlphaV1alpha1Client) ManagedCertificates(namespace string) ManagedCertificateInterface {
 	return newManagedCertificates(c, namespace)
 }
 
-// NewForConfig creates a new CloudV1alpha1Client for the given config.
-func NewForConfig(c *rest.Config) (*CloudV1alpha1Client, error) {
+// NewForConfig creates a new AlphaV1alpha1Client for the given config.
+func NewForConfig(c *rest.Config) (*AlphaV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -50,12 +50,12 @@ func NewForConfig(c *rest.Config) (*CloudV1alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CloudV1alpha1Client{client}, nil
+	return &AlphaV1alpha1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new CloudV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new AlphaV1alpha1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *CloudV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *AlphaV1alpha1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -63,9 +63,9 @@ func NewForConfigOrDie(c *rest.Config) *CloudV1alpha1Client {
 	return client
 }
 
-// New creates a new CloudV1alpha1Client for the given RESTClient.
-func New(c rest.Interface) *CloudV1alpha1Client {
-	return &CloudV1alpha1Client{c}
+// New creates a new AlphaV1alpha1Client for the given RESTClient.
+func New(c rest.Interface) *AlphaV1alpha1Client {
+	return &AlphaV1alpha1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
@@ -83,7 +83,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CloudV1alpha1Client) RESTClient() rest.Interface {
+func (c *AlphaV1alpha1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
