@@ -38,7 +38,7 @@ kubectl delete -f ${SCRIPT_ROOT}/deploy/rbac.yaml --ignore-not-found=true
 echo -ne "### Remove all existing SslCertificate objects\n"
 SLEEP=1
 for i in `seq 10`; do
-  SSL_CERTIFICATES=($(gcloud alpha compute ssl-certificates list --uri))
+  SSL_CERTIFICATES=($(gcloud compute ssl-certificates list --uri))
   sleep $SLEEP
 
   if [ ${#SSL_CERTIFICATES[@]} -eq 0 ];
@@ -47,7 +47,7 @@ for i in `seq 10`; do
   fi
 
   for uri in ${SSL_CERTIFICATES}; do
-    echo y | gcloud alpha compute ssl-certificates delete $uri || true
+    echo y | gcloud compute ssl-certificates delete $uri || true
   done
 
   SLEEP=$(( $SLEEP * 2 ))

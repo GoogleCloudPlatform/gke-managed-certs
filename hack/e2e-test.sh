@@ -24,7 +24,7 @@ echo -ne "### sleep 60 sec\n"
 sleep 60
 
 echo -ne "### expect 2 SslCertificate resources..."
-SSL_CERTIFICATES=($(gcloud alpha compute ssl-certificates list --uri))
+SSL_CERTIFICATES=($(gcloud compute ssl-certificates list --uri))
 
 if [ ${#SSL_CERTIFICATES[@]} -ne 2 ];
 then
@@ -45,7 +45,7 @@ echo -ne "### sleep 120 sec\n"
 sleep 120
 
 echo -ne "### expect 0 SslCertificate resources..."
-SSL_CERTIFICATES=($(gcloud alpha compute ssl-certificates list --uri))
+SSL_CERTIFICATES=($(gcloud compute ssl-certificates list --uri))
 
 if [ ${#SSL_CERTIFICATES[@]} -ne 0 ];
 then
