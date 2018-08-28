@@ -28,7 +28,7 @@ $ kubectl create -f deploy/managed-certificate-controller.yaml
 
 1. Create a Managed Certificate custom object, specifying a single non-wildcard domain not longer than 63 characters, for which you want to obtain a certificate:  
 ```
-apiVersion: cloud.google.com/v1alpha1
+apiVersion: alpha.cloud.google.com/v1alpha1
 kind: ManagedCertificate
 metadata:
   name: example-certificate
