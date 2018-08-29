@@ -35,6 +35,8 @@ echo -ne "### kubectl version: `./kubectl version`\n"
 echo -ne "### set namespace default\n"
 kubectl config set-context $(kubectl config current-context) --namespace=default
 
+python -c 'print("python available")'
+
 echo -ne "### Delete components created for e2e tests\n"
 ./e2e-down.sh
 
