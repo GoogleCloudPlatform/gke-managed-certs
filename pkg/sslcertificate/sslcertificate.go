@@ -17,16 +17,17 @@ limitations under the License.
 package sslcertificate
 
 import (
-	"cloud.google.com/go/compute/metadata"
 	"fmt"
+	"os"
+	"time"
+
+	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
 	gcfg "gopkg.in/gcfg.v1"
 	compute "google.golang.org/api/compute/v0.alpha"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"os"
-	"time"
 )
 
 const httpTimeout = 30 * time.Second

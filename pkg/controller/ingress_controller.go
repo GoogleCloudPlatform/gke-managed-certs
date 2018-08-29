@@ -17,10 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"time"
 )
 
 func (c *IngressController) Run(stopChannel <-chan struct{}) {

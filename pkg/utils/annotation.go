@@ -17,9 +17,10 @@ limitations under the License.
 package utils
 
 import (
+	"strings"
+
 	"github.com/golang/glog"
 	api "k8s.io/api/extensions/v1beta1"
-	"strings"
 )
 
 const (

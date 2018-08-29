@@ -17,9 +17,11 @@ limitations under the License.
 package utils
 
 import (
-	compute "google.golang.org/api/compute/v0.alpha"
-	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 	"testing"
+
+	compute "google.golang.org/api/compute/v0.alpha"
+
+	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
 func newMcert(domains []string) *api.ManagedCertificate {

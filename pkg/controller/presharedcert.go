@@ -17,11 +17,13 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"managed-certs-gke/pkg/utils"
 	"sort"
 	"strings"
+
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/runtime"
+
+	"managed-certs-gke/pkg/utils"
 )
 
 func (c *Controller) updatePreSharedCertAnnotation() {

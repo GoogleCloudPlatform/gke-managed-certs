@@ -18,13 +18,15 @@ package controller
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	"managed-certs-gke/pkg/config"
-	"time"
 )
 
 func NewController(opts *config.ControllerOptions) *Controller {

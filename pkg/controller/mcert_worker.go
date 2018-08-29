@@ -18,9 +18,11 @@ package controller
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+
 	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 	"managed-certs-gke/pkg/utils"
 )

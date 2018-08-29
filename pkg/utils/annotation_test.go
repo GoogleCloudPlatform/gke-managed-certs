@@ -17,9 +17,10 @@ limitations under the License.
 package utils
 
 import (
+	"testing"
+
 	api "k8s.io/api/extensions/v1beta1"
         "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func newIngress(annotationValue string) *api.Ingress {

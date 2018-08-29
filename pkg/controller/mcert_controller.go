@@ -18,14 +18,16 @@ package controller
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+
 	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
-	"strings"
-	"time"
 )
 
 func (c *McertController) Run(stopChannel <-chan struct{}, errors chan<- error) {
