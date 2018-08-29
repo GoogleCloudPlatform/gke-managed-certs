@@ -13,12 +13,10 @@
 # limitations under the License.
 
 FROM golang:1.10.2
+LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
 
-RUN apt-get update && apt-get --yes install libseccomp-dev
-RUN go version
-RUN go get github.com/tools/godep
-RUN godep version
+RUN apt-get update && apt-get --yes install libseccomp-dev && go version && go get github.com/tools/godep && godep version
 CMD ["/bin/bash"]

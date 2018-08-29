@@ -13,6 +13,7 @@
 # limitations under the License.
 
 FROM k8s.gcr.io/debian-base-amd64:0.3
+LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN clean-install ca-certificates
