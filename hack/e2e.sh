@@ -19,6 +19,8 @@ set -o nounset
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
+#${SCRIPT_ROOT}/hack/e2e.py
+
 echo -ne "### cd to hack\n"
 cd ${SCRIPT_ROOT}/hack
 echo -ne "### pwd: `pwd`\n"
@@ -35,7 +37,7 @@ echo -ne "### kubectl version: `./kubectl version`\n"
 echo -ne "### set namespace default\n"
 kubectl config set-context $(kubectl config current-context) --namespace=default
 
-python -c 'print("python available")'
+python -c 'import sys; print(sys.version)'
 
 echo -ne "### Delete components created for e2e tests\n"
 ./e2e-down.sh
