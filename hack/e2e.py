@@ -20,140 +20,133 @@ e2e test for Managed Certificates
 
 import argparse
 import os
-import subprocess
 import sys
-import time
+import urllib2
+
+from utils import command
+from utils import dns
+from utils import utils
 
 SCRIPT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-def call(command):
-  subprocess.call(command, shell=True)
+def kubectl_create(*file_names):
+  for file_name in file_names:
+    command.call("kubectl create -f {0}/deploy/{1}".format(SCRIPT_ROOT, file_name))
 
-def call_get_out(command):
-  p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-  return p.communicate()[0]
-
-def kubectl_create(file_name):
-  call("kubectl create -f {0}/deploy/{1}".format(SCRIPT_ROOT, file_name))
-
-def kubectl_delete(file_name):
-  call("kubectl delete -f {0}/deploy/{1} --ignore-not-found=true".format(SCRIPT_ROOT, file_name))
+def kubectl_delete(*file_names):
+  for file_name in file_names:
+    command.call("kubectl delete -f {0}/deploy/{1} --ignore-not-found=true".format(SCRIPT_ROOT, file_name))
 
 def delete_ssl_certificates():
+  print("### Remove all existing SslCertificate objects")
+
   for uri in get_ssl_certificates():
-    call("echo y | gcloud compute ssl-certificates delete {0}".format(uri))
+    command.call("echo y | gcloud compute ssl-certificates delete {0}".format(uri))
 
 def get_ssl_certificates():
-  return filter(None, call_get_out("gcloud compute ssl-certificates list --uri").split("\n"))
+  return command.call_get_out("gcloud compute ssl-certificates list --uri")[0]
+
+def delete_managed_certificates():
+  print("### Delete ManagedCertificate objects")
+  names, success = command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.metadata.name}}{{\"\\n\"}}{{end}}'")
+
+  if success:
+    for name in names:
+      command.call("kubectl delete mcrt {0}".format(name))
 
 def get_managed_certificate_statuses():
-  return call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\":\"}}{{end}}'")
-
-def expBackoff(action, condition, max_attempts=10):
-  timeout = 1
-
-  for attempt in range(max_attempts):
-    action()
-
-    if condition():
-      return True
-
-    print("### Condition not met, retrying in {0} seconds...".format(timeout))
-    time.sleep(timeout)
-    timeout *= 2
-
-  return False
+  return command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
 
 def init():
+  if not os.path.isfile("/etc/service-account/service-account.json"):
+    return
+
   print("### Configure registry authentication")
-  call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
-  call("gcloud auth configure-docker")
+  command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
+  command.call("gcloud auth configure-docker")
 
-  print("### get kubectl 1.11")
-  call("curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
-  call("chmod +x kubectl")
-  print("### kubectl version: {0}".format(call_get_out("./kubectl version")))
+  print("### Get kubectl 1.11")
+  command.call("curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
+  command.call("chmod +x kubectl")
+  print("### kubectl version: {0}".format(command.call_get_out("./kubectl version")[0][0]))
 
-  print("### set namespace default")
-  call("kubectl config set-context $(kubectl config current-context) --namespace=default")
+  print("### Set namespace default")
+  command.call("kubectl config set-context $(kubectl config current-context) --namespace=default")
 
-def tearDown():
-  print("### Delete managed-certificate-controller")
-  kubectl_delete("managed-certificate-controller.yaml")
+def tearDown(zone):
+  print("### Clean up, delete k8s objects, all SslCertificate resources and created DNS records")
 
-  print("### Delete CRD")
-  kubectl_delete("managedcertificates-crd.yaml")
+  kubectl_delete("ingress.yaml", "managed-certificate-controller.yaml")
+  delete_managed_certificates()
+  kubectl_delete("managedcertificates-crd.yaml", "http-hello.yaml", "rbac.yaml")
+  utils.expBackoff(delete_ssl_certificates, lambda: len(get_ssl_certificates()) == 0)
+  dns.clean_up(zone)
 
-  print("### Delete ingress")
-  kubectl_delete("ingress.yaml")
+def create_managed_certificates(domains):
+  i = 1
+  for domain in domains:
+    with open("/tmp/managed-certificate.yaml", "w") as f:
+      f.write(
+"""apiVersion: alpha.cloud.google.com/v1alpha1
+kind: ManagedCertificate
+metadata:
+    name: test{0}-certificate
+spec:
+    domains:
+        - {1}
+""".format(i, domain))
+      f.flush()
 
-  print("### Delete http-hello service")
-  kubectl_delete("http-hello.yaml")
+    command.call("kubectl create -f /tmp/managed-certificate.yaml", "Deploy test{0}-certificate ManagedCertificate custom object".format(i))
+    i += 1
 
-  print("### Remove RBAC")
-  kubectl_delete("rbac.yaml")
+def test(zone):
+  print("### Create random DNS records, set up k8s objects")
 
-  print("### Remove all existing SslCertificate objects")
-  expBackoff(delete_ssl_certificates, lambda: len(get_ssl_certificates()) == 0)
+  kubectl_create("rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml", "managed-certificate-controller.yaml")
 
-def setUp():
-  print("### Deploy RBAC")
-  kubectl_create("rbac.yaml")
+  domains = dns.create_random_domains(zone)
+  create_managed_certificates(domains)
 
-  print("### Deploy CRD")
-  kubectl_create("managedcertificates-crd.yaml")
-
-  print("### Deploy managed-certificate-controller")
-  kubectl_create("managed-certificate-controller.yaml")
-
-  print("### Deploy test1-certificate and test2-certificate ManagedCertificate custom objects")
-  kubectl_create("test1-certificate.yaml")
-  kubectl_create("test2-certificate.yaml")
-
-  print("### Deploy http-hello service")
   kubectl_create("http-hello.yaml")
 
-  print("### Deploy ingress")
-  kubectl_create("ingress.yaml")
-
-def test():
   print("### expect 2 SslCertificate resources...")
-  if expBackoff(lambda: None, lambda: len(get_ssl_certificates()) == 2):
+  if utils.expBackoff(lambda: None, lambda: len(get_ssl_certificates()) == 2):
     print("ok")
   else:
     print("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
   print("### wait for certificates to become Active...")
-  if expBackoff(lambda: None, lambda: get_managed_certificate_statuses() == "Active:Active:", max_attempts=20):
+  if utils.expBackoff(lambda: None, lambda: get_managed_certificate_statuses() == ["Active", "Active"], max_attempts=20):
     print("ok")
   else:
     print("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
     sys.exit(1)
 
-  print("### remove annotation managed-certificates from ingress")
-  call("kubectl annotate ingress test-ingress cloud.google.com/managed-certificates-")
-
-  print("### remove custom resources test1-certificate and test2-certificate")
-  kubectl_delete("test1-certificate.yaml")
-  kubectl_delete("test2-certificate.yaml")
-
-  print("### Remove all existing SslCertificate objects")
-  expBackoff(delete_ssl_certificates, lambda: len(get_ssl_certificates()) == 0)
+  for domain in domains:
+    try:
+      print("### Checking return code for domain {0}".format(domain))
+      connection = urllib2.urlopen("https://{0}".format(domain))
+      code = connection.getcode()
+      if code != 200:
+        print("### Code {0} is invalid".format(code))
+        sys.exit(1)
+    finally:
+      try:
+        connection.close()
+      except Exception:
+        pass
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--noinit", dest="init", action="store_false")
+  parser.add_argument("--zone", dest="zone", default="managedcertsgke")
   args = parser.parse_args()
 
-  if args.init:
-    init()
+  init()
 
-  tearDown()
-  setUp()
-
-  test()
-
-  tearDown()
+  tearDown(args.zone)
+  test(args.zone)
+  tearDown(args.zone)
 
 if __name__ == '__main__':
   main()
