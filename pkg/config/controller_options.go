@@ -27,7 +27,7 @@ import (
 	"managed-certs-gke/third_party/client/informers/externalversions"
 )
 
-type ControllerOptions struct {
+type ControllerOptions struct { // [review]: this should probably be called "ControllerClients"?
 	// IngressClient is a rest client which operates on k8s Ingress objects
 	IngressClient *ingress.Interface
 
@@ -47,10 +47,10 @@ func NewControllerOptions(cloudConfig string) (*ControllerOptions, error) {
 		return nil, err
 	}
 
-        config, err := rest.InClusterConfig()
-        if err != nil {
-                return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
-        }
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
+	}
 	client := versioned.NewForConfigOrDie(config)
 	factory := externalversions.NewSharedInformerFactory(client, 0)
 
@@ -60,9 +60,9 @@ func NewControllerOptions(cloudConfig string) (*ControllerOptions, error) {
 	}
 
 	return &ControllerOptions{
-		IngressClient: ingressClient,
-		McertClient: client,
+		IngressClient:        ingressClient,
+		McertClient:          client,
 		McertInformerFactory: factory,
-		SslClient: sslClient,
+		SslClient:            sslClient,
 	}, nil
 }

@@ -23,22 +23,22 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	gcfg "gopkg.in/gcfg.v1"
-	compute "google.golang.org/api/compute/v0.alpha"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	compute "google.golang.org/api/compute/v0.alpha"
+	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 const httpTimeout = 30 * time.Second
 
 type SslClient struct {
-	service *compute.Service
+	service   *compute.Service
 	projectId string
 }
 
 func NewClient(cloudConfig string) (*SslClient, error) {
-	tokenSource := google.ComputeTokenSource("")
+	tokenSource := google.ComputeTokenSource("") // [review]: var tokenSource ...
 
 	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
 		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
@@ -47,7 +47,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 		}
 
 		glog.V(1).Infof("In a GCP cluster, using TokenSource: %v", tokenSource)
-	} else if cloudConfig != "" {
+	} else if cloudConfig != "" { // [review]: shouldn't cloudConfig take precedance?
 		config, err := os.Open(cloudConfig)
 		if err != nil {
 			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %#v", cloudConfig, err)
@@ -59,9 +59,10 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 			return nil, fmt.Errorf("Could not read config %v", err)
 		}
 
-		tokenSource := gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
+		tokenSource = gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody) // [review]: you are creating a new var here...
 		glog.V(1).Infof("In a GKE cluster, using TokenSource: %v", tokenSource)
 	} else {
+		// [review]: tokenSource = google.ComputeTokenSource("")
 		glog.V(1).Infof("Using default TokenSource: %v", tokenSource)
 	}
 
@@ -79,7 +80,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 	}
 
 	return &SslClient{
-		service: service,
+		service:   service,
 		projectId: projectId,
 	}, nil
 }
@@ -103,7 +104,7 @@ func (c *SslClient) Insert(sslCertificateName string, domains []string) error {
 	}
 
 	_, err := c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
-	if err != nil {
+	if err != nil { // [review]: why wrap the error?
 		return fmt.Errorf("Failed to insert SslCertificate %v, err: %v", sslCertificate, err)
 	}
 

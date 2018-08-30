@@ -21,6 +21,8 @@ import (
 	"testing"
 )
 
+// [review] Table based tests
+
 func TestMcertState_GetPutDelete(t *testing.T) {
 	state := newMcertState()
 

@@ -19,17 +19,23 @@ package utils
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	api "k8s.io/api/extensions/v1beta1"
-        "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func newIngress(annotationValue string) *api.Ingress {
-	return &api.Ingress {
-		ObjectMeta: v1.ObjectMeta {
+	return &api.Ingress{
+		ObjectMeta: v1.ObjectMeta{
 			Annotations: map[string]string{annotation: annotationValue},
 		},
 	}
 }
+
+/*
+ * Use table-based go unit tests
+ *
+ * https://github.com/golang/go/wiki/TableDrivenTests
+ */
 
 func TestParseAnnotation_annotationMissing(t *testing.T) {
 	_, exists := ParseAnnotation(&api.Ingress{})

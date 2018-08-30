@@ -23,27 +23,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
-	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 	"managed-certs-gke/pkg/utils"
+
+	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
 const (
-	sslActive = "ACTIVE"
-	sslFailedNotVisible = "FAILED_NOT_VISIBLE"
-	sslFailedCaaChecking = "FAILED_CAA_CHECKING"
-	sslFailedCaaForbidden = "FAILED_CAA_FORBIDDEN"
-	sslFailedRateLimited = "FAILED_RATE_LIMITED"
+	sslActive                              = "ACTIVE"
+	sslFailedNotVisible                    = "FAILED_NOT_VISIBLE"
+	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
+	sslFailedCaaForbidden                  = "FAILED_CAA_FORBIDDEN"
+	sslFailedRateLimited                   = "FAILED_RATE_LIMITED"
 	sslManagedCertificateStatusUnspecified = "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED"
-	sslProvisioning = "PROVISIONING"
-	sslProvisioningFailed = "PROVISIONING_FAILED"
-	sslProvisioningFailedPermanently = "PROVISIONING_FAILED_PERMANENTLY"
-	sslRenewalFailed = "RENEWAL_FAILED"
+	sslProvisioning                        = "PROVISIONING"
+	sslProvisioningFailed                  = "PROVISIONING_FAILED"
+	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
+	sslRenewalFailed                       = "RENEWAL_FAILED"
 )
 
 func translateDomainStatus(status string) (string, error) {
 	switch status {
 	case sslProvisioning:
-		return "Provisioning",nil
+		return "Provisioning", nil
 	case sslFailedNotVisible:
 		return "FailedNotVisible", nil
 	case sslFailedCaaChecking:
@@ -96,7 +97,8 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 		return fmt.Errorf("Unexpected status %v of SslCertificate %v", sslCert.Managed.Status, sslCert)
 	}
 
-	domainStatus := make([]api.DomainStatus, 0)
+	var domainStatus []api.DomainStatus
+	// [review] domainStatus := make([]api.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
 		translatedStatus, err := translateDomainStatus(status)
 		if err != nil {
@@ -115,6 +117,8 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	return err
 }
 
+// [review] all the operations that reach out to gcp would be good to have more logging here
+
 func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) error {
 	sslCertificateState, exists := c.state.Get(mcert.ObjectMeta.Name)
 	if !exists {
@@ -127,6 +131,7 @@ func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) er
 			return err
 		}
 
+		// [review] general comment: whenever possible, use more specific format (e.g. %q or %s instead of just %v). This applies everywhere in this codebase...
 		glog.Infof("McertController adds to state new SslCertificate name %v for update of current SslCertificate %v associated with Managed Certificate %v", newName, sslCertificateState.Current, mcert.ObjectMeta.Name)
 		sslCertificateState.New = newName
 		c.state.PutState(mcert.ObjectMeta.Name, sslCertificateState)
@@ -135,20 +140,17 @@ func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) er
 	if sslCert, err := c.sslClient.Get(sslCertificateState.New); err != nil {
 		//New SslCertificate does not exist yet, create it
 		glog.Infof("McertController creates a new SslCertificate %v for update of current SslCertificate %v associated with Managed Certificate %v", sslCertificateState.New, sslCertificateState.Current, mcert.ObjectMeta.Name)
-		err := c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains)
-		if err != nil {
+		if err := c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains); err != nil { // [review]
 			return err
 		}
-	} else {
+		// [review] can we just short circuit here and return?
+	} else { // nesting of else if else seems strange here, also potentially confusing. consider early returns or factoring into subfunctions
 		if !utils.Equals(mcert, sslCert) || sslCert.Managed.Status == sslProvisioningFailedPermanently || sslCert.Managed.Status == sslRenewalFailed {
 			//New SslCertificate exists, but is outdated or has a failure status, so remove it and create a new one
-			err := c.sslClient.Delete(sslCertificateState.New)
-			if err != nil {
+			if err := c.sslClient.Delete(sslCertificateState.New); err != nil { // [review]
 				return err
 			}
-
-			err = c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains)
-			if err != nil {
+			if err = c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains); err != nil { // [review]
 				return err
 			}
 		} else if sslCert.Managed.Status == sslActive {
@@ -160,7 +162,7 @@ func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) er
 	return nil
 }
 
-func (c *McertController) createSslCertificateIfNecessary(sslCertificateName string, mcert *api.ManagedCertificate) error {
+func (c *McertController) createSslCertificateIfNeeded(sslCertificateName string, mcert *api.ManagedCertificate) error { // [review]
 	if sslCert, err := c.sslClient.Get(sslCertificateName); err != nil {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("McertController creates a new SslCertificate %v associated with Managed Certificate %v, based on state", sslCertificateName, mcert.ObjectMeta.Name)
@@ -168,6 +170,7 @@ func (c *McertController) createSslCertificateIfNecessary(sslCertificateName str
 		if err != nil {
 			return err
 		}
+		// [review] use early return here
 	} else {
 		if !utils.Equals(mcert, sslCert) {
 			//SslCertificate exists, but needs updating
@@ -178,7 +181,9 @@ func (c *McertController) createSslCertificateIfNecessary(sslCertificateName str
 		//SslCertificate exists and does not need updating, but maybe there is an ongoing update, that is no longer needed?
 		if sslCertificateState, exists := c.state.Get(mcert.ObjectMeta.Name); !exists {
 			return fmt.Errorf("Failed to in state Managed Certificate %v", mcert.ObjectMeta.Name)
-		} else if sslCertificateState.New != "" {
+		}
+
+		if sslCertificateState.New != "" { // [review]
 			//Ongoing update, now obsolete. Remove the new SslCertificate object.
 			sslCertNameToDelete := sslCertificateState.New
 			c.state.PutCurrent(mcert.ObjectMeta.Name, sslCertificateState.Current)
@@ -198,6 +203,11 @@ func (c *McertController) createSslCertificateIfNecessary(sslCertificateName str
 
 func (c *McertController) createSslCertificateNameIfNecessary(name string) (string, error) {
 	sslCertificateState, exists := c.state.Get(name)
+	if exists && sslCertificateState.Current != "" {
+		return sslCertificateState.Current, nil
+	}
+
+	// [review] switch if order
 	if !exists || sslCertificateState.Current == "" {
 		//State does not have anything for this managed certificate or no SslCertificate is associated with it
 		sslCertificateName, err := c.randomName()
@@ -218,7 +228,7 @@ func (c *McertController) handleMcert(key string) error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("McertController handling Managed Certificate %s.%s", ns, name)
+	glog.Infof("McertController handling Managed Certificate %s:%s", ns, name)
 
 	mcert, err := c.lister.ManagedCertificates(ns).Get(name)
 	if err != nil {
@@ -245,6 +255,7 @@ func (c *McertController) processNext() bool {
 		return false
 	}
 
+	// [review]: why is there a closure here?
 	err := func(obj interface{}) error {
 		defer c.queue.Done(obj)
 
@@ -252,7 +263,7 @@ func (c *McertController) processNext() bool {
 		var ok bool
 		if key, ok = obj.(string); !ok {
 			c.queue.Forget(obj)
-			return fmt.Errorf("Expected string in mcertQueue but got %#v", obj)
+			return fmt.Errorf("Expected string in mcertQueue but got %#v", obj) // [review]: %T prints the type
 		}
 
 		if err := c.handleMcert(key); err != nil {
@@ -273,9 +284,12 @@ func (c *McertController) processNext() bool {
 
 func (c *McertController) runWorker() {
 	for c.processNext() {
+		// [review] this seems incomplete
 	}
 }
 
+// [review]: centralize random name ish code in its own file/package
+// these should take a seed for repeatibility during testing
 func (c *McertController) randomName() (string, error) {
 	name, err := utils.RandomName()
 	if err != nil {

@@ -25,20 +25,22 @@ import (
 )
 
 func newMcert(domains []string) *api.ManagedCertificate {
-	return &api.ManagedCertificate {
-		Spec: api.ManagedCertificateSpec {
+	return &api.ManagedCertificate{
+		Spec: api.ManagedCertificateSpec{
 			Domains: domains,
 		},
 	}
 }
 
 func newSslCert(domains []string) *compute.SslCertificate {
-	return &compute.SslCertificate {
-		Managed: &compute.SslCertificateManagedSslCertificate {
+	return &compute.SslCertificate{
+		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
 		},
 	}
 }
+
+// see other comment about organizing test cases using a loop
 
 func TestEquals_emptyObjects(t *testing.T) {
 	mcert := newMcert([]string{})

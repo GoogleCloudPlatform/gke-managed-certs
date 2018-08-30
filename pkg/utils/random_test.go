@@ -21,6 +21,26 @@ import (
 )
 
 func TestRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.T) {
+	/*
+
+		use this pattern for your tests
+		for _, tc := range []struct{
+			desc string
+		}{
+			{test cases},
+		}{
+			t.Run(tc.desc, func(t*testing.T) {
+				if got, err := RandomName(); err != nil {
+					t.Errorf(...)
+				}
+				// Add your predicates here...
+				if len(got) < ... {
+				}
+			})
+		}
+
+	*/
+
 	name, err := RandomName()
 
 	if err != nil {

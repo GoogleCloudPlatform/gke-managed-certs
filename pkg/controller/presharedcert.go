@@ -29,16 +29,18 @@ import (
 func (c *Controller) updatePreSharedCertAnnotation() {
 	ingresses, err := c.Ingress.client.List()
 	if err != nil {
-		runtime.HandleError(err)
+		// [review] you need to glog errorf here
+		runtime.HandleError(err) // [review] is this what we want to do to handle errors?
 		return
 	}
 
 	sslCerts, err := c.Mcert.sslClient.List()
 	if err != nil {
+		// [review] you need to glog errorf here, see comment above
 		runtime.HandleError(err)
 		return
 	}
-	sslCertsMap := make(map[string]bool, 0)
+	sslCertsMap := map[string]bool{}
 	for _, sslCert := range sslCerts.Items {
 		sslCertsMap[sslCert.Name] = true
 	}
@@ -46,8 +48,9 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 	for _, ingress := range ingresses.Items {
 		glog.Infof("Update pre-shared-cert annotation for ingress %v", ingress.ObjectMeta.Name)
 
-		mcerts, exists := utils.ParseAnnotation(&ingress)
-		if !exists {
+		mcerts, ok := utils.ParseAnnotation(&ingress)
+		if !ok {
+			// glog.errorf
 			continue
 		}
 
@@ -74,6 +77,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 
 		glog.Infof("Update pre-shared-cert annotation for ingress %v, found SslCertificate resource names to put in the annotation: %v", ingress.ObjectMeta.Name, strings.Join(sslCertNames, ", "))
 
+		// [review] vendor the annotation name from ingress-gce repo if possible
 		ingress.ObjectMeta.Annotations["ingress.gcp.kubernetes.io/pre-shared-cert"] = strings.Join(sslCertNames, ", ")
 		_, err := c.Ingress.client.Update(&ingress)
 		if err != nil {
@@ -81,7 +85,6 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 			return
 		}
 
-		glog.Infof("Annotation pre-shared-cert updated for ingress %v", ingress.ObjectMeta.Name)
+		glog.Infof("Annotation pre-shared-cert updated for ingress %s:%s", ingress.Namespace, ingress.Name)
 	}
-
 }

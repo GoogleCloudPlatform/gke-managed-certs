@@ -26,7 +26,7 @@ const (
 	maxNameLength = 63
 )
 
-func min(a, b int) int {
+func min(a, b int) int { // golang style recommends just inlining this code
 	if a < b {
 		return a
 	}
@@ -34,7 +34,7 @@ func min(a, b int) int {
 	return b
 }
 
-func RandomName() (string, error) {
+func RandomName() (string, error) { // if you are using random, seed it from the command line flags for repeatability
 	uid, err := uuid.NewRandom()
 	if err != nil {
 		return "", err

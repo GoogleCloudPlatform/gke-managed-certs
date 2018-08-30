@@ -35,15 +35,15 @@ func NewController(opts *config.ControllerOptions) *Controller {
 	controller := &Controller{
 		Ingress: IngressController{
 			client: opts.IngressClient,
-			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		},
 		Mcert: McertController{
-			client: opts.McertClient,
-			lister: mcertInformer.Lister(),
-			synced: mcertInformer.Informer().HasSynced,
-			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
+			client:    opts.McertClient,
+			lister:    mcertInformer.Lister(),
+			synced:    mcertInformer.Informer().HasSynced,
+			queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
 			sslClient: opts.SslClient,
-			state: newMcertState(),
+			state:     newMcertState(),
 		},
 	}
 
@@ -75,6 +75,7 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 
 	errors := make(chan error)
 
+	// [review] if these are just waiting for the channel to close, then you can use a single channel that is shared
 	mcertStopChannel := make(chan struct{})
 	go c.Mcert.Run(mcertStopChannel, errors)
 
@@ -86,13 +87,13 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
-	select{
-		case <-stopChannel:
-			glog.Info("Controller received stop signal")
-			quit(mcertStopChannel, ingressStopChannel)
-		case err := <-errors:
-			runtime.HandleError(err)
-			quit(mcertStopChannel, ingressStopChannel)
+	select {
+	case <-stopChannel: // [review] wait for close
+		glog.Info("Controller received stop signal")
+		quit(mcertStopChannel, ingressStopChannel)
+	case err := <-errors:
+		runtime.HandleError(err)
+		quit(mcertStopChannel, ingressStopChannel)
 	}
 
 	glog.Info("Controller shutting down")
@@ -100,6 +101,6 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 }
 
 func quit(mcertStopChannel, ingressStopChannel chan<- struct{}) {
-	mcertStopChannel <- struct{}{}
-	ingressStopChannel <- struct{}{}
+	close(mcertStopChannel) // [review] see comment above
+	close(ingressStopChannel)
 }

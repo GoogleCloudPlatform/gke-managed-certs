@@ -47,7 +47,7 @@ func (c *IngressController) runWatcher() {
 					c.enqueue(ing)
 				}
 			}
-		default:
+		default: // [review]: why have default here?
 		}
 
 		if c.queue.ShuttingDown() {
@@ -55,12 +55,13 @@ func (c *IngressController) runWatcher() {
 			return
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(time.Second) // make this a command line flag
 	}
 }
 
 func (c *Controller) runIngressWorker() {
 	for c.processNextIngress() {
+		// [review]: ???
 	}
 }
 
@@ -69,7 +70,7 @@ func (c *Controller) handleIngress(key string) error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("Handling ingress %s.%s", ns, name)
+	glog.Infof("Handling ingress %s:%s", ns, name) // [review] most code uses colon ':'
 
 	ing, err := c.Ingress.client.Get(ns, name)
 	if err != nil {
@@ -89,7 +90,7 @@ func (c *Controller) handleIngress(key string) error {
 
 		if err != nil {
 			// TODO generate k8s event - can't fetch mcert
-			runtime.HandleError(err)
+			runtime.HandleError(err) // [review]: don't handle errors like this...
 		} else {
 			glog.Infof("Enqueue Managed Certificate %s for further processing", name)
 			c.Mcert.enqueue(mcert)

@@ -93,14 +93,16 @@ func (c *McertController) deleteObsoleteMcertsFromState(allMcertsInCluster map[s
 
 	for _, knownMcert := range allKnownMcerts {
 		if _, exists := allMcertsInCluster[knownMcert]; !exists {
-			// A managed certificate exists in state, but does not exist as a custom object in cluster, probably was deleted by the user - delete it from the state.
+			// A managed certificate exists in state, but does not
+			// exist as a custom object in cluster, probably was
+			// deleted by the user - delete it from the state.
 			c.state.Delete(knownMcert)
 			glog.Infof("McertController deleted managed certificate %s from state - not found in cluster", knownMcert)
 		}
 	}
 }
 
-func (c* McertController) deleteObsoleteSslCertificates() error {
+func (c *McertController) deleteObsoleteSslCertificates() error {
 	allKnownSslCerts := c.state.GetAllSslCertificates()
 	glog.Infof("McertController deleting obsolete SslCertificates from project, all known in state: %+v", allKnownSslCerts)
 
