@@ -131,6 +131,8 @@ def test(zone):
       if code != 200:
         print("### Code {0} is invalid".format(code))
         sys.exit(1)
+      else:
+        print("ok")
     finally:
       try:
         connection.close()
