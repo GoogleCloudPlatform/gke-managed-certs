@@ -25,7 +25,7 @@ import (
 
 const (
 	annotation = "cloud.google.com/managed-certificates"
-	splitBy = ","
+	splitBy    = ","
 )
 
 func ParseAnnotation(ingress *api.Ingress) (result []string, exists bool) {

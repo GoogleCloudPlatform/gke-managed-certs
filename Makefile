@@ -1,4 +1,4 @@
-all: build-binary-in-docker run-test-in-docker cross
+all: gofmt build-binary-in-docker run-test-in-docker cross
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
@@ -37,6 +37,11 @@ docker-ci:
 # Builds a builder image, i. e. an image used to later build a managed certs binary.
 docker-builder:
 	docker build -t ${NAME}-builder builder
+
+# Formats go source code with gofmt
+gofmt:
+	gofmt -w main.go
+	gofmt -w pkg
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
 release: build-binary-in-docker run-test-in-docker docker

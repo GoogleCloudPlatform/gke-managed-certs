@@ -23,8 +23,8 @@ import (
 	api "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
@@ -37,12 +37,12 @@ type Interface struct {
 }
 
 func NewClient() (client *Interface, err error) {
-        config, err := rest.InClusterConfig()
-        if err != nil {
-                return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
-        }
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
+	}
 
-        return &Interface{
+	return &Interface{
 		client: v1beta1.NewForConfigOrDie(config).RESTClient(),
 	}, nil
 }

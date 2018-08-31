@@ -27,30 +27,30 @@ import (
 	"managed-certs-gke/third_party/client/informers/externalversions"
 )
 
-type ControllerOptions struct {
-	// IngressClient is a rest client which operates on k8s Ingress objects
-	IngressClient *ingress.Interface
+type ControllerClients struct {
+	// Ingress is a rest client which operates on k8s Ingress objects
+	Ingress *ingress.Interface
 
-	// McertClient lets manage ManagedCertificate custom resources
-	McertClient *versioned.Clientset
+	// Mcert is a client which manages ManagedCertificate custom resources
+	Mcert *versioned.Clientset
 
 	// McertInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	McertInformerFactory externalversions.SharedInformerFactory
 
 	// SslClient is a client of GCP compute api which gives access to SslCertificate resource
-	SslClient *sslcertificate.SslClient
+	Ssl *sslcertificate.SslClient
 }
 
-func NewControllerOptions(cloudConfig string) (*ControllerOptions, error) {
+func NewControllerClients(cloudConfig string) (*ControllerClients, error) {
 	ingressClient, err := ingress.NewClient()
 	if err != nil {
 		return nil, err
 	}
 
-        config, err := rest.InClusterConfig()
-        if err != nil {
-                return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
-        }
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
+	}
 	client := versioned.NewForConfigOrDie(config)
 	factory := externalversions.NewSharedInformerFactory(client, 0)
 
@@ -59,10 +59,10 @@ func NewControllerOptions(cloudConfig string) (*ControllerOptions, error) {
 		return nil, err
 	}
 
-	return &ControllerOptions{
-		IngressClient: ingressClient,
-		McertClient: client,
+	return &ControllerClients{
+		Ingress:              ingressClient,
+		Mcert:                client,
 		McertInformerFactory: factory,
-		SslClient: sslClient,
+		Ssl:                  sslClient,
 	}, nil
 }

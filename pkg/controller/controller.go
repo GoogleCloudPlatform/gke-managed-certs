@@ -29,21 +29,21 @@ import (
 	"managed-certs-gke/pkg/config"
 )
 
-func NewController(opts *config.ControllerOptions) *Controller {
-	mcertInformer := opts.McertInformerFactory.Alpha().V1alpha1().ManagedCertificates()
+func NewController(clients *config.ControllerClients) *Controller {
+	mcertInformer := clients.McertInformerFactory.Alpha().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
 		Ingress: IngressController{
-			client: opts.IngressClient,
-			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+			client: clients.Ingress,
+			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		},
 		Mcert: McertController{
-			client: opts.McertClient,
-			lister: mcertInformer.Lister(),
-			synced: mcertInformer.Informer().HasSynced,
-			queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
-			sslClient: opts.SslClient,
-			state: newMcertState(),
+			client:    clients.Mcert,
+			lister:    mcertInformer.Lister(),
+			synced:    mcertInformer.Informer().HasSynced,
+			queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcertQueue"),
+			sslClient: clients.Ssl,
+			state:     newMcertState(),
 		},
 	}
 
@@ -86,13 +86,13 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
-	select{
-		case <-stopChannel:
-			glog.Info("Controller received stop signal")
-			quit(mcertStopChannel, ingressStopChannel)
-		case err := <-errors:
-			runtime.HandleError(err)
-			quit(mcertStopChannel, ingressStopChannel)
+	select {
+	case <-stopChannel:
+		glog.Info("Controller received stop signal")
+		quit(mcertStopChannel, ingressStopChannel)
+	case err := <-errors:
+		runtime.HandleError(err)
+		quit(mcertStopChannel, ingressStopChannel)
 	}
 
 	glog.Info("Controller shutting down")

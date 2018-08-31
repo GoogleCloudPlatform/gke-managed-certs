@@ -28,22 +28,22 @@ import (
 )
 
 const (
-	sslActive = "ACTIVE"
-	sslFailedNotVisible = "FAILED_NOT_VISIBLE"
-	sslFailedCaaChecking = "FAILED_CAA_CHECKING"
-	sslFailedCaaForbidden = "FAILED_CAA_FORBIDDEN"
-	sslFailedRateLimited = "FAILED_RATE_LIMITED"
+	sslActive                              = "ACTIVE"
+	sslFailedNotVisible                    = "FAILED_NOT_VISIBLE"
+	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
+	sslFailedCaaForbidden                  = "FAILED_CAA_FORBIDDEN"
+	sslFailedRateLimited                   = "FAILED_RATE_LIMITED"
 	sslManagedCertificateStatusUnspecified = "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED"
-	sslProvisioning = "PROVISIONING"
-	sslProvisioningFailed = "PROVISIONING_FAILED"
-	sslProvisioningFailedPermanently = "PROVISIONING_FAILED_PERMANENTLY"
-	sslRenewalFailed = "RENEWAL_FAILED"
+	sslProvisioning                        = "PROVISIONING"
+	sslProvisioningFailed                  = "PROVISIONING_FAILED"
+	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
+	sslRenewalFailed                       = "RENEWAL_FAILED"
 )
 
 func translateDomainStatus(status string) (string, error) {
 	switch status {
 	case sslProvisioning:
-		return "Provisioning",nil
+		return "Provisioning", nil
 	case sslFailedNotVisible:
 		return "FailedNotVisible", nil
 	case sslFailedCaaChecking:

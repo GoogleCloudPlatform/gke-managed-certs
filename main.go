@@ -39,14 +39,14 @@ func main() {
 	//To handle SIGINT gracefully
 	stopChannel := server.SetupSignalHandler()
 
-	opts, err := config.NewControllerOptions(*cloudConfig)
+	clients, err := config.NewControllerClients(*cloudConfig)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
-	controller := controller.NewController(opts)
+	controller := controller.NewController(clients)
 
-	go opts.McertInformerFactory.Start(stopChannel)
+	go clients.McertInformerFactory.Start(stopChannel)
 
 	if err = controller.Run(stopChannel); err != nil {
 		glog.Fatal("Error running controller: %v", err)

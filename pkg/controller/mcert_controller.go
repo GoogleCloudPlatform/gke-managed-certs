@@ -100,7 +100,7 @@ func (c *McertController) deleteObsoleteMcertsFromState(allMcertsInCluster map[s
 	}
 }
 
-func (c* McertController) deleteObsoleteSslCertificates() error {
+func (c *McertController) deleteObsoleteSslCertificates() error {
 	allKnownSslCerts := c.state.GetAllSslCertificates()
 	glog.Infof("McertController deleting obsolete SslCertificates from project, all known in state: %+v", allKnownSslCerts)
 

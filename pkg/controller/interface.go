@@ -27,20 +27,20 @@ import (
 )
 
 type IngressController struct {
-        client *ingress.Interface
-        queue workqueue.RateLimitingInterface
+	client *ingress.Interface
+	queue  workqueue.RateLimitingInterface
 }
 
 type McertController struct {
-	client *versioned.Clientset
-        lister mcertlister.ManagedCertificateLister
-        synced cache.InformerSynced
-        queue workqueue.RateLimitingInterface
+	client    *versioned.Clientset
+	lister    mcertlister.ManagedCertificateLister
+	synced    cache.InformerSynced
+	queue     workqueue.RateLimitingInterface
 	sslClient *sslcertificate.SslClient
-	state *McertState
+	state     *McertState
 }
 
 type Controller struct {
 	Ingress IngressController
-	Mcert McertController
+	Mcert   McertController
 }

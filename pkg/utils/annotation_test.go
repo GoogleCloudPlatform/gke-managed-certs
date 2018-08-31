@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	api "k8s.io/api/extensions/v1beta1"
-        "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func newIngress(annotationValue string) *api.Ingress {
-	return &api.Ingress {
-		ObjectMeta: v1.ObjectMeta {
+	return &api.Ingress{
+		ObjectMeta: v1.ObjectMeta{
 			Annotations: map[string]string{annotation: annotationValue},
 		},
 	}
