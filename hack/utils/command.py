@@ -24,11 +24,7 @@ def call(command, info=None):
   """
   Calls a command through shell
   """
-  if info is not None:
-    print("### {0}".format(info))
-
-  print("### Executing $ {0}".format(command))
-  subprocess.call(command, shell=True)
+  output, success = call_get_out(command, info)
 
 def call_get_out(command, info=None):
   """
