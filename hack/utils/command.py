@@ -26,6 +26,7 @@ def call(command, info=None):
   Calls a command through shell
   """
   output, success = call_get_out(command, info)
+  utils.printf("Success: {0}, output: {1}".format(success, output))
 
 def call_get_out(command, info=None):
   """
