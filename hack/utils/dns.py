@@ -22,6 +22,7 @@ import command
 import os.path
 import random
 import string
+import time
 import utils
 
 RECORD_LENGTH = 20
@@ -79,6 +80,7 @@ def create_random_domains(zone_name):
   ip = output[0]
   utils.printf("Creating random domains pointing at ip {0}".format(ip))
 
+  time.sleep(9*60)
   ingress_ip, _ = command.call_get_out("kubectl get ingress --field-selector='metadata.name=test-ingress' -o go-template='{{range .items}}{{index (index .status.loadBalancer.ingress 0) \"ip\"}}{{\"\\n\"}}{{end}}'")
   utils.printf(ingress_ip)
 
