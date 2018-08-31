@@ -79,6 +79,9 @@ def create_random_domains(zone_name):
   ip = output[0]
   utils.printf("Creating random domains pointing at ip {0}".format(ip))
 
+  ingress_ip, _ = command.call_get_out("kubectl get ingress --field-selector='metadata.name=test-ingress' -o go-template='{{range .items}}{{index (index .status.loadBalancer.ingress 0) \"ip\"}}{{\"\\n\"}}{{end}}'")
+  utils.printf(ingress_ip)
+
   switch_to_certsbridge_conf()
 
   command.call("gcloud dns record-sets transaction start --zone {0}".format(zone_name))
