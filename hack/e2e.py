@@ -40,8 +40,12 @@ def kubectl_delete(*file_names):
 def delete_ssl_certificates():
   print("### Remove all existing SslCertificate objects")
 
-  for uri in get_ssl_certificates():
+  ssl_certificates = get_ssl_certificates()
+
+  for uri in ssl_certificates:
     command.call("echo y | gcloud compute ssl-certificates delete {0}".format(uri))
+
+  return ssl_certificates
 
 def get_ssl_certificates():
   return command.call_get_out("gcloud compute ssl-certificates list --uri")[0]
@@ -56,6 +60,24 @@ def delete_managed_certificates():
 
 def get_managed_certificate_statuses():
   return command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
+
+def get_http_statuses(domains):
+  statuses = []
+
+  for domain in domains:
+    url = "https://{0}".format(domain)
+    try:
+      connection = urllib2.urlopen(url)
+      statuses.append(connection.getcode())
+    except Exception, e:
+      print("### HTTP GET for {0} failed: {1}".format(url, e))
+    finally:
+      try:
+        connection.close()
+      except:
+        pass
+
+  return statuses
 
 def init():
   if not os.path.isfile("/etc/service-account/service-account.json"):
@@ -79,7 +101,7 @@ def tearDown(zone):
   kubectl_delete("ingress.yaml", "managed-certificate-controller.yaml")
   delete_managed_certificates()
   kubectl_delete("managedcertificates-crd.yaml", "http-hello.yaml", "rbac.yaml")
-  utils.expBackoff(delete_ssl_certificates, lambda: len(get_ssl_certificates()) == 0)
+  utils.expBackoff(delete_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 0)
   dns.clean_up(zone)
 
 def create_managed_certificates(domains):
@@ -111,33 +133,24 @@ def test(zone):
   kubectl_create("http-hello.yaml")
 
   print("### expect 2 SslCertificate resources...")
-  if utils.expBackoff(lambda: None, lambda: len(get_ssl_certificates()) == 2):
+  if utils.expBackoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 2):
     print("ok")
   else:
     print("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
   print("### wait for certificates to become Active...")
-  if utils.expBackoff(lambda: None, lambda: get_managed_certificate_statuses() == ["Active", "Active"], max_attempts=20):
+  if utils.expBackoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"], max_attempts=20):
     print("ok")
   else:
     print("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
     sys.exit(1)
 
-  for domain in domains:
-    try:
-      print("### Checking return code for domain {0}".format(domain))
-      connection = urllib2.urlopen("https://{0}".format(domain))
-      code = connection.getcode()
-      if code != 200:
-        print("### Code {0} is invalid".format(code))
-        sys.exit(1)
-      else:
-        print("ok")
-    finally:
-      try:
-        connection.close()
-      except Exception:
-        pass
+  print("### Check HTTP return codes for GET requests to domains {0}...".format(", ".join(domains)))
+  if utils.expBackoff(lambda: get_http_statuses(domains), lambda statuses: statuses == [200, 200]):
+    print("ok")
+  else:
+    print("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
+    sys.exit(1)
 
 def main():
   parser = argparse.ArgumentParser()

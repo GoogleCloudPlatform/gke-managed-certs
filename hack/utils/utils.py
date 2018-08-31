@@ -22,14 +22,14 @@ import time
 
 def expBackoff(action, condition, max_attempts=10):
   """
-  Calls action() up to max_attempts times until condition() becomes true, with exponential backoff. Returns a bool flag indicating whether action() succeded.
+  Calls result = action() up to max_attempts times until condition(result) becomes true, with exponential backoff. Returns a bool flag indicating whether action() succeded.
   """
   timeout = 1
 
   for attempt in range(max_attempts):
-    action()
+    result = action()
 
-    if condition():
+    if condition(result):
       return True
 
     print("### Condition not met, retrying in {0} seconds...".format(timeout))
