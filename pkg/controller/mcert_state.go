@@ -23,7 +23,7 @@ import (
 // SslCertificateState contains: Current, the name of associated SslCertificate and New, the name of a new SslCertificate if update is in progress
 type SslCertificateState struct {
 	Current string
-	New string
+	New     string
 }
 
 type McertState struct {
@@ -53,7 +53,8 @@ func (state *McertState) Get(key string) (SslCertificateState, bool) {
 }
 
 func (state *McertState) GetAllManagedCertificates() (values []string) {
-	values = make([]string, 0)
+	var values []string
+	// [review] values = make([]string, 0)
 
 	state.RLock()
 	defer state.RUnlock()
@@ -66,7 +67,8 @@ func (state *McertState) GetAllManagedCertificates() (values []string) {
 }
 
 func (state *McertState) GetAllSslCertificates() (values []string) {
-	values = make([]string, 0)
+	var values []string
+	// [review] values = make([]string, 0)
 
 	state.RLock()
 	defer state.RUnlock()
@@ -88,11 +90,11 @@ func (state *McertState) PutCurrent(key, value string) {
 
 	state.m[key] = SslCertificateState{
 		Current: value,
-		New: "",
+		New:     "",
 	}
 }
 
-func (state *McertState) PutState(key string, sslState SslCertificateState) {
+func (state *McertState) PutState(key string, sslState SslCertificateState) { // Put(...), State is redundant.
 	state.Lock()
 	defer state.Unlock()
 	state.m[key] = sslState

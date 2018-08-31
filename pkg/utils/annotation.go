@@ -24,20 +24,21 @@ import (
 )
 
 const (
-	annotation = "cloud.google.com/managed-certificates"
-	splitBy = ","
+	annotation = "cloud.google.com/managed-certificates" // [review]: apparently we are moving away from using cloud.google.com. I will dig up the e-mail thread about this.
+	splitBy    = ","
 )
 
-func ParseAnnotation(ingress *api.Ingress) (result []string, exists bool) {
-	annotationValue, exists := ingress.ObjectMeta.Annotations[annotation]
-	if !exists {
+// [review]: document all exported package members.
+func ParseAnnotation(ingress *api.Ingress) (result []string, exists bool) { // [review] don't use named return values
+	annotationValue, ok := ingress.ObjectMeta.Annotations[annotation] // [review]
+	if !ok {                                                          // [review]
 		return nil, false
 	}
 
-	glog.Infof("Found annotation %s on ingress", annotationValue)
+	glog.Infof("Found %s annotation %q on ingress %s:%s", annotation, annotationValue, ingress.Namespace, ingress.Name) // [review]
 
 	if annotationValue == "" {
-		return nil, true
+		return nil, true // [review] doesn't this mean not exists?
 	}
 
 	for _, value := range strings.Split(annotationValue, splitBy) {

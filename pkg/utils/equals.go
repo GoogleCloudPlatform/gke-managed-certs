@@ -24,7 +24,8 @@ import (
 	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
 )
 
-func Equals(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) bool {
+// document here
+func Equals(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) bool { // why not strip out the fields you don't want to compare and use reflect.DeepEqual?
 	if len(mcert.Spec.Domains) != len(sslCert.Managed.Domains) {
 		return false
 	}

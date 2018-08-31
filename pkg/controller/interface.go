@@ -23,24 +23,27 @@ import (
 	"managed-certs-gke/pkg/ingress"
 	"managed-certs-gke/pkg/sslcertificate"
 	"managed-certs-gke/third_party/client/clientset/versioned"
+
 	mcertlister "managed-certs-gke/third_party/client/listers/alpha.cloud.google.com/v1alpha1"
 )
 
 type IngressController struct {
-        client *ingress.Interface
-        queue workqueue.RateLimitingInterface
+	client *ingress.Interface
+	queue  workqueue.RateLimitingInterface
 }
 
 type McertController struct {
-	client *versioned.Clientset
-        lister mcertlister.ManagedCertificateLister
-        synced cache.InformerSynced
-        queue workqueue.RateLimitingInterface
+	client    *versioned.Clientset
+	lister    mcertlister.ManagedCertificateLister
+	synced    cache.InformerSynced
+	queue     workqueue.RateLimitingInterface
 	sslClient *sslcertificate.SslClient
-	state *McertState
+	state     *McertState
 }
 
 type Controller struct {
 	Ingress IngressController
-	Mcert McertController
+	Mcert   McertController
 }
+
+// [review]: not good style to have a separate interface.go file...

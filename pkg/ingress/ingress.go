@@ -20,11 +20,11 @@ package ingress
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	api "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
@@ -37,29 +37,29 @@ type Interface struct {
 }
 
 func NewClient() (client *Interface, err error) {
-        config, err := rest.InClusterConfig()
-        if err != nil {
-                return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
-        }
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
+	}
 
-        return &Interface{
+	return &Interface{
 		client: v1beta1.NewForConfigOrDie(config).RESTClient(),
 	}, nil
 }
 
-func (c *Interface) Get(namespace string, name string) (result *api.Ingress, err error) {
+func (c *Interface) Get(namespace string, name string) (result *api.Ingress, err error) { // [review]: go style should not use named params unless there is a good reason (fix instances below)
 	result = &api.Ingress{}
 	err = c.client.Get().Namespace(namespace).Resource(resource).Name(name).Do().Into(result)
-	return
+	return // [review]: why are you using the raw restclient? Use the typed client.
 }
 
-func (c *Interface) List() (result *api.IngressList, err error) {
+func (c *Interface) List() (result *api.IngressList, err error) { // [review]: see above
 	result = &api.IngressList{}
 	err = c.client.Get().Resource(resource).Do().Into(result)
 	return
 }
 
-func (c *Interface) Update(ingress *api.Ingress) (result *api.Ingress, err error) {
+func (c *Interface) Update(ingress *api.Ingress) (result *api.Ingress, err error) { // [review]: see above
 	result = &api.Ingress{}
 	err = c.client.Put().Namespace(ingress.ObjectMeta.Namespace).Resource(resource).Name(ingress.Name).Body(ingress).Do().Into(result)
 	return
