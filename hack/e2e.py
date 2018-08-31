@@ -101,7 +101,7 @@ def tearDown(zone):
   kubectl_delete("ingress.yaml", "managed-certificate-controller.yaml")
   delete_managed_certificates()
   kubectl_delete("managedcertificates-crd.yaml", "http-hello.yaml", "rbac.yaml")
-  utils.expBackoff(delete_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 0)
+  utils.backoff(delete_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 0)
   dns.clean_up(zone)
 
 def create_managed_certificates(domains):
@@ -133,20 +133,20 @@ def test(zone):
   kubectl_create("http-hello.yaml")
 
   print("### expect 2 SslCertificate resources...")
-  if utils.expBackoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 2):
+  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 2):
     print("ok")
   else:
     print("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
   print("### wait for certificates to become Active...")
-  if utils.expBackoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"], max_attempts=20):
+  if utils.backoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"], max_attempts=20):
     print("ok")
   else:
     print("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
     sys.exit(1)
 
   print("### Check HTTP return codes for GET requests to domains {0}...".format(", ".join(domains)))
-  if utils.expBackoff(lambda: get_http_statuses(domains), lambda statuses: statuses == [200, 200]):
+  if utils.backoff(lambda: get_http_statuses(domains), lambda statuses: statuses == [200, 200]):
     print("ok")
   else:
     print("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))

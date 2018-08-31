@@ -20,11 +20,11 @@ Utils for e2e test for Managed Certificates
 
 import time
 
-def expBackoff(action, condition, max_attempts=10):
+def backoff(action, condition, max_attempts=10):
   """
-  Calls result = action() up to max_attempts times until condition(result) becomes true, with exponential backoff. Returns a bool flag indicating whether action() succeded.
+  Calls result = action() up to max_attempts times until condition(result) becomes true, with 30 s backoff. Returns a bool flag indicating whether condition(result) was met.
   """
-  timeout = 1
+  timeout = 30
 
   for attempt in range(max_attempts):
     result = action()
@@ -34,6 +34,5 @@ def expBackoff(action, condition, max_attempts=10):
 
     print("### Condition not met, retrying in {0} seconds...".format(timeout))
     time.sleep(timeout)
-    timeout *= 2
 
   return False
