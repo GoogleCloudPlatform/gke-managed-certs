@@ -38,7 +38,7 @@ def kubectl_delete(*file_names):
     command.call("kubectl delete -f {0}/deploy/{1} --ignore-not-found=true".format(SCRIPT_ROOT, file_name))
 
 def delete_ssl_certificates():
-  print("### Remove all existing SslCertificate objects")
+  utils.printf("Remove all existing SslCertificate objects")
 
   ssl_certificates = get_ssl_certificates()
 
@@ -51,7 +51,7 @@ def get_ssl_certificates():
   return command.call_get_out("gcloud compute ssl-certificates list --uri")[0]
 
 def delete_managed_certificates():
-  print("### Delete ManagedCertificate objects")
+  utils.printf("Delete ManagedCertificate objects")
   names, success = command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.metadata.name}}{{\"\\n\"}}{{end}}'")
 
   if success:
@@ -70,7 +70,7 @@ def get_http_statuses(domains):
       connection = urllib2.urlopen(url)
       statuses.append(connection.getcode())
     except Exception, e:
-      print("### HTTP GET for {0} failed: {1}".format(url, e))
+      utils.printf("HTTP GET for {0} failed: {1}".format(url, e))
     finally:
       try:
         connection.close()
@@ -83,20 +83,20 @@ def init():
   if not os.path.isfile("/etc/service-account/service-account.json"):
     return
 
-  print("### Configure registry authentication")
+  utils.printf("Configure registry authentication")
   command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
   command.call("gcloud auth configure-docker")
 
-  print("### Get kubectl 1.11")
+  utils.printf("Get kubectl 1.11")
   command.call("curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
   command.call("chmod +x kubectl")
-  print("### kubectl version: {0}".format(command.call_get_out("./kubectl version")[0][0]))
+  utils.printf("kubectl version: {0}".format(command.call_get_out("./kubectl version")[0][0]))
 
-  print("### Set namespace default")
+  utils.printf("Set namespace default")
   command.call("kubectl config set-context $(kubectl config current-context) --namespace=default")
 
 def tearDown(zone):
-  print("### Clean up, delete k8s objects, all SslCertificate resources and created DNS records")
+  utils.printf("Clean up, delete k8s objects, all SslCertificate resources and created DNS records")
 
   kubectl_delete("ingress.yaml", "managed-certificate-controller.yaml")
   delete_managed_certificates()
@@ -123,7 +123,7 @@ spec:
     i += 1
 
 def test(zone):
-  print("### Create random DNS records, set up k8s objects")
+  utils.printf("Create random DNS records, set up k8s objects")
 
   kubectl_create("rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml", "managed-certificate-controller.yaml")
 
@@ -132,24 +132,24 @@ def test(zone):
 
   kubectl_create("http-hello.yaml")
 
-  print("### expect 2 SslCertificate resources...")
+  utils.printf("Expect 2 SslCertificate resources...")
   if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 2):
-    print("ok")
+    utils.printf("ok")
   else:
-    print("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
+    utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
-  print("### wait for certificates to become Active...")
+  utils.printf("Wait for certificates to become Active...")
   if utils.backoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"]):
-    print("ok")
+    utils.printf("ok")
   else:
-    print("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
+    utils.printf("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
     sys.exit(1)
 
-  print("### Check HTTP return codes for GET requests to domains {0}...".format(", ".join(domains)))
+  utils.printf("Check HTTP return codes for GET requests to domains {0}...".format(", ".join(domains)))
   if utils.backoff(lambda: get_http_statuses(domains), lambda statuses: statuses == [200, 200]):
-    print("ok")
+    utils.printf("ok")
   else:
-    print("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
+    utils.printf("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
     sys.exit(1)
 
 def main():

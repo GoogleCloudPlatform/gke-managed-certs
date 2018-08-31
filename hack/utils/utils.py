@@ -18,9 +18,10 @@ limitations under the License.
 Utils for e2e test for Managed Certificates
 """
 
+import sys
 import time
 
-def backoff(action, condition, max_attempts=30):
+def backoff(action, condition, max_attempts=40):
   """
   Calls result = action() up to max_attempts times until condition(result) becomes true, with 30 s backoff. Returns a bool flag indicating whether condition(result) was met.
   """
@@ -32,7 +33,14 @@ def backoff(action, condition, max_attempts=30):
     if condition(result):
       return True
 
-    print("### Condition not met, retrying in {0} seconds...".format(timeout))
+    printf("Condition not met, retrying in {0} seconds...".format(timeout))
     time.sleep(timeout)
 
   return False
+
+def printf(info):
+  """
+  Prints info with ### prepended to make it stand out in the output, then flushes stdout.
+  """
+  print("### {0}".format(info))
+  sys.stdout.flush()

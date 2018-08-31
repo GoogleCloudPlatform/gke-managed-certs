@@ -22,6 +22,7 @@ import command
 import os.path
 import random
 import string
+import utils
 
 RECORD_LENGTH = 20
 
@@ -37,7 +38,6 @@ def switch_to_certsbridge_conf():
     if os.path.isfile("/etc/service-account/service-account.json"):
       command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
   else:
-    print("### Gcloud conf certsbridge exists")
     command.call("gcloud config configurations activate certsbridge", "Switch gcloud conf to certsbridge")
 
 def switch_to_default_conf():
@@ -56,7 +56,7 @@ def clear_dns_zone(zone_name):
   """
   Removes A sub-records of com.certsbridge from a given DNS zone.
   """
-  print("### Removing all sub-records of com.certsbridge from zone {0}".format(zone_name))
+  utils.printf("Removing all sub-records of com.certsbridge from zone {0}".format(zone_name))
   switch_to_certsbridge_conf()
 
   output = command.call_get_out("gcloud dns record-sets list --zone {0} --filter=type=A | grep certsbridge.com | tr -s ' ' | cut -d ' ' -f 1,4".format(zone_name))[0]
@@ -77,7 +77,7 @@ def create_random_domains(zone_name):
 
   output, _ = command.call_get_out("gcloud compute addresses describe test-ip-address --global | grep address: | cut -d ' ' -f 2")
   ip = output[0]
-  print("### Creating random domains pointing at ip {0}".format(ip))
+  utils.printf("Creating random domains pointing at ip {0}".format(ip))
 
   switch_to_certsbridge_conf()
 

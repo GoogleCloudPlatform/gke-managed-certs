@@ -19,6 +19,7 @@ Wrappers around subprocess which simplify calling external commands from Python 
 """
 
 import subprocess
+import utils
 
 def call(command, info=None):
   """
@@ -33,9 +34,9 @@ def call_get_out(command, info=None):
     * second element is a flag indicating whether the command succeeded or not
   """
   if info is not None:
-    print("### {0}".format(info))
+    utils.printf(info)
 
-  #print("### Executing $ {0}".format(command))
+  utils.printf("Executing $ {0}".format(command))
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
   output = filter(None, p.communicate()[0].split("\n"))
   return (output, p.returncode == 0)
