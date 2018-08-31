@@ -35,7 +35,7 @@ def call_get_out(command, info=None):
   if info is not None:
     print("### {0}".format(info))
 
-  print("### Executing $ {0}".format(command))
+  #print("### Executing $ {0}".format(command))
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
   output = filter(None, p.communicate()[0].split("\n"))
   return (output, p.returncode == 0)
