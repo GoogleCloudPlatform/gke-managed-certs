@@ -20,7 +20,7 @@ Utils for e2e test for Managed Certificates
 
 import time
 
-def backoff(action, condition, max_attempts=10):
+def backoff(action, condition, max_attempts=30):
   """
   Calls result = action() up to max_attempts times until condition(result) becomes true, with 30 s backoff. Returns a bool flag indicating whether condition(result) was met.
   """

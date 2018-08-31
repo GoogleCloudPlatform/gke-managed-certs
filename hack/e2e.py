@@ -139,7 +139,7 @@ def test(zone):
     print("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
   print("### wait for certificates to become Active...")
-  if utils.backoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"], max_attempts=20):
+  if utils.backoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"]):
     print("ok")
   else:
     print("statuses are: {0}. Certificates did not become Active, exiting with failure".format(get_managed_certificate_statuses()))
