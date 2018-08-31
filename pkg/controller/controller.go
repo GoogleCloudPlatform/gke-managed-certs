@@ -65,6 +65,9 @@ func NewController(clients *config.ControllerClients) *Controller {
 func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
 
+	done := make(chan struct{})
+	defer close(done)
+
 	glog.Info("Controller.Run()")
 
 	glog.Info("Waiting for Managed Certificate cache sync")
@@ -74,32 +77,20 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	glog.Info("Managed Certifiate cache synced")
 
 	errors := make(chan error)
-
-	mcertStopChannel := make(chan struct{})
-	go c.Mcert.Run(mcertStopChannel, errors)
-
-	ingressStopChannel := make(chan struct{})
-	go c.Ingress.Run(ingressStopChannel)
+	go c.Mcert.Run(done, errors)
+	go c.Ingress.Run(done)
 
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
-
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
 	select {
 	case <-stopChannel:
 		glog.Info("Controller received stop signal")
-		quit(mcertStopChannel, ingressStopChannel)
 	case err := <-errors:
 		runtime.HandleError(err)
-		quit(mcertStopChannel, ingressStopChannel)
 	}
 
 	glog.Info("Controller shutting down")
 	return nil
-}
-
-func quit(mcertStopChannel, ingressStopChannel chan<- struct{}) {
-	mcertStopChannel <- struct{}{}
-	ingressStopChannel <- struct{}{}
 }
