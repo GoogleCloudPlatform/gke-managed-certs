@@ -138,7 +138,7 @@ def test(zone):
 
   instance_prefix = os.getenv("INSTANCE_PREFIX")
   if instance_prefix is not None:
-    command_call("gcloud compute firewall-rules create mcert-{0}-egress --network={0} --direction=egress --allow=tcp".format(instance_prefix))
+    command.call("gcloud compute firewall-rules create mcert-{0}-egress --network={0} --direction=egress --allow=tcp".format(instance_prefix))
   else:
     utils.printf("INSTANCE_PREFIX env is not set")
 
