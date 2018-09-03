@@ -24,10 +24,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *IngressController) Run(stopChannel <-chan struct{}) {
+func (c *IngressController) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) {
 	defer c.queue.ShutDown()
 
-	go c.runWatcher()
+	go c.runWatcher(ingressWatcherDelay)
 	go wait.Until(c.synchronizeAllIngresses, time.Minute, stopChannel)
 
 	<-stopChannel

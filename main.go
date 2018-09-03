@@ -18,10 +18,10 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
-	kube_flag "k8s.io/apiserver/pkg/util/flag"
 
 	"managed-certs-gke/pkg/config"
 	"managed-certs-gke/pkg/controller"
@@ -30,10 +30,9 @@ import (
 const managedCertificatesVersion = "0.0.1"
 
 var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+var ingressWatcherDelay = flag.Duration("ingress-watcher-delay", time.Second, "The delay slept before polling for Ingress resources")
 
 func main() {
-	kube_flag.InitFlags()
-
 	glog.V(1).Infof("Managed certificates %s controller starting", managedCertificatesVersion)
 
 	//To handle SIGINT gracefully
@@ -48,7 +47,7 @@ func main() {
 
 	go clients.McertInformerFactory.Start(stopChannel)
 
-	if err = controller.Run(stopChannel); err != nil {
+	if err = controller.Run(stopChannel, *ingressWatcherDelay); err != nil {
 		glog.Fatal("Error running controller: %v", err)
 	}
 }

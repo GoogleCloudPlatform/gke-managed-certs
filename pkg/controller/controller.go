@@ -62,7 +62,7 @@ func NewController(clients *config.ControllerClients) *Controller {
 	return controller
 }
 
-func (c *Controller) Run(stopChannel <-chan struct{}) error {
+func (c *Controller) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) error {
 	defer runtime.HandleCrash()
 
 	done := make(chan struct{})
@@ -78,7 +78,7 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 
 	errors := make(chan error)
 	go c.Mcert.Run(done, errors)
-	go c.Ingress.Run(done)
+	go c.Ingress.Run(done, ingressWatcherDelay)
 
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)

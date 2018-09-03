@@ -29,7 +29,7 @@ import (
 	"managed-certs-gke/pkg/utils"
 )
 
-func (c *IngressController) runWatcher() {
+func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
 	watcher, err := c.client.Watch()
 
 	if err != nil {
@@ -55,7 +55,7 @@ func (c *IngressController) runWatcher() {
 			return
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(ingressWatcherDelay)
 	}
 }
 
