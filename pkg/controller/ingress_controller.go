@@ -22,7 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+
+	"managed-certs-gke/pkg/ingress"
 )
+
+type IngressController struct {
+	client *ingress.Interface
+	queue  workqueue.RateLimitingInterface
+}
 
 func (c *IngressController) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) {
 	defer c.queue.ShutDown()

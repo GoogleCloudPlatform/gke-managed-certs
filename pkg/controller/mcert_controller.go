@@ -26,9 +26,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 
 	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	"managed-certs-gke/pkg/sslcertificate"
+	"managed-certs-gke/third_party/client/clientset/versioned"
+	mcertlister "managed-certs-gke/third_party/client/listers/alpha.cloud.google.com/v1alpha1"
 )
+
+type McertController struct {
+	client    *versioned.Clientset
+	lister    mcertlister.ManagedCertificateLister
+	synced    cache.InformerSynced
+	queue     workqueue.RateLimitingInterface
+	sslClient *sslcertificate.SslClient
+	state     *McertState
+}
 
 func (c *McertController) Run(stopChannel <-chan struct{}, errors chan<- error) {
 	defer c.queue.ShutDown()

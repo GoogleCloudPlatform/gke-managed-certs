@@ -76,12 +76,8 @@ def create_random_domains(zone_name):
   Generates 2 random domain names in zone_name, under top-level domain com.certsbridge
   """
 
-  #output, _ = command.call_get_out("gcloud compute addresses describe test-ip-address --global | grep address: | cut -d ' ' -f 2")
-
-  time.sleep(9*60)
-  ingress_ip, _ = command.call_get_out("kubectl get ingress --field-selector='metadata.name=test-ingress' -o go-template='{{range .items}}{{index (index .status.loadBalancer.ingress 0) \"ip\"}}{{\"\\n\"}}{{end}}'")
-  utils.printf(ingress_ip)
-  ip = ingress_ip
+  output, _ = command.call_get_out("gcloud compute addresses describe test-ip-address --global | grep address: | cut -d ' ' -f 2")
+  ip = output[0]
   utils.printf("Creating random domains pointing at ip {0}".format(ip))
 
   switch_to_certsbridge_conf()

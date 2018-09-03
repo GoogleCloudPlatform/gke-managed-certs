@@ -29,6 +29,11 @@ import (
 	"managed-certs-gke/pkg/config"
 )
 
+type Controller struct {
+	Ingress IngressController
+	Mcert   McertController
+}
+
 func NewController(clients *config.ControllerClients) *Controller {
 	mcertInformer := clients.McertInformerFactory.Alpha().V1alpha1().ManagedCertificates()
 
