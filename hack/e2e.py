@@ -58,6 +58,14 @@ def delete_managed_certificates():
     for name in names:
       command.call("kubectl delete mcrt {0}".format(name))
 
+def get_firewall_rules():
+  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter=network=e2e --uri 2>/dev/null")
+  return uris
+
+def delete_firewall_rules():
+  for uri in get_firewall_rules():
+    command.call("echo y | gcloud compute firewall-rules delete {0}".format(uri))
+
 def get_managed_certificate_statuses():
   return command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
 
@@ -96,7 +104,10 @@ def init():
   command.call("kubectl config set-context $(kubectl config current-context) --namespace=default")
 
 def tearDown(zone):
-  utils.printf("Clean up, delete k8s objects, all SslCertificate resources and created DNS records")
+  utils.printf("Clean up, delete firewall rules, k8s objects, all SslCertificate resources and created DNS records")
+
+  utils.printf("Delete firewall rules for networks matching e2e")
+  utils.backoff(delete_firewall_rules, lambda _: len(get_firewall_rules()) == 0)
 
   kubectl_delete("ingress.yaml", "managed-certificate-controller.yaml")
   delete_managed_certificates()
@@ -123,7 +134,13 @@ spec:
     i += 1
 
 def test(zone):
-  utils.printf("Create random DNS records, set up k8s objects")
+  utils.printf("Create firewal rules, random DNS records, set up k8s objects")
+
+  instance_prefix = os.getenv("INSTANCE_PREFIX")
+  if instance_prefix is not None:
+    command_call("gcloud compute firewall-rules create {0}-egress --direction=egress --allow=tcp".format(instance_prefix))
+  else:
+    utils.printf("INSTANCE_PREFIX env is not set")
 
   kubectl_create("rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml", "managed-certificate-controller.yaml")
 

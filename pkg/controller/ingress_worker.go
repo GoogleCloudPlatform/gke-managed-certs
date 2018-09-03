@@ -69,7 +69,7 @@ func (c *Controller) handleIngress(key string) error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("Handling ingress %s.%s", ns, name)
+	glog.Infof("Handling ingress %s:%s", ns, name)
 
 	ing, err := c.Ingress.client.Get(ns, name)
 	if err != nil {
