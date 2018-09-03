@@ -59,7 +59,7 @@ def delete_managed_certificates():
       command.call("kubectl delete mcrt {0}".format(name))
 
 def get_firewall_rules():
-  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter=network=e2e --uri 2>/dev/null")
+  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter='network=e2e AND name=mcert' --uri 2>/dev/null")
   return uris
 
 def delete_firewall_rules():
@@ -138,7 +138,7 @@ def test(zone):
 
   instance_prefix = os.getenv("INSTANCE_PREFIX")
   if instance_prefix is not None:
-    command_call("gcloud compute firewall-rules create {0}-egress --direction=egress --allow=tcp".format(instance_prefix))
+    command_call("gcloud compute firewall-rules create mcert-{0}-egress --network={0} --direction=egress --allow=tcp".format(instance_prefix))
   else:
     utils.printf("INSTANCE_PREFIX env is not set")
 
