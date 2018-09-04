@@ -28,7 +28,7 @@ func TestRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.T) {
 	}
 
 	if len(name) <= 0 || len(name) >= 64 {
-		t.Errorf("Random name %v has %v characters, should have between 0 and 63", name, len(name))
+		t.Errorf("Random name %s has %d characters, should have between 0 and 63", name, len(name))
 	}
 }
 
@@ -45,6 +45,6 @@ func TestRandomName_calledTwiceReturnsDifferentNames(t *testing.T) {
 	}
 
 	if name1 == name2 {
-		t.Errorf("createRandomName called twice returned the same name %v", name1)
+		t.Errorf("createRandomName called twice returned the same name %s", name1)
 	}
 }
