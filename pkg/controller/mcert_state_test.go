@@ -21,59 +21,96 @@ import (
 	"testing"
 )
 
-func TestMcertState_GetPutDelete(t *testing.T) {
-	state := newMcertState()
+var getPutDeleteTests = []struct {
+	initArg   string
+	initState SslCertificateState
+	testArg   string
+	outExists bool
+	outState  SslCertificateState
+	desc      string
+}{
+	{"", SslCertificateState{}, "cat", false, SslCertificateState{}, "Lookup argument in empty state"},
+	{"cat", SslCertificateState{Current: "1", New: ""}, "cat", true, SslCertificateState{Current: "1", New: ""}, "Insert and lookup same argument, New empty"},
+	{"tea", SslCertificateState{Current: "1", New: ""}, "dog", false, SslCertificateState{}, "Insert and lookup different arguments, New empty"},
+	{"cat", SslCertificateState{Current: "1", New: "2"}, "cat", true, SslCertificateState{Current: "1", New: "2"}, "Insert and lookup same argument, New non-empty"},
+	{"tea", SslCertificateState{Current: "1", New: "2"}, "dog", false, SslCertificateState{}, "Insert and lookup different arguments, New non-empty"},
+}
 
-	_, e := state.Get("x")
-	if e {
-		t.Errorf("Fail, state should be empty")
-		return
-	}
+func TestGetPutDelete(t *testing.T) {
+	for _, testCase := range getPutDeleteTests {
+		t.Run(testCase.desc, func(t *testing.T) {
+			sut := newMcertState()
 
-	state.PutCurrent("x", "1")
+			if testCase.initArg != "" {
+				sut.Put(testCase.initArg, testCase.initState)
+			}
 
-	v, e := state.Get("x")
-	if !e || v.Current != "1" {
-		t.Errorf("Fail, x should be mapped to 1")
-		return
-	}
+			if state, exists := sut.Get(testCase.testArg); exists != testCase.outExists {
+				t.Errorf("Expected key %s to exist in state to be %t", testCase.testArg, testCase.outExists)
+			} else {
+				if state != testCase.outState {
+					t.Errorf("Expected key %s to be mapped to %+v, instead is mapped to %+v", testCase.testArg, testCase.outState, state)
+				}
+			}
 
-	state.PutCurrent("x", "2")
+			if testCase.initArg != "" {
+				sut.PutCurrent(testCase.initArg, testCase.initState.Current)
+			}
 
-	v, e = state.Get("x")
-	if !e || v.Current != "2" {
-		t.Errorf("Fail, x should be mapped to 2")
-	}
+			if state, exists := sut.Get(testCase.testArg); exists != testCase.outExists {
+				t.Errorf("Expected key %s to exist in state to be %t", testCase.testArg, testCase.outExists)
+			} else {
+				if state.Current != testCase.outState.Current {
+					t.Errorf("Expected key %s to be mapped to %s, instead is mapped to %s", testCase.testArg, testCase.outState.Current, state.Current)
+				}
 
-	state.Delete("y") // no-op
+				if state.New != "" {
+					t.Errorf("Expected New to be empty, instead is %s", state.New)
+				}
+			}
 
-	state.Delete("x")
+			sut.Delete("non existing key") // no-op
 
-	_, e = state.Get("x")
-	if e {
-		t.Errorf("Fail, state should be empty after delete")
-		return
+			sut.Delete(testCase.initArg)
+
+			if state, exists := sut.Get(testCase.initArg); exists {
+				t.Errorf("State should be empty after delete, instead is %+v", state)
+			}
+		})
 	}
 }
 
-func TestMcertState_GetAllManagedCertificates_GetAllSslCertificates_Delete(t *testing.T) {
+func eq(a, b []string) bool {
+	sort.Strings(a)
+	sort.Strings(b)
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestGetAll(t *testing.T) {
 	state := newMcertState()
 
 	state.PutCurrent("x", "1")
-	state.PutState("y", SslCertificateState{Current: "2", New: "3"})
+	state.Put("y", SslCertificateState{Current: "2", New: "3"})
 
 	mcerts := state.GetAllManagedCertificates()
-	sort.Strings(mcerts)
-
-	if mcerts[0] != "x" || mcerts[1] != "y" || len(mcerts) != 2 {
-		t.Errorf("Fail, mcerts should have exactly two items x and y, instead %v", mcerts)
+	if !eq(mcerts, []string{"x", "y"}) {
+		t.Errorf("AllManagedCertificates expected to equal [x, y], instead are %v", mcerts)
 	}
 
 	sslCerts := state.GetAllSslCertificates()
-	sort.Strings(sslCerts)
-
-	if sslCerts[0] != "1" || sslCerts[1] != "2" || sslCerts[2] != "3" || len(sslCerts) != 3 {
-		t.Errorf("Fail, ssl certs should have exactly three items 1, 2 and 3, instead %v", sslCerts)
+	if !eq(sslCerts, []string{"1", "2", "3"}) {
+		t.Errorf("AllSslCertificates expected to equal [1,2,3], instead are %v", sslCerts)
 	}
 
 	state.Delete("z") // no-op
@@ -81,12 +118,12 @@ func TestMcertState_GetAllManagedCertificates_GetAllSslCertificates_Delete(t *te
 	state.Delete("x")
 
 	mcerts = state.GetAllManagedCertificates()
-	if mcerts[0] != "y" || len(mcerts) != 1 {
-		t.Errorf("Fail, mcerts should have exactly one item y, instead %v", mcerts)
+	if !eq(mcerts, []string{"y"}) {
+		t.Errorf("AllManagedCertificates expected to equal [y], instead are %v", mcerts)
 	}
 
 	sslCerts = state.GetAllSslCertificates()
-	if sslCerts[0] != "2" || sslCerts[1] != "3" || len(sslCerts) != 2 {
-		t.Errorf("Fail, ssl certs should have exactly two items 2 and 3, instead %v", sslCerts)
+	if !eq(sslCerts, []string{"2", "3"}) {
+		t.Errorf("AllSslCertificates expected to equal [2,3], instead are %v", sslCerts)
 	}
 }

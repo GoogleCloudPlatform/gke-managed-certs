@@ -52,34 +52,34 @@ func (state *McertState) Get(key string) (SslCertificateState, bool) {
 	return value, exists
 }
 
-func (state *McertState) GetAllManagedCertificates() (values []string) {
-	values = make([]string, 0)
+func (state *McertState) GetAllManagedCertificates() []string {
+	var result []string
 
 	state.RLock()
 	defer state.RUnlock()
 
 	for key := range state.m {
-		values = append(values, key)
+		result = append(result, key)
 	}
 
-	return
+	return result
 }
 
-func (state *McertState) GetAllSslCertificates() (values []string) {
-	values = make([]string, 0)
+func (state *McertState) GetAllSslCertificates() []string {
+	var result []string
 
 	state.RLock()
 	defer state.RUnlock()
 
 	for _, value := range state.m {
-		values = append(values, value.Current)
+		result = append(result, value.Current)
 
 		if value.New != "" {
-			values = append(values, value.New)
+			result = append(result, value.New)
 		}
 	}
 
-	return
+	return result
 }
 
 func (state *McertState) PutCurrent(key, value string) {
@@ -92,7 +92,7 @@ func (state *McertState) PutCurrent(key, value string) {
 	}
 }
 
-func (state *McertState) PutState(key string, sslState SslCertificateState) {
+func (state *McertState) Put(key string, sslState SslCertificateState) {
 	state.Lock()
 	defer state.Unlock()
 	state.m[key] = sslState

@@ -96,7 +96,7 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 		return fmt.Errorf("Unexpected status %v of SslCertificate %v", sslCert.Managed.Status, sslCert)
 	}
 
-	domainStatus := make([]api.DomainStatus, 0)
+	var domainStatus []api.DomainStatus
 	for domain, status := range sslCert.Managed.DomainStatus {
 		translatedStatus, err := translateDomainStatus(status)
 		if err != nil {
@@ -129,7 +129,7 @@ func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) er
 
 		glog.Infof("McertController adds to state new SslCertificate name %v for update of current SslCertificate %v associated with Managed Certificate %v", newName, sslCertificateState.Current, mcert.ObjectMeta.Name)
 		sslCertificateState.New = newName
-		c.state.PutState(mcert.ObjectMeta.Name, sslCertificateState)
+		c.state.Put(mcert.ObjectMeta.Name, sslCertificateState)
 	}
 
 	if sslCert, err := c.sslClient.Get(sslCertificateState.New); err != nil {
