@@ -28,7 +28,7 @@ $ kubectl create -f deploy/managed-certificate-controller.yaml
 
 1. Create a Managed Certificate custom object, specifying a single non-wildcard domain not longer than 63 characters, for which you want to obtain a certificate:  
 ```
-apiVersion: alpha.cloud.google.com/v1alpha1
+apiVersion: gke.googleapis.com/v1alpha1
 kind: ManagedCertificate
 metadata:
   name: example-certificate
@@ -38,7 +38,7 @@ spec:
 ```
 2. Configure Ingress to use this custom object to terminate SSL connections:  
 ```console
-kubectl annotate ingress [your-ingress-name] cloud.google.com/managed-certificates example-certificate
+kubectl annotate ingress [your-ingress-name] gke.googleapis.com/managed-certificates example-certificate
 ```  
 If you need, you can specify more multiple managed certificates here, separating their names with commas.
 
@@ -48,7 +48,7 @@ You can do the below steps in any order and doing even one of them will turn SSL
 
 * Remove annotation from Ingress  
 ```console
-kubectl annotate ingress [your-ingress-name] cloud.google.com/managed-certificates-
+kubectl annotate ingress [your-ingress-name] gke.googleapis.com/managed-certificates-
 ```  
 (note the minus sign at the end of annotation name)
 * Tear down the controller  

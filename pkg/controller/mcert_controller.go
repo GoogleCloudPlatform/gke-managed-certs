@@ -28,10 +28,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 	"managed-certs-gke/pkg/sslcertificate"
 	"managed-certs-gke/third_party/client/clientset/versioned"
-	mcertlister "managed-certs-gke/third_party/client/listers/alpha.cloud.google.com/v1alpha1"
+	mcertlister "managed-certs-gke/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
 
 type McertController struct {

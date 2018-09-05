@@ -35,7 +35,7 @@ type Controller struct {
 }
 
 func NewController(clients *config.ControllerClients) *Controller {
-	mcertInformer := clients.McertInformerFactory.Alpha().V1alpha1().ManagedCertificates()
+	mcertInformer := clients.McertInformerFactory.Gke().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
 		Ingress: IngressController{

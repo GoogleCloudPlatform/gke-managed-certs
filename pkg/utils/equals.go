@@ -21,7 +21,7 @@ import (
 
 	compute "google.golang.org/api/compute/v0.alpha"
 
-	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 func Equals(mcert *api.ManagedCertificate, sslCert *compute.SslCertificate) bool {

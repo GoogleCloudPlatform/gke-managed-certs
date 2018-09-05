@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
-	api "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 	"managed-certs-gke/pkg/utils"
 )
 
@@ -111,7 +111,7 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	mcert.Status.DomainStatus = domainStatus
 	mcert.Status.CertificateName = sslCert.Name
 
-	_, err = c.client.AlphaV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
+	_, err = c.client.GkeV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
 	return err
 }
 

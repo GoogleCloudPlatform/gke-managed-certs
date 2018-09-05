@@ -18,7 +18,7 @@ metadata:
   name: test-ingress
   annotations:
     kubernetes.io/ingress.global-static-ip-name: test-ip-address
-    cloud.google.com/managed-certificates: test1-certificate,test2-certificate
+    gke.googleapis.com/managed-certificates: test1-certificate,test2-certificate
 spec:
   backend:
     serviceName: http-hello

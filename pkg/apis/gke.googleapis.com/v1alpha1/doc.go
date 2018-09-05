@@ -16,5 +16,5 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
-// +groupName=alpha.cloud.google.com
+// +groupName=gke.googleapis.com
 package v1alpha1

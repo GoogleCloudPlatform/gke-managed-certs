@@ -15,9 +15,9 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-    name: managedcertificates.alpha.cloud.google.com
+    name: managedcertificates.gke.googleapis.com
 spec:
-    group: alpha.cloud.google.com
+    group: gke.googleapis.com
     version: v1alpha1
     scope: Namespaced
     names:

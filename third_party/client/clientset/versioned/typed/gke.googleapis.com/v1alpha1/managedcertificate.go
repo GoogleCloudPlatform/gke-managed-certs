@@ -25,7 +25,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "managed-certs-gke/pkg/apis/alpha.cloud.google.com/v1alpha1"
+	v1alpha1 "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 // ManagedCertificatesGetter has a method to return a ManagedCertificateInterface.
@@ -55,7 +55,7 @@ type managedCertificates struct {
 }
 
 // newManagedCertificates returns a ManagedCertificates
-func newManagedCertificates(c *AlphaV1alpha1Client, namespace string) *managedCertificates {
+func newManagedCertificates(c *GkeV1alpha1Client, namespace string) *managedCertificates {
 	return &managedCertificates{
 		client: c.RESTClient(),
 		ns:     namespace,

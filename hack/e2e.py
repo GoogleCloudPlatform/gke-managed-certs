@@ -120,7 +120,7 @@ def create_managed_certificates(domains):
   for domain in domains:
     with open("/tmp/managed-certificate.yaml", "w") as f:
       f.write(
-"""apiVersion: alpha.cloud.google.com/v1alpha1
+"""apiVersion: gke.googleapis.com/v1alpha1
 kind: ManagedCertificate
 metadata:
     name: test{0}-certificate

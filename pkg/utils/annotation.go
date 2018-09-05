@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	annotation = "cloud.google.com/managed-certificates"
+	annotation = "gke.googleapis.com/managed-certificates"
 	splitBy    = ","
 )
 
