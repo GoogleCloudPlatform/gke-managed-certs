@@ -53,12 +53,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 
 		var sslCertNames []string
 		for _, mcert := range mcerts {
-			if state, exists := c.Mcert.state.Get(mcert); exists {
-				sslCertName := state.New
-				if sslCertName == "" {
-					sslCertName = state.Current
-				}
-
+			if sslCertName, exists := c.Mcert.state.Get(mcert); exists {
 				if _, exists := sslCertsMap[sslCertName]; exists {
 					sslCertNames = append(sslCertNames, sslCertName)
 				}

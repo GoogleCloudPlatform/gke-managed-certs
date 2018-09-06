@@ -1,4 +1,4 @@
-all: gofmt build-binary-in-docker run-test-in-docker cross
+all: gofmt build-binary-in-docker run-test-in-docker cross clean
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
@@ -44,7 +44,7 @@ gofmt:
 	gofmt -w pkg
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
-release: build-binary-in-docker run-test-in-docker docker
+release: build-binary-in-docker run-test-in-docker docker clean
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
 release-ci: build-binary-in-docker run-test-in-docker docker-ci

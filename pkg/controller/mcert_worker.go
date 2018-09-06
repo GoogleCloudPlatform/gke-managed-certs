@@ -60,18 +60,9 @@ func translateDomainStatus(status string) (string, error) {
 }
 
 func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
-	sslCertificateState, exists := c.state.Get(mcert.ObjectMeta.Name)
+	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
 	if !exists {
 		return fmt.Errorf("Failed to find in state Managed Certificate %s", mcert.ObjectMeta.Name)
-	}
-
-	if sslCertificateState.Current == "" {
-		return nil
-	}
-
-	sslCertificateName := sslCertificateState.New
-	if sslCertificateName == "" {
-		sslCertificateName = sslCertificateState.Current
 	}
 
 	sslCert, err := c.sslClient.Get(sslCertificateName)
@@ -115,81 +106,13 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	return err
 }
 
-func (c *McertController) updateSslCertificate(mcert *api.ManagedCertificate) error {
-	sslCertificateState, exists := c.state.Get(mcert.ObjectMeta.Name)
-	if !exists {
-		return fmt.Errorf("Failed to find in state Managed Certificate %s", mcert.ObjectMeta.Name)
-	}
-
-	if sslCertificateState.New == "" {
-		newName, err := c.randomName()
-		if err != nil {
-			return err
-		}
-
-		glog.Infof("McertController adds to state new SslCertificate name %s for update of current SslCertificate %s associated with Managed Certificate %s", newName, sslCertificateState.Current, mcert.ObjectMeta.Name)
-		sslCertificateState.New = newName
-		c.state.Put(mcert.ObjectMeta.Name, sslCertificateState)
-	}
-
-	if sslCert, err := c.sslClient.Get(sslCertificateState.New); err != nil {
-		//New SslCertificate does not exist yet, create it
-		glog.Infof("McertController creates a new SslCertificate %s for update of current SslCertificate %s associated with Managed Certificate %s", sslCertificateState.New, sslCertificateState.Current, mcert.ObjectMeta.Name)
-		err := c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains)
-		if err != nil {
-			return err
-		}
-	} else {
-		if !utils.Equals(mcert, sslCert) || sslCert.Managed.Status == sslProvisioningFailedPermanently || sslCert.Managed.Status == sslRenewalFailed {
-			//New SslCertificate exists, but is outdated or has a failure status, so remove it and create a new one
-			err := c.sslClient.Delete(sslCertificateState.New)
-			if err != nil {
-				return err
-			}
-
-			err = c.sslClient.Insert(sslCertificateState.New, mcert.Spec.Domains)
-			if err != nil {
-				return err
-			}
-		} else if sslCert.Managed.Status == sslActive {
-			// New SslCertificate exists and is active, so just make it the current one
-			c.state.PutCurrent(mcert.ObjectMeta.Name, sslCertificateState.New)
-		}
-	}
-
-	return nil
-}
-
 func (c *McertController) createSslCertificateIfNecessary(sslCertificateName string, mcert *api.ManagedCertificate) error {
-	if sslCert, err := c.sslClient.Get(sslCertificateName); err != nil {
+	if _, err := c.sslClient.Get(sslCertificateName); err != nil {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("McertController creates a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcert.ObjectMeta.Name)
 		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
 		if err != nil {
 			return err
-		}
-	} else {
-		if !utils.Equals(mcert, sslCert) {
-			//SslCertificate exists, but needs updating
-			glog.Infof("McertController found inconsistent state between Managed Certificate %s (domains: %+v) and SslCertificate %s (domains: %+v), update is needed", mcert.ObjectMeta.Name, mcert.Spec.Domains, sslCert.Name, sslCert.Managed.Domains)
-			return c.updateSslCertificate(mcert)
-		}
-
-		//SslCertificate exists and does not need updating, but maybe there is an ongoing update, that is no longer needed?
-		if sslCertificateState, exists := c.state.Get(mcert.ObjectMeta.Name); !exists {
-			return fmt.Errorf("Failed to find in state Managed Certificate %s", mcert.ObjectMeta.Name)
-		} else if sslCertificateState.New != "" {
-			//Ongoing update, now obsolete. Remove the new SslCertificate object.
-			sslCertNameToDelete := sslCertificateState.New
-			c.state.PutCurrent(mcert.ObjectMeta.Name, sslCertificateState.Current)
-			glog.Infof("McertController stops no longer needed ongoing update of Managed Certificate %s. New SslCertificate %s removed from state", mcert.ObjectMeta.Name, sslCertNameToDelete)
-
-			err := c.sslClient.Delete(sslCertNameToDelete)
-			if err != nil {
-				return err
-			}
-
-			glog.Infof("McertContoller deleted no longer needed SslCertificate %s that was created to update Managed Certificate %s", sslCertNameToDelete, mcert.ObjectMeta.Name)
 		}
 	}
 
@@ -197,8 +120,8 @@ func (c *McertController) createSslCertificateIfNecessary(sslCertificateName str
 }
 
 func (c *McertController) createSslCertificateNameIfNecessary(name string) (string, error) {
-	sslCertificateState, exists := c.state.Get(name)
-	if !exists || sslCertificateState.Current == "" {
+	sslCertificateName, exists := c.state.Get(name)
+	if !exists || sslCertificateName == "" {
 		//State does not have anything for this managed certificate or no SslCertificate is associated with it
 		sslCertificateName, err := c.randomName()
 		if err != nil {
@@ -206,11 +129,11 @@ func (c *McertController) createSslCertificateNameIfNecessary(name string) (stri
 		}
 
 		glog.Infof("McertController adds to state new SslCertificate name %s associated with Managed Certificate %s", sslCertificateName, name)
-		c.state.PutCurrent(name, sslCertificateName)
+		c.state.Put(name, sslCertificateName)
 		return sslCertificateName, nil
 	}
 
-	return sslCertificateState.Current, nil
+	return sslCertificateName, nil
 }
 
 func (c *McertController) handleMcert(key string) error {

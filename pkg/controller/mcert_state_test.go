@@ -23,17 +23,15 @@ import (
 
 var getPutDeleteTests = []struct {
 	initArg   string
-	initState SslCertificateState
+	initVal   string
 	testArg   string
 	outExists bool
-	outState  SslCertificateState
+	outVal    string
 	desc      string
 }{
-	{"", SslCertificateState{}, "cat", false, SslCertificateState{}, "Lookup argument in empty state"},
-	{"cat", SslCertificateState{Current: "1", New: ""}, "cat", true, SslCertificateState{Current: "1", New: ""}, "Insert and lookup same argument, New empty"},
-	{"tea", SslCertificateState{Current: "1", New: ""}, "dog", false, SslCertificateState{}, "Insert and lookup different arguments, New empty"},
-	{"cat", SslCertificateState{Current: "1", New: "2"}, "cat", true, SslCertificateState{Current: "1", New: "2"}, "Insert and lookup same argument, New non-empty"},
-	{"tea", SslCertificateState{Current: "1", New: "2"}, "dog", false, SslCertificateState{}, "Insert and lookup different arguments, New non-empty"},
+	{"", "", "cat", false, "", "Lookup argument in empty state"},
+	{"cat", "1", "cat", true, "1", "Insert and lookup same argument"},
+	{"tea", "1", "dog", false, "", "Insert and lookup different arguments, New empty"},
 }
 
 func TestGetPutDelete(t *testing.T) {
@@ -42,30 +40,14 @@ func TestGetPutDelete(t *testing.T) {
 			sut := newMcertState()
 
 			if testCase.initArg != "" {
-				sut.Put(testCase.initArg, testCase.initState)
+				sut.Put(testCase.initArg, testCase.initVal)
 			}
 
-			if state, exists := sut.Get(testCase.testArg); exists != testCase.outExists {
+			if value, exists := sut.Get(testCase.testArg); exists != testCase.outExists {
 				t.Errorf("Expected key %s to exist in state to be %t", testCase.testArg, testCase.outExists)
 			} else {
-				if state != testCase.outState {
-					t.Errorf("Expected key %s to be mapped to %+v, instead is mapped to %+v", testCase.testArg, testCase.outState, state)
-				}
-			}
-
-			if testCase.initArg != "" {
-				sut.PutCurrent(testCase.initArg, testCase.initState.Current)
-			}
-
-			if state, exists := sut.Get(testCase.testArg); exists != testCase.outExists {
-				t.Errorf("Expected key %s to exist in state to be %t", testCase.testArg, testCase.outExists)
-			} else {
-				if state.Current != testCase.outState.Current {
-					t.Errorf("Expected key %s to be mapped to %s, instead is mapped to %s", testCase.testArg, testCase.outState.Current, state.Current)
-				}
-
-				if state.New != "" {
-					t.Errorf("Expected New to be empty, instead is %s", state.New)
+				if value != testCase.outVal {
+					t.Errorf("Expected key %s to be mapped to %s, instead is mapped to %s", testCase.testArg, testCase.outVal, value)
 				}
 			}
 
@@ -73,8 +55,8 @@ func TestGetPutDelete(t *testing.T) {
 
 			sut.Delete(testCase.initArg)
 
-			if state, exists := sut.Get(testCase.initArg); exists {
-				t.Errorf("State should be empty after delete, instead is %+v", state)
+			if value, exists := sut.Get(testCase.initArg); exists {
+				t.Errorf("State should be empty after delete, instead is %s", value)
 			}
 		})
 	}
@@ -100,8 +82,8 @@ func eq(a, b []string) bool {
 func TestGetAll(t *testing.T) {
 	state := newMcertState()
 
-	state.PutCurrent("x", "1")
-	state.Put("y", SslCertificateState{Current: "2", New: "3"})
+	state.Put("x", "1")
+	state.Put("y", "2")
 
 	mcerts := state.GetAllManagedCertificates()
 	if !eq(mcerts, []string{"x", "y"}) {
@@ -109,8 +91,8 @@ func TestGetAll(t *testing.T) {
 	}
 
 	sslCerts := state.GetAllSslCertificates()
-	if !eq(sslCerts, []string{"1", "2", "3"}) {
-		t.Errorf("AllSslCertificates expected to equal [1,2,3], instead are %v", sslCerts)
+	if !eq(sslCerts, []string{"1", "2"}) {
+		t.Errorf("AllSslCertificates expected to equal [1,2], instead are %v", sslCerts)
 	}
 
 	state.Delete("z") // no-op
@@ -123,7 +105,7 @@ func TestGetAll(t *testing.T) {
 	}
 
 	sslCerts = state.GetAllSslCertificates()
-	if !eq(sslCerts, []string{"2", "3"}) {
-		t.Errorf("AllSslCertificates expected to equal [2,3], instead are %v", sslCerts)
+	if !eq(sslCerts, []string{"2"}) {
+		t.Errorf("AllSslCertificates expected to equal [2], instead are %v", sslCerts)
 	}
 }

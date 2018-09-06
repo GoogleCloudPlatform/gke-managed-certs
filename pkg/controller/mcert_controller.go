@@ -71,7 +71,7 @@ func (c *McertController) initializeState() error {
 	glog.Infof("McertController initializing state, managed certificates found: %+v", strings.Join(mcertsNames, ", "))
 
 	for _, mcert := range mcerts {
-		c.state.PutCurrent(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
+		c.state.Put(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
 	}
 
 	return nil
