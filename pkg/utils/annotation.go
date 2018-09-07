@@ -35,7 +35,7 @@ const (
 *  - a boolean flag which is true if Ingress is annotated with a non-empty managed-certificates annotation.
  */
 func ParseAnnotation(ingress *api.Ingress) ([]string, bool) {
-	annotationValue, exists := ingress.ObjectMeta.Annotations[annotation]
+	annotationValue, exists := ingress.Annotations[annotation]
 	if !exists || annotationValue == "" {
 		return nil, false
 	}

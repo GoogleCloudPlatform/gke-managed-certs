@@ -84,16 +84,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 	}, nil
 }
 
-func (c *SslClient) Delete(name string) error {
-	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
-	return err
-}
-
-func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
-	return c.service.SslCertificates.Get(c.projectId, name).Do()
-}
-
-func (c *SslClient) Insert(sslCertificateName string, domains []string) error {
+func (c *SslClient) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -108,6 +99,15 @@ func (c *SslClient) Insert(sslCertificateName string, domains []string) error {
 	}
 
 	return nil
+}
+
+func (c *SslClient) Delete(name string) error {
+	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
+	return err
+}
+
+func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
+	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
 
 func (c *SslClient) List() (*compute.SslCertificateList, error) {

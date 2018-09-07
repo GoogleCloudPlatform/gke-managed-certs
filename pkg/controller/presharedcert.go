@@ -44,7 +44,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 	}
 
 	for _, ingress := range ingresses.Items {
-		glog.Infof("Update pre-shared-cert annotation for ingress %s", ingress.ObjectMeta.Name)
+		glog.Infof("Update pre-shared-cert annotation for ingress %s", ingress.Name)
 
 		mcerts, exists := utils.ParseAnnotation(&ingress)
 		if !exists {
@@ -61,22 +61,21 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 		}
 
 		if len(sslCertNames) < 1 {
-			glog.Infof("No ssl certificates to update ingress %s with", ingress.ObjectMeta.Name)
+			glog.Infof("No ssl certificates to update ingress %s with", ingress.Name)
 			continue
 		}
 
 		sort.Strings(sslCertNames)
 
-		glog.Infof("Update pre-shared-cert annotation for ingress %s, found SslCertificate resource names to put in the annotation: %s", ingress.ObjectMeta.Name, strings.Join(sslCertNames, ", "))
+		glog.Infof("Update pre-shared-cert annotation for ingress %s, found SslCertificate resource names to put in the annotation: %s", ingress.Name, strings.Join(sslCertNames, ", "))
 
-		ingress.ObjectMeta.Annotations["ingress.gcp.kubernetes.io/pre-shared-cert"] = strings.Join(sslCertNames, ", ")
-		_, err := c.Ingress.client.Update(&ingress)
-		if err != nil {
+		ingress.Annotations["ingress.gcp.kubernetes.io/pre-shared-cert"] = strings.Join(sslCertNames, ", ")
+		if _, err := c.Ingress.client.Update(&ingress); err != nil {
 			runtime.HandleError(err)
 			return
 		}
 
-		glog.Infof("Annotation pre-shared-cert updated for ingress %s", ingress.ObjectMeta.Name)
+		glog.Infof("Annotation pre-shared-cert updated for ingress %s", ingress.Name)
 	}
 
 }

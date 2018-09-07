@@ -60,9 +60,9 @@ func translateDomainStatus(status string) (string, error) {
 }
 
 func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
-	sslCertificateName, exists := c.state.Get(mcert.ObjectMeta.Name)
+	sslCertificateName, exists := c.state.Get(mcert.Name)
 	if !exists {
-		return fmt.Errorf("Failed to find in state Managed Certificate %s", mcert.ObjectMeta.Name)
+		return fmt.Errorf("Failed to find in state Managed Certificate %s", mcert.Name)
 	}
 
 	sslCert, err := c.sslClient.Get(sslCertificateName)
@@ -102,15 +102,15 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	mcert.Status.DomainStatus = domainStatus
 	mcert.Status.CertificateName = sslCert.Name
 
-	_, err = c.client.GkeV1alpha1().ManagedCertificates(mcert.ObjectMeta.Namespace).Update(mcert)
+	_, err = c.client.GkeV1alpha1().ManagedCertificates(mcert.Namespace).Update(mcert)
 	return err
 }
 
 func (c *McertController) createSslCertificateIfNecessary(sslCertificateName string, mcert *api.ManagedCertificate) error {
 	if _, err := c.sslClient.Get(sslCertificateName); err != nil {
 		//SslCertificate does not yet exist, create it
-		glog.Infof("McertController creates a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcert.ObjectMeta.Name)
-		err := c.sslClient.Insert(sslCertificateName, mcert.Spec.Domains)
+		glog.Infof("McertController creates a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcert.Name)
+		err := c.sslClient.Create(sslCertificateName, mcert.Spec.Domains)
 		if err != nil {
 			return err
 		}

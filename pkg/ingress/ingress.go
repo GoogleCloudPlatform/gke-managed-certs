@@ -61,7 +61,7 @@ func (c *Interface) List() (result *api.IngressList, err error) {
 
 func (c *Interface) Update(ingress *api.Ingress) (result *api.Ingress, err error) {
 	result = &api.Ingress{}
-	err = c.client.Put().Namespace(ingress.ObjectMeta.Namespace).Resource(resource).Name(ingress.Name).Body(ingress).Do().Into(result)
+	err = c.client.Put().Namespace(ingress.Namespace).Resource(resource).Name(ingress.Name).Body(ingress).Do().Into(result)
 	return
 }
 

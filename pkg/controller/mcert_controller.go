@@ -66,12 +66,12 @@ func (c *McertController) initializeState() error {
 
 	var mcertsNames []string
 	for _, mcert := range mcerts {
-		mcertsNames = append(mcertsNames, mcert.ObjectMeta.Name)
+		mcertsNames = append(mcertsNames, mcert.Name)
 	}
 	glog.Infof("McertController initializing state, managed certificates found: %+v", strings.Join(mcertsNames, ", "))
 
 	for _, mcert := range mcerts {
-		c.state.Put(mcert.ObjectMeta.Name, mcert.Status.CertificateName)
+		c.state.Put(mcert.Name, mcert.Status.CertificateName)
 	}
 
 	return nil
@@ -93,7 +93,7 @@ func (c *McertController) getAllMcertsInCluster() (result map[string]*api.Manage
 
 	result = make(map[string]*api.ManagedCertificate, len(mcerts))
 	for _, mcert := range mcerts {
-		result[mcert.ObjectMeta.Name] = mcert
+		result[mcert.Name] = mcert
 	}
 
 	return
