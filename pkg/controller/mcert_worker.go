@@ -106,12 +106,11 @@ func (c *McertController) updateStatus(mcert *api.ManagedCertificate) error {
 	return err
 }
 
-func (c *McertController) createSslCertificateIfNecessary(sslCertificateName string, mcert *api.ManagedCertificate) error {
+func (c *McertController) createSslCertificateIfNeeded(sslCertificateName string, mcert *api.ManagedCertificate) error {
 	if _, err := c.sslClient.Get(sslCertificateName); err != nil {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("McertController creates a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcert.Name)
-		err := c.sslClient.Create(sslCertificateName, mcert.Spec.Domains)
-		if err != nil {
+		if err := c.sslClient.Create(sslCertificateName, mcert.Spec.Domains); err != nil {
 			return err
 		}
 	}
@@ -119,20 +118,21 @@ func (c *McertController) createSslCertificateIfNecessary(sslCertificateName str
 	return nil
 }
 
-func (c *McertController) createSslCertificateNameIfNecessary(name string) (string, error) {
+func (c *McertController) createSslCertificateNameIfNeeded(name string) (string, error) {
 	sslCertificateName, exists := c.state.Get(name)
-	if !exists || sslCertificateName == "" {
-		//State does not have anything for this managed certificate or no SslCertificate is associated with it
-		sslCertificateName, err := c.randomName()
-		if err != nil {
-			return "", err
-		}
 
-		glog.Infof("McertController adds to state new SslCertificate name %s associated with Managed Certificate %s", sslCertificateName, name)
-		c.state.Put(name, sslCertificateName)
+	if exists && sslCertificateName != "" {
 		return sslCertificateName, nil
 	}
 
+	//State does not have anything for this managed certificate or no SslCertificate is associated with it
+	sslCertificateName, err := c.randomName()
+	if err != nil {
+		return "", err
+	}
+
+	glog.Infof("McertController adds to state new SslCertificate name %s associated with Managed Certificate %s", sslCertificateName, name)
+	c.state.Put(name, sslCertificateName)
 	return sslCertificateName, nil
 }
 
@@ -141,20 +141,19 @@ func (c *McertController) handleMcert(key string) error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("McertController handling Managed Certificate %s.%s", ns, name)
+	glog.Infof("McertController handling Managed Certificate %s:%s", ns, name)
 
 	mcert, err := c.lister.ManagedCertificates(ns).Get(name)
 	if err != nil {
 		return err
 	}
 
-	sslCertificateName, err := c.createSslCertificateNameIfNecessary(name)
+	sslCertificateName, err := c.createSslCertificateNameIfNeeded(name)
 	if err != nil {
 		return err
 	}
 
-	err = c.createSslCertificateIfNecessary(sslCertificateName, mcert)
-	if err != nil {
+	if err = c.createSslCertificateIfNeeded(sslCertificateName, mcert); err != nil {
 		return err
 	}
 
@@ -168,28 +167,21 @@ func (c *McertController) processNext() bool {
 		return false
 	}
 
-	err := func(obj interface{}) error {
-		defer c.queue.Done(obj)
+	defer c.queue.Done(obj)
 
-		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.queue.Forget(obj)
-			return fmt.Errorf("Expected string in mcertQueue but got %#v", obj)
-		}
-
-		if err := c.handleMcert(key); err != nil {
-			c.queue.AddRateLimited(obj)
-			return err
-		}
-
+	var key string
+	var ok bool
+	if key, ok = obj.(string); !ok {
 		c.queue.Forget(obj)
-		return nil
-	}(obj)
+		runtime.HandleError(fmt.Errorf("Expected string in mcertQueue but got %T", obj))
+	}
 
-	if err != nil {
+	if err := c.handleMcert(key); err != nil {
+		c.queue.AddRateLimited(obj)
 		runtime.HandleError(err)
 	}
+
+	c.queue.Forget(obj)
 
 	return true
 }

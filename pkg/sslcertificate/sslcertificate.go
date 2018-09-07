@@ -68,7 +68,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 		return nil, err
 	}
 
-	glog.V(1).Infof("Using TokenSource %v", tokenSource)
+	glog.V(1).Infof("TokenSource: %v", tokenSource)
 
 	projectId, err := metadata.ProjectID()
 	if err != nil {

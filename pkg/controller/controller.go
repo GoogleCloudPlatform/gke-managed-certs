@@ -79,7 +79,7 @@ func (c *Controller) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.D
 	if !cache.WaitForCacheSync(stopChannel, c.Mcert.synced) {
 		return fmt.Errorf("Timed out waiting for Managed Certificate cache sync")
 	}
-	glog.Info("Managed Certifiate cache synced")
+	glog.Info("Managed Certificate cache synced")
 
 	errors := make(chan error)
 	go c.Mcert.Run(done, errors)

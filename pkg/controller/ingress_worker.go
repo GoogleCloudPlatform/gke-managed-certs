@@ -42,7 +42,7 @@ func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
 		case event := <-watcher.ResultChan():
 			if event.Object != nil {
 				if ing, ok := event.Object.(*api.Ingress); !ok {
-					runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %v instead, event: %v", event.Object, event))
+					runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %T instead, event: %+v", event.Object, event))
 				} else if event.Type == watch.Added || event.Type == watch.Modified {
 					c.enqueue(ing)
 				}
@@ -76,18 +76,16 @@ func (c *Controller) handleIngress(key string) error {
 		return err
 	}
 
-	mcertNames, present := utils.ParseAnnotation(ing)
-	if !present {
-		// There is no annotation on this ingress
+	mcertNames, isNonEmpty := utils.ParseAnnotation(ing)
+	if !isNonEmpty {
+		// There is either no annotation on this ingress, or there is one which has an empty value
 		return nil
 	}
 
 	for _, name := range mcertNames {
 		// Assume the namespace is the same as ingress's
 		glog.Infof("Looking up Managed Certificate %s in namespace %s", name, ns)
-		mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name)
-
-		if err != nil {
+		if mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name); err != nil {
 			// TODO generate k8s event - can't fetch mcert
 			runtime.HandleError(err)
 		} else {
@@ -106,28 +104,21 @@ func (c *Controller) processNextIngress() bool {
 		return false
 	}
 
-	err := func(obj interface{}) error {
-		defer c.Ingress.queue.Done(obj)
+	defer c.Ingress.queue.Done(obj)
 
-		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.Ingress.queue.Forget(obj)
-			return fmt.Errorf("Expected string in ingressQueue but got %#v", obj)
-		}
-
-		if err := c.handleIngress(key); err != nil {
-			c.Ingress.queue.AddRateLimited(obj)
-			return err
-		}
-
+	var key string
+	var ok bool
+	if key, ok = obj.(string); !ok {
 		c.Ingress.queue.Forget(obj)
-		return nil
-	}(obj)
+		runtime.HandleError(fmt.Errorf("Expected string in ingressQueue but got %T", obj))
+	}
 
-	if err != nil {
+	if err := c.handleIngress(key); err != nil {
+		c.Ingress.queue.AddRateLimited(obj)
 		runtime.HandleError(err)
 	}
+
+	c.Ingress.queue.Forget(obj)
 
 	return true
 }

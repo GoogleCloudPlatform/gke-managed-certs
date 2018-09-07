@@ -33,6 +33,8 @@ var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provide
 var ingressWatcherDelay = flag.Duration("ingress-watcher-delay", time.Second, "The delay slept before polling for Ingress resources")
 
 func main() {
+	flag.Parse()
+
 	glog.V(1).Infof("Managed certificates %s controller starting", managedCertificatesVersion)
 
 	//To handle SIGINT gracefully

@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Handles all Ingress objects in the cluster, from all namespaces.
+/*
+* Wrapper over client-go for handling Ingress object. It is different from the wrapped client, as it offers List() and Watch() operations in all namespaces, with an easier to use interface.
+ */
 package ingress
 
 import (
@@ -33,7 +35,7 @@ const (
 )
 
 type Interface struct {
-	client rest.Interface
+	client *v1beta1.ExtensionsV1beta1Client
 }
 
 func NewClient() (client *Interface, err error) {
@@ -43,29 +45,37 @@ func NewClient() (client *Interface, err error) {
 	}
 
 	return &Interface{
-		client: v1beta1.NewForConfigOrDie(config).RESTClient(),
+		client: v1beta1.NewForConfigOrDie(config),
 	}, nil
 }
 
-func (c *Interface) Get(namespace string, name string) (result *api.Ingress, err error) {
-	result = &api.Ingress{}
-	err = c.client.Get().Namespace(namespace).Resource(resource).Name(name).Do().Into(result)
-	return
+/*
+* Fetches a given Ingress object.
+ */
+func (c *Interface) Get(namespace string, name string) (*api.Ingress, error) {
+	return c.client.Ingresses(namespace).Get(name, v1.GetOptions{})
 }
 
-func (c *Interface) List() (result *api.IngressList, err error) {
-	result = &api.IngressList{}
-	err = c.client.Get().Resource(resource).Do().Into(result)
-	return
+/*
+* Lists all Ingress objects in the cluster, from all namespaces.
+ */
+func (c *Interface) List() (*api.IngressList, error) {
+	var result api.IngressList
+	err := c.client.RESTClient().Get().Resource(resource).Do().Into(&result)
+	return &result, err
 }
 
-func (c *Interface) Update(ingress *api.Ingress) (result *api.Ingress, err error) {
-	result = &api.Ingress{}
-	err = c.client.Put().Namespace(ingress.Namespace).Resource(resource).Name(ingress.Name).Body(ingress).Do().Into(result)
-	return
+/*
+* Updates a given Ingress object.
+ */
+func (c *Interface) Update(ingress *api.Ingress) (*api.Ingress, error) {
+	return c.client.Ingresses(ingress.Namespace).Update(ingress)
 }
 
+/*
+* Watches all Ingress objects in the cluster, from all namespaces.
+ */
 func (c *Interface) Watch() (watch.Interface, error) {
 	opts := &v1.ListOptions{Watch: true}
-	return c.client.Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
+	return c.client.RESTClient().Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
 }
