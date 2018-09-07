@@ -37,20 +37,13 @@ type SslClient struct {
 	projectId string
 }
 
-func NewClient(cloudConfig string) (*SslClient, error) {
-	tokenSource := google.ComputeTokenSource("")
+func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
+	if cloudConfig != "" {
+		glog.V(1).Info("In a GKE cluster")
 
-	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
-		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
-		if err != nil {
-			return nil, err
-		}
-
-		glog.V(1).Infof("In a GCP cluster, using TokenSource: %v", tokenSource)
-	} else if cloudConfig != "" {
 		config, err := os.Open(cloudConfig)
 		if err != nil {
-			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %#v", cloudConfig, err)
+			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %v", cloudConfig, err)
 		}
 		defer config.Close()
 
@@ -59,11 +52,23 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 			return nil, fmt.Errorf("Could not read config %v", err)
 		}
 
-		tokenSource := gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
-		glog.V(1).Infof("In a GKE cluster, using TokenSource: %v", tokenSource)
+		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), nil
+	} else if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
+		glog.V(1).Info("In a GCP cluster")
+		return google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
 	} else {
-		glog.V(1).Infof("Using default TokenSource: %v", tokenSource)
+		glog.V(1).Info("Using default TokenSource")
+		return google.ComputeTokenSource(""), nil
 	}
+}
+
+func NewClient(cloudConfig string) (*SslClient, error) {
+	tokenSource, err := getTokenSource(cloudConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(1).Infof("Using TokenSource %v", tokenSource)
 
 	projectId, err := metadata.ProjectID()
 	if err != nil {
@@ -94,11 +99,7 @@ func (c *SslClient) Create(sslCertificateName string, domains []string) error {
 	}
 
 	_, err := c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
-	if err != nil {
-		return fmt.Errorf("Failed to insert SslCertificate %v, err: %v", sslCertificate, err)
-	}
-
-	return nil
+	return err
 }
 
 func (c *SslClient) Delete(name string) error {
