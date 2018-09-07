@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+* Provides clients which managed-certificate-controller uses to talk to api server and GCLB, to perform its tasks.
+ */
 package config
 
 import (
@@ -28,7 +31,7 @@ import (
 )
 
 type ControllerClients struct {
-	// Ingress is a rest client which operates on k8s Ingress objects
+	// Ingress is a client which manages Ingress objects
 	Ingress *ingress.Interface
 
 	// Mcert is a client which manages ManagedCertificate custom resources

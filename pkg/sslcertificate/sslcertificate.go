@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+* Provides interface to operate on GCE SslCertificate resource.
+* */
 package sslcertificate
 
 import (
@@ -89,6 +92,9 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 	}, nil
 }
 
+/*
+* Creates a new SslCertificate with Name=sslCertificateName and Domains=domains.
+ */
 func (c *SslClient) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
@@ -102,15 +108,24 @@ func (c *SslClient) Create(sslCertificateName string, domains []string) error {
 	return err
 }
 
+/*
+* Deletes an SslCertificate resource with Name=name.
+ */
 func (c *SslClient) Delete(name string) error {
 	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
 	return err
 }
 
+/*
+* Fetches an SslCertificate resource with name=Name.
+ */
 func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
 
+/*
+* Lists all SslCertificate resources.
+ */
 func (c *SslClient) List() (*compute.SslCertificateList, error) {
 	return c.service.SslCertificates.List(c.projectId).Do()
 }
