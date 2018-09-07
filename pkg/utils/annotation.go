@@ -28,21 +28,24 @@ const (
 	splitBy    = ","
 )
 
-func ParseAnnotation(ingress *api.Ingress) (result []string, exists bool) {
+/*
+* Parses managed-certificates Ingress annotation to extract names of ManagedCertificate objects from it.
+* Returns:
+*  - a slice of names,
+*  - a boolean flag which is true if Ingress is annotated with a non-empty managed-certificates annotation.
+ */
+func ParseAnnotation(ingress *api.Ingress) ([]string, bool) {
 	annotationValue, exists := ingress.ObjectMeta.Annotations[annotation]
-	if !exists {
+	if !exists || annotationValue == "" {
 		return nil, false
 	}
 
-	glog.Infof("Found annotation %s on ingress", annotationValue)
+	glog.Infof("Found %s annotation %q on ingress %s:%s", annotation, annotationValue, ingress.Namespace, ingress.Name)
 
-	if annotationValue == "" {
-		return nil, true
-	}
-
+	var result []string
 	for _, value := range strings.Split(annotationValue, splitBy) {
 		result = append(result, strings.TrimSpace(value))
 	}
 
-	return
+	return result, true
 }

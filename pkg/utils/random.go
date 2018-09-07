@@ -26,21 +26,19 @@ const (
 	maxNameLength = 63
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
+/*
+* Generates random names for SslCertificate resources. Returns a name and error.
+ */
 func RandomName() (string, error) {
-	uid, err := uuid.NewRandom()
-	if err != nil {
+	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
-	}
+	} else {
+		generatedName := fmt.Sprintf("mcrt%s", uid.String())
+		maxLength := maxNameLength
+		if len(generatedName) < maxLength {
+			maxLength = len(generatedName)
+		}
 
-	generatedName := fmt.Sprintf("mcert%s", uid.String())
-	maxLength := min(len(generatedName), maxNameLength)
-	return generatedName[:maxLength], nil
+		return generatedName[:maxLength], nil
+	}
 }

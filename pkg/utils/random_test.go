@@ -20,31 +20,23 @@ import (
 	"testing"
 )
 
-func TestRandomName_returnsNonEmptyNameShorterThan64Characters(t *testing.T) {
-	name, err := RandomName()
-
-	if err != nil {
+func newRandomName(t *testing.T) string {
+	if name, err := RandomName(); err != nil {
 		t.Errorf("Failed to create random name: %v", err)
+		return ""
+	} else {
+		return name
 	}
+}
 
-	if len(name) <= 0 || len(name) >= 64 {
+func TestRandomName_NonEmptyNameShorterThanLimit(t *testing.T) {
+	if name := newRandomName(t); len(name) <= 0 || len(name) >= 64 {
 		t.Errorf("Random name %s has %d characters, should have between 0 and 63", name, len(name))
 	}
 }
 
-func TestRandomName_calledTwiceReturnsDifferentNames(t *testing.T) {
-	name1, err := RandomName()
-
-	if err != nil {
-		t.Errorf("Failed to create random name1: %v", err)
-	}
-
-	name2, err := RandomName()
-	if err != nil {
-		t.Errorf("Failed to create random name2 %v", err)
-	}
-
-	if name1 == name2 {
-		t.Errorf("createRandomName called twice returned the same name %s", name1)
+func TestRandomName_TwiceReturnsDifferent(t *testing.T) {
+	if name := newRandomName(t); name == newRandomName(t) {
+		t.Errorf("RandomName called twice returned the same name %s", name)
 	}
 }

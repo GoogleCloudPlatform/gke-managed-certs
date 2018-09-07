@@ -17,11 +17,25 @@ limitations under the License.
 package utils
 
 import (
+	"reflect"
 	"testing"
 
 	api "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var testCases = []struct {
+	input          string
+	output         []string
+	existsNonEmpty bool
+	desc           string
+}{
+	{"", nil, false, "Empty annotation"},
+	{"xyz", []string{"xyz"}, true, "One element annotation"},
+	{" xyz ", []string{"xyz"}, true, "One element annotation with whitespace"},
+	{"abc,xyz", []string{"abc", "xyz"}, true, "Multiple element annotation"},
+	{" abc , xyz ", []string{"abc", "xyz"}, true, "Multiple element annotation with whitespace"},
+}
 
 func newIngress(annotationValue string) *api.Ingress {
 	return &api.Ingress{
@@ -31,70 +45,20 @@ func newIngress(annotationValue string) *api.Ingress {
 	}
 }
 
-func TestParseAnnotation_annotationMissing(t *testing.T) {
-	_, exists := ParseAnnotation(&api.Ingress{})
+func TestParseAnnotation(t *testing.T) {
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
+			output, existsNonEmpty := ParseAnnotation(newIngress(testCase.input))
 
-	if exists {
+			if existsNonEmpty != testCase.existsNonEmpty || !reflect.DeepEqual(output, testCase.output) {
+				t.Errorf("Fail: annotation %s expected to be non empty (%t), in fact is (%t). The extracted names expected to be %v, in fact are %v", testCase.input, testCase.existsNonEmpty, existsNonEmpty, testCase.output, output)
+			}
+		})
+	}
+}
+
+func TestParseAnnotationMissing(t *testing.T) {
+	if _, exists := ParseAnnotation(&api.Ingress{}); exists {
 		t.Errorf("Empty ingress should not have annotation")
-	}
-}
-
-func TestParseAnnotation_empty(t *testing.T) {
-	names, exists := ParseAnnotation(newIngress(""))
-
-	if !exists {
-		t.Errorf("Annotation should be present")
-	}
-
-	if len(names) != 0 {
-		t.Errorf("Empty value annotation \"\" should be parsed into empty array, is instead: %v.", names)
-	}
-}
-
-func TestParseAnnotation_oneElement(t *testing.T) {
-	names, exists := ParseAnnotation(newIngress("xyz"))
-
-	if !exists {
-		t.Errorf("Annotation should be present")
-	}
-
-	if len(names) != 1 || names[0] != "xyz" {
-		t.Errorf("One element annotation \"xyz\" should be parsed into one element array with value xyz, is instead: %v.", names)
-	}
-}
-
-func TestParseAnnotation_oneElementWithWhitespace(t *testing.T) {
-	names, exists := ParseAnnotation(newIngress(" xyz "))
-
-	if !exists {
-		t.Errorf("Annotation should be present")
-	}
-
-	if len(names) != 1 || names[0] != "xyz" {
-		t.Errorf("One element annotation with whitespace \" xyz \" should be parsed into one element array with value xyz, is instead: %v.", names)
-	}
-}
-
-func TestParseAnnotation_multiElement(t *testing.T) {
-	names, exists := ParseAnnotation(newIngress("xyz,abc"))
-
-	if !exists {
-		t.Errorf("Annotation should be present")
-	}
-
-	if len(names) != 2 || names[0] != "xyz" || names[1] != "abc" {
-		t.Errorf("Multi element annotation \"xyz,abc\" should be parsed into two element array with values xyz, abc, is instead: %v.", names)
-	}
-}
-
-func TestParseAnnotation_multiElementWithWhitespace(t *testing.T) {
-	names, exists := ParseAnnotation(newIngress(" xyz, abc "))
-
-	if !exists {
-		t.Errorf("Annotation should be present")
-	}
-
-	if len(names) != 2 || names[0] != "xyz" || names[1] != "abc" {
-		t.Errorf("Multi element annotation with whitespace \" xyz , abc \" should be parsed into two element array with values xyz, abc, is instead: %v.", names)
 	}
 }

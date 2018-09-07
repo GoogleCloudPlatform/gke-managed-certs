@@ -1,4 +1,4 @@
-all: gofmt build-binary-in-docker run-test-in-docker cross clean
+all: gofmt build-binary-in-docker run-test-in-docker clean cross
 
 TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
