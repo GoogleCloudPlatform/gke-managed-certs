@@ -15,13 +15,11 @@ limitations under the License.
 */
 
 /*
-* Wrapper over client-go for handling Ingress object. It is different from the wrapped client, as it offers List() and Watch() operations in all namespaces, with an easier to use interface.
+* Provides operations for manipulating Ingress objects. Offers List() and Watch() operations which handle Ingress objects in all namespaces.
  */
-package ingress
+package client
 
 import (
-	"fmt"
-
 	api "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -34,32 +32,27 @@ const (
 	resource = "ingresses"
 )
 
-type Interface struct {
+type Ingress struct {
 	client *v1beta1.ExtensionsV1beta1Client
 }
 
-func NewClient() (client *Interface, err error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
-	}
-
-	return &Interface{
+func NewIngress(config *rest.Config) *Ingress {
+	return &Ingress{
 		client: v1beta1.NewForConfigOrDie(config),
-	}, nil
+	}
 }
 
 /*
 * Fetches a given Ingress object.
  */
-func (c *Interface) Get(namespace string, name string) (*api.Ingress, error) {
+func (c *Ingress) Get(namespace string, name string) (*api.Ingress, error) {
 	return c.client.Ingresses(namespace).Get(name, v1.GetOptions{})
 }
 
 /*
 * Lists all Ingress objects in the cluster, from all namespaces.
  */
-func (c *Interface) List() (*api.IngressList, error) {
+func (c *Ingress) List() (*api.IngressList, error) {
 	var result api.IngressList
 	err := c.client.RESTClient().Get().Resource(resource).Do().Into(&result)
 	return &result, err
@@ -68,14 +61,14 @@ func (c *Interface) List() (*api.IngressList, error) {
 /*
 * Updates a given Ingress object.
  */
-func (c *Interface) Update(ingress *api.Ingress) (*api.Ingress, error) {
+func (c *Ingress) Update(ingress *api.Ingress) (*api.Ingress, error) {
 	return c.client.Ingresses(ingress.Namespace).Update(ingress)
 }
 
 /*
 * Watches all Ingress objects in the cluster, from all namespaces.
  */
-func (c *Interface) Watch() (watch.Interface, error) {
+func (c *Ingress) Watch() (watch.Interface, error) {
 	opts := &v1.ListOptions{Watch: true}
 	return c.client.RESTClient().Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
 }

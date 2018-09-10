@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
 
-	"managed-certs-gke/pkg/config"
+	"managed-certs-gke/pkg/client"
 	"managed-certs-gke/pkg/controller"
 )
 
@@ -40,14 +40,14 @@ func main() {
 	//To handle SIGINT gracefully
 	stopChannel := server.SetupSignalHandler()
 
-	clients, err := config.NewControllerClients(*cloudConfig)
+	clients, err := client.NewClients(*cloudConfig)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
 	controller := controller.NewController(clients)
 
-	go clients.McertInformerFactory.Start(stopChannel)
+	go clients.McrtInformerFactory.Start(stopChannel)
 
 	if err = controller.Run(stopChannel, *ingressWatcherDelay); err != nil {
 		glog.Fatal("Error running controller: %v", err)

@@ -37,7 +37,7 @@ var getPutDeleteTests = []struct {
 func TestGetPutDelete(t *testing.T) {
 	for _, testCase := range getPutDeleteTests {
 		t.Run(testCase.desc, func(t *testing.T) {
-			sut := newMcertState()
+			sut := newMcrtState()
 
 			if testCase.initArg != "" {
 				sut.Put(testCase.initArg, testCase.initVal)
@@ -80,14 +80,14 @@ func eq(a, b []string) bool {
 }
 
 func TestGetAll(t *testing.T) {
-	state := newMcertState()
+	state := newMcrtState()
 
 	state.Put("x", "1")
 	state.Put("y", "2")
 
-	mcerts := state.GetAllManagedCertificates()
-	if !eq(mcerts, []string{"x", "y"}) {
-		t.Errorf("AllManagedCertificates expected to equal [x, y], instead are %v", mcerts)
+	mcrts := state.GetAllManagedCertificates()
+	if !eq(mcrts, []string{"x", "y"}) {
+		t.Errorf("AllManagedCertificates expected to equal [x, y], instead are %v", mcrts)
 	}
 
 	sslCerts := state.GetAllSslCertificates()
@@ -99,9 +99,9 @@ func TestGetAll(t *testing.T) {
 
 	state.Delete("x")
 
-	mcerts = state.GetAllManagedCertificates()
-	if !eq(mcerts, []string{"y"}) {
-		t.Errorf("AllManagedCertificates expected to equal [y], instead are %v", mcerts)
+	mcrts = state.GetAllManagedCertificates()
+	if !eq(mcrts, []string{"y"}) {
+		t.Errorf("AllManagedCertificates expected to equal [y], instead are %v", mcrts)
 	}
 
 	sslCerts = state.GetAllSslCertificates()

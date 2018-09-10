@@ -17,7 +17,7 @@ limitations under the License.
 /*
 * Provides interface to operate on GCE SslCertificate resource.
 * */
-package sslcertificate
+package client
 
 import (
 	"fmt"
@@ -35,7 +35,7 @@ import (
 
 const httpTimeout = 30 * time.Second
 
-type SslClient struct {
+type Ssl struct {
 	service   *compute.Service
 	projectId string
 }
@@ -65,7 +65,7 @@ func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
 	}
 }
 
-func NewClient(cloudConfig string) (*SslClient, error) {
+func NewSsl(cloudConfig string) (*Ssl, error) {
 	tokenSource, err := getTokenSource(cloudConfig)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 		return nil, err
 	}
 
-	return &SslClient{
+	return &Ssl{
 		service:   service,
 		projectId: projectId,
 	}, nil
@@ -95,7 +95,7 @@ func NewClient(cloudConfig string) (*SslClient, error) {
 /*
 * Creates a new SslCertificate with Name=sslCertificateName and Domains=domains.
  */
-func (c *SslClient) Create(sslCertificateName string, domains []string) error {
+func (c *Ssl) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -111,7 +111,7 @@ func (c *SslClient) Create(sslCertificateName string, domains []string) error {
 /*
 * Deletes an SslCertificate resource with Name=name.
  */
-func (c *SslClient) Delete(name string) error {
+func (c *Ssl) Delete(name string) error {
 	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
 	return err
 }
@@ -119,13 +119,13 @@ func (c *SslClient) Delete(name string) error {
 /*
 * Fetches an SslCertificate resource with name=Name.
  */
-func (c *SslClient) Get(name string) (*compute.SslCertificate, error) {
+func (c *Ssl) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
 
 /*
 * Lists all SslCertificate resources.
  */
-func (c *SslClient) List() (*compute.SslCertificateList, error) {
+func (c *Ssl) List() (*compute.SslCertificateList, error) {
 	return c.service.SslCertificates.List(c.projectId).Do()
 }

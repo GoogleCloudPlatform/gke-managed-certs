@@ -20,33 +20,33 @@ import (
 	"sync"
 )
 
-type McertState struct {
+type McrtState struct {
 	sync.RWMutex
 
 	// Maps Managed Certificate name to SslCertificate resource name
 	m map[string]string
 }
 
-func newMcertState() *McertState {
-	return &McertState{
+func newMcrtState() *McrtState {
+	return &McrtState{
 		m: make(map[string]string),
 	}
 }
 
-func (state *McertState) Delete(key string) {
+func (state *McrtState) Delete(key string) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.m, key)
 }
 
-func (state *McertState) Get(key string) (string, bool) {
+func (state *McrtState) Get(key string) (string, bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists := state.m[key]
 	return value, exists
 }
 
-func (state *McertState) GetAllManagedCertificates() []string {
+func (state *McrtState) GetAllManagedCertificates() []string {
 	var result []string
 
 	state.RLock()
@@ -59,7 +59,7 @@ func (state *McertState) GetAllManagedCertificates() []string {
 	return result
 }
 
-func (state *McertState) GetAllSslCertificates() []string {
+func (state *McrtState) GetAllSslCertificates() []string {
 	var result []string
 
 	state.RLock()
@@ -72,7 +72,7 @@ func (state *McertState) GetAllSslCertificates() []string {
 	return result
 }
 
-func (state *McertState) Put(key, value string) {
+func (state *McrtState) Put(key, value string) {
 	state.Lock()
 	defer state.Unlock()
 

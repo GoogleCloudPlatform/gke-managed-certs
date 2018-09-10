@@ -27,13 +27,13 @@ import (
 )
 
 func (c *Controller) updatePreSharedCertAnnotation() {
-	ingresses, err := c.Ingress.client.List()
+	ingresses, err := c.Ingress.ingress.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
 
-	sslCerts, err := c.Mcert.sslClient.List()
+	sslCerts, err := c.Mcrt.ssl.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
@@ -46,14 +46,14 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 	for _, ingress := range ingresses.Items {
 		glog.Infof("Update pre-shared-cert annotation for ingress %s", ingress.Name)
 
-		mcerts, exists := utils.ParseAnnotation(&ingress)
+		mcrts, exists := utils.ParseAnnotation(&ingress)
 		if !exists {
 			continue
 		}
 
 		var sslCertNames []string
-		for _, mcert := range mcerts {
-			if sslCertName, exists := c.Mcert.state.Get(mcert); exists {
+		for _, mcrt := range mcrts {
+			if sslCertName, exists := c.Mcrt.state.Get(mcrt); exists {
 				if _, exists := sslCertsMap[sslCertName]; exists {
 					sslCertNames = append(sslCertNames, sslCertName)
 				}
@@ -70,7 +70,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 		glog.Infof("Update pre-shared-cert annotation for ingress %s, found SslCertificate resource names to put in the annotation: %s", ingress.Name, strings.Join(sslCertNames, ", "))
 
 		ingress.Annotations["ingress.gcp.kubernetes.io/pre-shared-cert"] = strings.Join(sslCertNames, ", ")
-		if _, err := c.Ingress.client.Update(&ingress); err != nil {
+		if _, err := c.Ingress.ingress.Update(&ingress); err != nil {
 			runtime.HandleError(err)
 			return
 		}

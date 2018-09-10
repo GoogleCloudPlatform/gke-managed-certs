@@ -30,7 +30,7 @@ import (
 )
 
 func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
-	watcher, err := c.client.Watch()
+	watcher, err := c.ingress.Watch()
 
 	if err != nil {
 		runtime.HandleError(err)
@@ -71,26 +71,26 @@ func (c *Controller) handleIngress(key string) error {
 	}
 	glog.Infof("Handling ingress %s:%s", ns, name)
 
-	ing, err := c.Ingress.client.Get(ns, name)
+	ing, err := c.Ingress.ingress.Get(ns, name)
 	if err != nil {
 		return err
 	}
 
-	mcertNames, isNonEmpty := utils.ParseAnnotation(ing)
+	mcrtNames, isNonEmpty := utils.ParseAnnotation(ing)
 	if !isNonEmpty {
 		// There is either no annotation on this ingress, or there is one which has an empty value
 		return nil
 	}
 
-	for _, name := range mcertNames {
+	for _, name := range mcrtNames {
 		// Assume the namespace is the same as ingress's
 		glog.Infof("Looking up Managed Certificate %s in namespace %s", name, ns)
-		if mcert, err := c.Mcert.lister.ManagedCertificates(ns).Get(name); err != nil {
-			// TODO generate k8s event - can't fetch mcert
+		if mcrt, err := c.Mcrt.lister.ManagedCertificates(ns).Get(name); err != nil {
+			// TODO generate k8s event - can't fetch mcrt
 			runtime.HandleError(err)
 		} else {
 			glog.Infof("Enqueue Managed Certificate %s for further processing", name)
-			c.Mcert.enqueue(mcert)
+			c.Mcrt.enqueue(mcrt)
 		}
 	}
 

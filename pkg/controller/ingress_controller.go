@@ -24,12 +24,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"managed-certs-gke/pkg/ingress"
+	"managed-certs-gke/pkg/client"
 )
 
 type IngressController struct {
-	client *ingress.Interface
-	queue  workqueue.RateLimitingInterface
+	ingress *client.Ingress
+	queue   workqueue.RateLimitingInterface
 }
 
 func (c *IngressController) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) {
@@ -50,13 +50,13 @@ func (c *IngressController) enqueue(obj interface{}) {
 }
 
 func (c *IngressController) synchronizeAllIngresses() {
-	ingresses, err := c.client.List()
+	ingresses, err := c.ingress.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
 
-	for _, ing := range ingresses.Items {
-		c.enqueue(&ing)
+	for _, ingress := range ingresses.Items {
+		c.enqueue(&ingress)
 	}
 }
