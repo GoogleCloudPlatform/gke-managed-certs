@@ -42,12 +42,15 @@ docker-builder:
 gofmt:
 	gofmt -w main.go
 	gofmt -w pkg
+	gofmt -w http-hello
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
 release: build-binary-in-docker run-test-in-docker docker clean
+	make -C http-hello
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
 release-ci: build-binary-in-docker run-test-in-docker docker-ci
+	make -C http-hello
 
 run-test-in-docker: docker-builder
 	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make test'
