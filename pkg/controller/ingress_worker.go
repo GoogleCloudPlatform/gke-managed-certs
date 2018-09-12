@@ -29,7 +29,7 @@ import (
 	"managed-certs-gke/pkg/utils"
 )
 
-func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
+func (c *IngressController) runWatcher() {
 	watcher, err := c.ingress.Watch()
 
 	if err != nil {
@@ -41,10 +41,10 @@ func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
 		select {
 		case event := <-watcher.ResultChan():
 			if event.Object != nil {
-				if ing, ok := event.Object.(*api.Ingress); !ok {
+				if ingress, ok := event.Object.(*api.Ingress); !ok {
 					runtime.HandleError(fmt.Errorf("Expected an Ingress, watch returned %T instead, event: %+v", event.Object, event))
 				} else if event.Type == watch.Added || event.Type == watch.Modified {
-					c.enqueue(ing)
+					c.enqueue(ingress)
 				}
 			}
 		default:
@@ -55,7 +55,7 @@ func (c *IngressController) runWatcher(ingressWatcherDelay time.Duration) {
 			return
 		}
 
-		time.Sleep(ingressWatcherDelay)
+		time.Sleep(c.ingressWatcherDelay)
 	}
 }
 
@@ -65,18 +65,18 @@ func (c *Controller) runIngressWorker() {
 }
 
 func (c *Controller) handleIngress(key string) error {
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
-	glog.Infof("Handling ingress %s:%s", ns, name)
+	glog.Infof("Handling ingress %s:%s", namespace, name)
 
-	ing, err := c.Ingress.ingress.Get(ns, name)
+	ingress, err := c.Ingress.ingress.Get(namespace, name)
 	if err != nil {
 		return err
 	}
 
-	mcrtNames, isNonEmpty := utils.ParseAnnotation(ing)
+	mcrtNames, isNonEmpty := utils.ParseAnnotation(ingress)
 	if !isNonEmpty {
 		// There is either no annotation on this ingress, or there is one which has an empty value
 		return nil
@@ -84,12 +84,9 @@ func (c *Controller) handleIngress(key string) error {
 
 	for _, name := range mcrtNames {
 		// Assume the namespace is the same as ingress's
-		glog.Infof("Looking up Managed Certificate %s in namespace %s", name, ns)
-		if mcrt, err := c.Mcrt.lister.ManagedCertificates(ns).Get(name); err != nil {
-			// TODO generate k8s event - can't fetch mcrt
-			runtime.HandleError(err)
-		} else {
-			glog.Infof("Enqueue Managed Certificate %s for further processing", name)
+		glog.Infof("Looking up Managed Certificate %s:%s", namespace, name)
+		if mcrt, ok := c.Mcrt.getMcrt(namespace, name); ok {
+			glog.Infof("Enqueue Managed Certificate %s:%s for further processing", namespace, name)
 			c.Mcrt.enqueue(mcrt)
 		}
 	}

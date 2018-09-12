@@ -59,7 +59,7 @@ def delete_managed_certificates():
       command.call("kubectl delete mcrt {0}".format(name))
 
 def get_firewall_rules():
-  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter='network=e2e AND name=mcert' --uri 2>/dev/null")
+  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter='network=e2e AND name=mcrt' --uri 2>/dev/null")
   return uris
 
 def delete_firewall_rules():
@@ -98,7 +98,7 @@ def init():
   utils.printf("Get kubectl 1.11")
   command.call("curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
   command.call("chmod +x kubectl")
-  utils.printf("kubectl version: {0}".format(command.call_get_out("./kubectl version")[0][0]))
+  utils.printf("kubectl version: {0}".format(command.call_get_out("kubectl version")[0][0]))
 
   utils.printf("Set namespace default")
   command.call("kubectl config set-context $(kubectl config current-context) --namespace=default")
@@ -138,19 +138,22 @@ def test(zone):
 
   instance_prefix = os.getenv("INSTANCE_PREFIX")
   if instance_prefix is not None:
-    command.call("gcloud compute firewall-rules create mcert-{0} --network={0} --allow=tcp,udp,icmp,esp,ah,sctp".format(instance_prefix))
+    command.call("gcloud compute firewall-rules create mcrt-{0} --network={0} --allow=tcp,udp,icmp,esp,ah,sctp".format(instance_prefix))
   else:
     utils.printf("INSTANCE_PREFIX env is not set")
 
-  kubectl_create("rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml", "managed-certificate-controller.yaml")
+  kubectl_create("rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml")
 
   domains = dns.create_random_domains(zone)
+
+  command.call("gcloud alpha compute ssl-certificates create user-created-certificate --global --domains example.com", "Create additional managed SslCertificate to make sure it won't be deleted by managed-certificate-controller")
+
   create_managed_certificates(domains)
 
-  kubectl_create("http-hello.yaml")
+  kubectl_create("managed-certificate-controller.yaml", "http-hello.yaml")
 
-  utils.printf("Expect 2 SslCertificate resources...")
-  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 2):
+  utils.printf("Expect 3 SslCertificate resources...")
+  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 3):
     utils.printf("ok")
   else:
     utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
@@ -168,6 +171,16 @@ def test(zone):
   else:
     utils.printf("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
     sys.exit(1)
+
+  command.call("kubectl annotate ingress test-ingress gke.googleapis.com/managed-certificates-", "Remove managed-certificates annotation")
+  command.call("kubectl annotate ingress test-ingress ingress.gcp.kubernetes.io/pre-shared-cert-", "Remove pre-shared-cert annotation")
+  delete_managed_certificates()
+
+  utils.printf("Expect 1 SslCertificate resource...")
+  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 1):
+    utils.printf("ok")
+  else:
+    utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
 def main():
   parser = argparse.ArgumentParser()

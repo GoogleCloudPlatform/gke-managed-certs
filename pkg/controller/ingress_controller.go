@@ -28,14 +28,15 @@ import (
 )
 
 type IngressController struct {
-	ingress *client.Ingress
-	queue   workqueue.RateLimitingInterface
+	ingress             *client.Ingress
+	queue               workqueue.RateLimitingInterface
+	ingressWatcherDelay time.Duration
 }
 
-func (c *IngressController) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) {
+func (c *IngressController) Run(stopChannel <-chan struct{}) {
 	defer c.queue.ShutDown()
 
-	go c.runWatcher(ingressWatcherDelay)
+	go c.runWatcher()
 	go wait.Until(c.synchronizeAllIngresses, time.Minute, stopChannel)
 
 	<-stopChannel

@@ -34,13 +34,14 @@ type Controller struct {
 	Mcrt    McrtController
 }
 
-func NewController(clients *client.Clients) *Controller {
+func New(clients *client.Clients, ingressWatcherDelay time.Duration) *Controller {
 	mcrtInformer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
 		Ingress: IngressController{
-			ingress: clients.Ingress,
-			queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+			ingress:             clients.Ingress,
+			queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+			ingressWatcherDelay: ingressWatcherDelay,
 		},
 		Mcrt: McrtController{
 			mcrt:   clients.Mcrt,
@@ -48,7 +49,7 @@ func NewController(clients *client.Clients) *Controller {
 			synced: mcrtInformer.Informer().HasSynced,
 			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcrtQueue"),
 			ssl:    clients.Ssl,
-			state:  newMcrtState(),
+			state:  newMcrtState(clients.ConfigMap),
 		},
 	}
 
@@ -67,7 +68,7 @@ func NewController(clients *client.Clients) *Controller {
 	return controller
 }
 
-func (c *Controller) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.Duration) error {
+func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
 
 	done := make(chan struct{})
@@ -81,20 +82,16 @@ func (c *Controller) Run(stopChannel <-chan struct{}, ingressWatcherDelay time.D
 	}
 	glog.Info("Managed Certificate cache synced")
 
-	errors := make(chan error)
-	go c.Mcrt.Run(done, errors)
-	go c.Ingress.Run(done, ingressWatcherDelay)
+	go c.Mcrt.Run(done)
+	go c.Ingress.Run(done)
 
 	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
-	select {
-	case <-stopChannel:
-		glog.Info("Controller received stop signal")
-	case err := <-errors:
-		runtime.HandleError(err)
-	}
+
+	<-stopChannel
+	glog.Info("Controller received stop signal")
 
 	glog.Info("Controller shutting down")
 	return nil

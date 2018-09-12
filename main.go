@@ -45,11 +45,11 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	controller := controller.NewController(clients)
+	controller := controller.New(clients, *ingressWatcherDelay)
 
 	go clients.McrtInformerFactory.Start(stopChannel)
 
-	if err = controller.Run(stopChannel, *ingressWatcherDelay); err != nil {
+	if err = controller.Run(stopChannel); err != nil {
 		glog.Fatal("Error running controller: %v", err)
 	}
 }

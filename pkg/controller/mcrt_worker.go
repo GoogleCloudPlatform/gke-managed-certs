@@ -60,7 +60,7 @@ func translateDomainStatus(status string) (string, error) {
 }
 
 func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
-	sslCertificateName, exists := c.state.Get(mcrt.Name)
+	sslCertificateName, exists := c.state.Get(mcrt.Namespace, mcrt.Name)
 	if !exists {
 		return fmt.Errorf("Failed to find in state Managed Certificate %s", mcrt.Name)
 	}
@@ -87,7 +87,7 @@ func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
 		return fmt.Errorf("Unexpected status %s of SslCertificate %v", sslCert.Managed.Status, sslCert)
 	}
 
-	var domainStatus []api.DomainStatus
+	domainStatus := make([]api.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
 		translatedStatus, err := translateDomainStatus(status)
 		if err != nil {
@@ -118,37 +118,38 @@ func (c *McrtController) createSslCertificateIfNeeded(sslCertificateName string,
 	return nil
 }
 
-func (c *McrtController) createSslCertificateNameIfNeeded(name string) (string, error) {
-	sslCertificateName, exists := c.state.Get(name)
+func (c *McrtController) createSslCertificateNameIfNeeded(mcrt *api.ManagedCertificate) (string, error) {
+	sslCertificateName, exists := c.state.Get(mcrt.Namespace, mcrt.Name)
 
 	if exists && sslCertificateName != "" {
 		return sslCertificateName, nil
 	}
 
-	//State does not have anything for this managed certificate or no SslCertificate is associated with it
+	//State does not have anything for this Managed Certificate or no SslCertificate is associated with it
 	sslCertificateName, err := c.randomName()
 	if err != nil {
 		return "", err
 	}
 
-	glog.Infof("McrtController adds to state new SslCertificate name %s associated with Managed Certificate %s", sslCertificateName, name)
-	c.state.Put(name, sslCertificateName)
+	glog.Infof("McrtController adds to state SslCertificate name %s associated with Managed Certificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
+	c.state.Put(mcrt.Namespace, mcrt.Name, sslCertificateName)
 	return sslCertificateName, nil
 }
 
 func (c *McrtController) handleMcrt(key string) error {
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return err
-	}
-	glog.Infof("McrtController handling Managed Certificate %s:%s", ns, name)
-
-	mcrt, err := c.lister.ManagedCertificates(ns).Get(name)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
 
-	sslCertificateName, err := c.createSslCertificateNameIfNeeded(name)
+	mcrt, ok := c.getMcrt(namespace, name)
+	if !ok {
+		return nil
+	}
+
+	glog.Infof("McrtController handling Managed Certificate %s:%s", mcrt.Namespace, mcrt.Name)
+
+	sslCertificateName, err := c.createSslCertificateNameIfNeeded(mcrt)
 	if err != nil {
 		return err
 	}

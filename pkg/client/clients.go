@@ -29,6 +29,9 @@ import (
 )
 
 type Clients struct {
+	// ConfigMap manages ConfigMap objects
+	ConfigMap ConfigMapClient
+
 	// Ingress manages Ingress objects
 	Ingress *Ingress
 
@@ -48,7 +51,6 @@ func NewClients(cloudConfig string) (*Clients, error) {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
 
-	ingress := NewIngress(config)
 	mcrt := versioned.NewForConfigOrDie(config)
 	factory := externalversions.NewSharedInformerFactory(mcrt, 0)
 
@@ -58,7 +60,8 @@ func NewClients(cloudConfig string) (*Clients, error) {
 	}
 
 	return &Clients{
-		Ingress:             ingress,
+		ConfigMap:           NewConfigMap(config),
+		Ingress:             NewIngress(config),
 		Mcrt:                mcrt,
 		McrtInformerFactory: factory,
 		Ssl:                 ssl,
