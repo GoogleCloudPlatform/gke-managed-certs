@@ -26,6 +26,7 @@ import time
 import utils
 
 RECORD_LENGTH = 20
+PROW_TEST = os.path.isfile("/etc/service-account/service-account.json")
 
 def switch_to_certsbridge_conf():
   configurations, success = command.call_get_out("gcloud config configurations list --filter=name=certsbridge")
@@ -36,7 +37,7 @@ def switch_to_certsbridge_conf():
     command.call("gcloud config set compute/zone europe-west1-b")
     command.call("gcloud config set project certsbridge-dev")
 
-    if os.path.isfile("/etc/service-account/service-account.json"):
+    if PROW_TEST:
       command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
   else:
     command.call("gcloud config configurations activate certsbridge", "Switch gcloud conf to certsbridge")
@@ -47,7 +48,7 @@ def switch_to_default_conf():
 def clean_up(zone_name):
   clear_dns_zone(zone_name)
 
-  if os.path.isfile("/etc/service-account/service-account.json"):
+  if PROW_TEST:
     clear_conf()
 
 def clear_conf():

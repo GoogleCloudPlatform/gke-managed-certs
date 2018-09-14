@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: http-hello
-          image: eu.gcr.io/krzyk-205712/http-hello:v1.0
+          image: eu.gcr.io/managed-certs-gke/http-hello:ci_latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
