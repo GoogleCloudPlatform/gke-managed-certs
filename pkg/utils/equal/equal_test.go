@@ -24,7 +24,7 @@ import (
 )
 
 var testCases = []struct {
-	mcertDomains   []string
+	mcrtDomains    []string
 	sslCertDomains []string
 	equal          bool
 	desc           string
@@ -39,12 +39,12 @@ var testCases = []struct {
 	{[]string{"a", "b"}, []string{"b", "a"}, true, "[a, b] == [b, a]"},
 }
 
-func TestAre(t *testing.T) {
+func TestCertificates(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
-			mcert := api.ManagedCertificate{
+			mcrt := api.ManagedCertificate{
 				Spec: api.ManagedCertificateSpec{
-					Domains: testCase.mcertDomains,
+					Domains: testCase.mcrtDomains,
 				},
 			}
 			sslCert := compute.SslCertificate{
@@ -54,8 +54,8 @@ func TestAre(t *testing.T) {
 				Type: "MANAGED",
 			}
 
-			if Are(mcert, sslCert) != testCase.equal {
-				t.Errorf("Are(%v, %v) expected to be %t", testCase.mcertDomains, testCase.sslCertDomains, testCase.equal)
+			if Certificates(mcrt, sslCert) != testCase.equal {
+				t.Errorf("Managed Certificate: %v, SslCertificate: %v, Certificates(mcrt, sslCert) = %t, want %t", mcrt, sslCert, Certificates(mcrt, sslCert), testCase.equal)
 			}
 		})
 	}

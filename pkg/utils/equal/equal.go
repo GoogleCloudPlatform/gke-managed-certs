@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package equal checks for equality between Managed Certificate and SslCertificate.
+// Package equal provides utility functions for checking equality.
 package equal
 
 import (
@@ -25,12 +25,8 @@ import (
 	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
-// Are compares Managed Certificate and SslCertificate for equality, i. e. if their domain sets are equal.
-func Are(mcrt api.ManagedCertificate, sslCert compute.SslCertificate) bool {
-	if len(mcrt.Spec.Domains) == 0 && len(sslCert.Managed.Domains) == 0 {
-		return true
-	}
-
+// Certificates compares Managed Certificate and SslCertificate for equality, i. e. if their domain sets are equal.
+func Certificates(mcrt api.ManagedCertificate, sslCert compute.SslCertificate) bool {
 	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
 	copy(mcrtDomains, mcrt.Spec.Domains)
 	sort.Strings(mcrtDomains)

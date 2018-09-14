@@ -131,7 +131,7 @@ func (c *McrtController) createSslCertificateIfNeeded(sslCertificateName string,
 		return err
 	}
 
-	if !equal.Are(*mcrt, *sslCert) {
+	if !equal.Certificates(*mcrt, *sslCert) {
 		glog.Infof("McrtController: ManagedCertificate %v and SslCertificate %v are different, removing the SslCertificate", mcrt, sslCert)
 		err := c.ssl.Delete(sslCertificateName)
 		if err != nil {
