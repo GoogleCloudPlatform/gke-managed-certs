@@ -71,9 +71,7 @@ func (c *McrtController) getMcrt(namespace, name string) (*api.ManagedCertificat
 	return nil, false
 }
 
-/*
-* Tries to delete SslCertificate mapped to already deleted Managed Certificate identified by key. Returns true if SslCertificate is deleted.
- */
+// Deletes SslCertificate mapped to already deleted Managed Certificate.
 func (c *McrtController) removeSslCertificate(namespace, name string) error {
 	sslCertificateName, exists := c.state.Get(namespace, name)
 	if !exists {
@@ -82,7 +80,12 @@ func (c *McrtController) removeSslCertificate(namespace, name string) error {
 	}
 
 	// SslCertificate (still) exists in state, check if it exists in GCE
-	if !c.ssl.Exists(sslCertificateName) {
+	exists, err := c.ssl.Exists(sslCertificateName)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
 		// SslCertificate already deleted
 		glog.Infof("McrtController: SslCertificate %s mapped to Managed Certificate %s:%s already deleted", sslCertificateName, namespace, name)
 		return nil

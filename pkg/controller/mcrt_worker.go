@@ -118,7 +118,12 @@ func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
 }
 
 func (c *McrtController) createSslCertificateIfNeeded(sslCertificateName string, mcrt *api.ManagedCertificate) error {
-	if !c.ssl.Exists(sslCertificateName) {
+	exists, err := c.ssl.Exists(sslCertificateName)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
 		//SslCertificate does not yet exist, create it
 		glog.Infof("McrtController: create a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcrt.Name)
 		if err := c.ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
@@ -225,7 +230,12 @@ func (c *McrtController) randomName() (string, error) {
 		return "", err
 	}
 
-	if c.ssl.Exists(name) {
+	exists, err := c.ssl.Exists(name)
+	if err != nil {
+		return "", err
+	}
+
+	if exists {
 		// Name taken, choose a new one
 		name, err = random.Name()
 		if err != nil {

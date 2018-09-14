@@ -113,18 +113,18 @@ func (c *Ssl) Delete(name string) error {
 }
 
 // Exists returns false if an SslCertificate is deleted and true if it either exists or an error has occurred.
-func (c *Ssl) Exists(name string) bool {
+func (c *Ssl) Exists(name string) (bool, error) {
 	_, err := c.Get(name)
 	if err == nil {
-		return true
+		return true, nil
 	}
 
 	gerr, ok := err.(*googleapi.Error)
 	if ok && gerr.Code == http.StatusNotFound {
-		return false
+		return false, nil
 	}
 
-	return true
+	return false, err
 }
 
 // Get fetches an SslCertificate resource.
