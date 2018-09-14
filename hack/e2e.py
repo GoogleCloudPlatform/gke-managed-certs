@@ -99,7 +99,7 @@ def init():
   kubectl.install()
 
   utils.printf("Set namespace default")
-  current_context = kubectl.call_get_out("config current-context")[0]
+  current_context = kubectl.call_get_out("config current-context")[0][0]
   kubectl.call("config set-context {0} --namespace=default".format(current_context))
 
 def tearDown(zone):
