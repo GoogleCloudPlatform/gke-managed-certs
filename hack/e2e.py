@@ -81,6 +81,13 @@ def get_http_statuses(domains):
 
   return statuses
 
+def expect_ssl_certificates(count):
+  utils.printf("Expect {0} SslCertificate resources...".format(count))
+  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == count):
+    utils.printf("ok")
+  else:
+    utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
+
 def init():
   if not PROW_TEST:
     return
@@ -144,11 +151,7 @@ def test(zone):
 
   kubectl.create(SCRIPT_ROOT, "managed-certificate-controller.yaml", "http-hello.yaml")
 
-  utils.printf("Expect 3 SslCertificate resources...")
-  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 3):
-    utils.printf("ok")
-  else:
-    utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
+  expect_ssl_certificates(3)
 
   utils.printf("Wait for certificates to become Active...")
   if utils.backoff(get_managed_certificate_statuses, lambda statuses: statuses == ["Active", "Active"], max_attempts=50):
@@ -166,13 +169,10 @@ def test(zone):
 
   kubectl.call("annotate ingress test-ingress gke.googleapis.com/managed-certificates-", "Remove managed-certificates annotation")
   kubectl.call("annotate ingress test-ingress ingress.gcp.kubernetes.io/pre-shared-cert-", "Remove pre-shared-cert annotation")
+  kubectl.delete(SCRIPT_ROOT, "ingress.yaml")
   delete_managed_certificates()
 
-  utils.printf("Expect 1 SslCertificate resource...")
-  if utils.backoff(get_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 1):
-    utils.printf("ok")
-  else:
-    utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
+  expect_ssl_certificates(1)
 
 def main():
   parser = argparse.ArgumentParser()
