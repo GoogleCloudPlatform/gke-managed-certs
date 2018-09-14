@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/client/configmap"
 )
 
 const (
@@ -42,7 +42,7 @@ type McrtState struct {
 	mapping map[string]string
 
 	// Manages ConfigMap objects
-	configmap client.ConfigMapClient
+	configmap configmap.Client
 }
 
 /*
@@ -60,7 +60,7 @@ func splitKey(key string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func newMcrtState(configmap client.ConfigMapClient) *McrtState {
+func newMcrtState(configmap configmap.Client) *McrtState {
 	mapping := make(map[string]string)
 
 	if config, err := configmap.Get(configMapNamespace, configMapName); err != nil && len(config.Data) > 0 {

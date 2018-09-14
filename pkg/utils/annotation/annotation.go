@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+// Package annotation provides utilities for manipulating a managed-certificates annotation.
+package annotation
 
 import (
 	"strings"
@@ -34,7 +35,7 @@ const (
 *  - a slice of names,
 *  - a boolean flag which is true if Ingress is annotated with a non-empty managed-certificates annotation.
  */
-func ParseAnnotation(ingress *api.Ingress) ([]string, bool) {
+func Parse(ingress *api.Ingress) ([]string, bool) {
 	annotationValue, exists := ingress.Annotations[annotation]
 	if !exists || annotationValue == "" {
 		return nil, false

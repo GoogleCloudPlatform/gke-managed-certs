@@ -17,7 +17,7 @@ limitations under the License.
 /*
 * Provides operations for manipulating ConfigMap objects.
  */
-package client
+package configmap
 
 import (
 	api "k8s.io/api/core/v1"
@@ -30,27 +30,23 @@ type ConfigMap struct {
 	client *v1.CoreV1Client
 }
 
-type ConfigMapClient interface {
+type Client interface {
 	Get(namespace, name string) (*api.ConfigMap, error)
 	UpdateOrCreate(namespace string, configmap *api.ConfigMap) error
 }
 
-func NewConfigMap(config *rest.Config) ConfigMap {
+func New(config *rest.Config) ConfigMap {
 	return ConfigMap{
 		client: v1.NewForConfigOrDie(config),
 	}
 }
 
-/*
-* Fetches a given ConfigMap object.
- */
+// Get fetches a ConfigMap.
 func (c ConfigMap) Get(namespace, name string) (*api.ConfigMap, error) {
 	return c.client.ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 }
 
-/*
-* Updates a given ConfigMap object.
- */
+// UpdateOrCreate updates or creates a ConfigMap.
 func (c ConfigMap) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
 	configmaps := c.client.ConfigMaps(namespace)
 

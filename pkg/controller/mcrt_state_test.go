@@ -24,7 +24,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 
-	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/client/configmap"
 )
 
 type FakeConfigMock struct {
@@ -33,7 +33,7 @@ type FakeConfigMock struct {
 	t           *testing.T
 }
 
-var _ client.ConfigMapClient = (*FakeConfigMock)(nil)
+var _ configmap.Client = (*FakeConfigMock)(nil)
 
 func (f *FakeConfigMock) Get(namespace, name string) (*api.ConfigMap, error) {
 	f.getCount++

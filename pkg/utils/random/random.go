@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+// Package random contains utilities for generating random names.
+package random
 
 import (
 	"fmt"
@@ -26,10 +27,8 @@ const (
 	maxNameLength = 63
 )
 
-/*
-* Generates random names for SslCertificate resources. Returns a name and error.
- */
-func RandomName() (string, error) {
+// Name generates a random name for SslCertificate resource.
+func Name() (string, error) {
 	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
 	} else {

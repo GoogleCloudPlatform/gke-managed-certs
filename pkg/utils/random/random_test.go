@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package random
 
 import (
 	"testing"
 )
 
-func newRandomName(t *testing.T) string {
-	if name, err := RandomName(); err != nil {
+func newName(t *testing.T) string {
+	if name, err := Name(); err != nil {
 		t.Errorf("Failed to create random name: %v", err)
 		return ""
 	} else {
@@ -29,14 +29,14 @@ func newRandomName(t *testing.T) string {
 	}
 }
 
-func TestRandomName_NonEmptyNameShorterThanLimit(t *testing.T) {
-	if name := newRandomName(t); len(name) <= 0 || len(name) >= 64 {
+func TestName_NonEmptyNameShorterThanLimit(t *testing.T) {
+	if name := newName(t); len(name) <= 0 || len(name) >= 64 {
 		t.Errorf("Random name %s has %d characters, should have between 0 and 63", name, len(name))
 	}
 }
 
-func TestRandomName_TwiceReturnsDifferent(t *testing.T) {
-	if name := newRandomName(t); name == newRandomName(t) {
+func TestName_TwiceReturnsDifferent(t *testing.T) {
+	if name := newName(t); name == newName(t) {
 		t.Errorf("RandomName called twice returned the same name %s", name)
 	}
 }

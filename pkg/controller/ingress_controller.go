@@ -19,16 +19,17 @@ package controller
 import (
 	"time"
 
+	api "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/client/ingress"
 )
 
 type IngressController struct {
-	ingress             *client.Ingress
+	ingress             *ingress.Ingress
 	queue               workqueue.RateLimitingInterface
 	ingressWatcherDelay time.Duration
 }
@@ -42,12 +43,14 @@ func (c *IngressController) Run(stopChannel <-chan struct{}) {
 	<-stopChannel
 }
 
-func (c *IngressController) enqueue(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
+func (c *IngressController) enqueue(ingress *api.Ingress) {
+	key, err := cache.MetaNamespaceKeyFunc(ingress)
+	if err != nil {
 		runtime.HandleError(err)
-	} else {
-		c.queue.AddRateLimited(key)
+		return
 	}
+
+	c.queue.AddRateLimited(key)
 }
 
 func (c *IngressController) synchronizeAllIngresses() {

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	"managed-certs-gke/pkg/utils"
+	"managed-certs-gke/pkg/utils/annotation"
 )
 
 func (c *IngressController) runWatcher() {
@@ -76,7 +76,7 @@ func (c *Controller) handleIngress(key string) error {
 		return err
 	}
 
-	mcrtNames, isNonEmpty := utils.ParseAnnotation(ingress)
+	mcrtNames, isNonEmpty := annotation.Parse(ingress)
 	if !isNonEmpty {
 		// There is either no annotation on this ingress, or there is one which has an empty value
 		return nil
@@ -103,19 +103,20 @@ func (c *Controller) processNextIngress() bool {
 
 	defer c.Ingress.queue.Done(obj)
 
-	var key string
-	var ok bool
-	if key, ok = obj.(string); !ok {
+	key, ok := obj.(string)
+	if !ok {
 		c.Ingress.queue.Forget(obj)
-		runtime.HandleError(fmt.Errorf("Expected string in ingressQueue but got %T", obj))
+		runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
+		return true
 	}
 
-	if err := c.handleIngress(key); err != nil {
-		c.Ingress.queue.AddRateLimited(obj)
-		runtime.HandleError(err)
+	err := c.handleIngress(key)
+	if err == nil {
+		c.Ingress.queue.Forget(obj)
+		return true
 	}
 
-	c.Ingress.queue.Forget(obj)
-
+	c.Ingress.queue.AddRateLimited(obj)
+	runtime.HandleError(err)
 	return true
 }

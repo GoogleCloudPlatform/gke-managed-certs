@@ -17,11 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/golang/glog"
-	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,7 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
-	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/client/ssl"
 	"managed-certs-gke/third_party/client/clientset/versioned"
 	mcrtlister "managed-certs-gke/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
@@ -39,7 +37,7 @@ type McrtController struct {
 	lister mcrtlister.ManagedCertificateLister
 	synced cache.InformerSynced
 	queue  workqueue.RateLimitingInterface
-	ssl    *client.Ssl
+	ssl    *ssl.Ssl
 	state  *McrtState
 }
 
@@ -53,44 +51,45 @@ func (c *McrtController) Run(stopChannel <-chan struct{}) {
 }
 
 func (c *McrtController) enqueue(obj interface{}) {
-	if key, err := cache.MetaNamespaceKeyFunc(obj); err != nil {
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err != nil {
 		runtime.HandleError(err)
-	} else {
-		c.queue.AddRateLimited(key)
+		return
 	}
+
+	c.queue.AddRateLimited(key)
 }
 
 func (c *McrtController) getMcrt(namespace, name string) (*api.ManagedCertificate, bool) {
-	if mcrt, err := c.lister.ManagedCertificates(namespace).Get(name); err != nil {
-		//TODO(krzyk) generate k8s event - can't fetch mcrt
-		runtime.HandleError(err)
-		return nil, false
-	} else {
+	mcrt, err := c.lister.ManagedCertificates(namespace).Get(name)
+	if err == nil {
 		return mcrt, true
 	}
+
+	//TODO(krzyk) generate k8s event - can't fetch mcrt
+	runtime.HandleError(err)
+	return nil, false
 }
 
 /*
 * Tries to delete SslCertificate mapped to already deleted Managed Certificate identified by key. Returns true if SslCertificate is deleted.
  */
 func (c *McrtController) removeSslCertificate(namespace, name string) error {
-	sslCertName, exists := c.state.Get(namespace, name)
+	sslCertificateName, exists := c.state.Get(namespace, name)
 	if !exists {
 		glog.Infof("McrtController: Can't find in state SslCertificate mapped to Managed Certificate %s:%s", namespace, name)
 		return nil
 	}
 
 	// SslCertificate (still) exists in state, check if it exists in GCE
-	if _, err := c.ssl.Get(sslCertName); err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == http.StatusNotFound {
-			// SslCertificate already deleted
-			glog.Infof("McrtController: SslCertificate %s mapped to Managed Certificate %s:%s already deleted", sslCertName, namespace, name)
-			return nil
-		}
+	if !c.ssl.Exists(sslCertificateName) {
+		// SslCertificate already deleted
+		glog.Infof("McrtController: SslCertificate %s mapped to Managed Certificate %s:%s already deleted", sslCertificateName, namespace, name)
+		return nil
 	}
 
 	// SslCertificate exists in GCE, remove it and delete entry from state
-	if err := c.ssl.Delete(sslCertName); err != nil {
+	if err := c.ssl.Delete(sslCertificateName); err != nil {
 		// Failed to delete SslCertificate
 		// TODO(krzyk): generate k8s event
 		runtime.HandleError(err)
@@ -98,7 +97,7 @@ func (c *McrtController) removeSslCertificate(namespace, name string) error {
 	}
 
 	// Successfully deleted SslCertificate
-	glog.Infof("McrtController: successfully deleted SslCertificate %s mapped to Managed Certificate %s:%s", sslCertName, namespace, name)
+	glog.Infof("McrtController: successfully deleted SslCertificate %s mapped to Managed Certificate %s:%s", sslCertificateName, namespace, name)
 	return nil
 }
 

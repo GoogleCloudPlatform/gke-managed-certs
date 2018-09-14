@@ -40,7 +40,7 @@ func main() {
 	//To handle SIGINT gracefully
 	stopChannel := server.SetupSignalHandler()
 
-	clients, err := client.NewClients(*cloudConfig)
+	clients, err := client.New(*cloudConfig)
 	if err != nil {
 		glog.Fatal(err)
 	}

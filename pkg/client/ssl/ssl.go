@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-* Provides interface to operate on GCE SslCertificate resource.
-* */
-package client
+// Package ssl provides operations for manipulating SslCertificate GCE resources.
+package ssl
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.alpha"
+	"google.golang.org/api/googleapi"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
@@ -65,7 +65,7 @@ func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
 	}
 }
 
-func NewSsl(cloudConfig string) (*Ssl, error) {
+func New(cloudConfig string) (*Ssl, error) {
 	tokenSource, err := getTokenSource(cloudConfig)
 	if err != nil {
 		return nil, err
@@ -92,9 +92,7 @@ func NewSsl(cloudConfig string) (*Ssl, error) {
 	}, nil
 }
 
-/*
-* Creates a new SslCertificate with Name=sslCertificateName and Domains=domains.
- */
+// Create creates a new SslCertificate resource.
 func (c *Ssl) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
@@ -108,24 +106,33 @@ func (c *Ssl) Create(sslCertificateName string, domains []string) error {
 	return err
 }
 
-/*
-* Deletes an SslCertificate resource with Name=name.
- */
+// Delete deletes an SslCertificate resource.
 func (c *Ssl) Delete(name string) error {
 	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
 	return err
 }
 
-/*
-* Fetches an SslCertificate resource with name=Name.
- */
+// Exists returns false if an SslCertificate is deleted and true if it either exists or an error has occurred.
+func (c *Ssl) Exists(name string) bool {
+	_, err := c.Get(name)
+	if err == nil {
+		return true
+	}
+
+	gerr, ok := err.(*googleapi.Error)
+	if ok && gerr.Code == http.StatusNotFound {
+		return false
+	}
+
+	return true
+}
+
+// Get fetches an SslCertificate resource.
 func (c *Ssl) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectId, name).Do()
 }
 
-/*
-* Lists all SslCertificate resources.
- */
+// List fetches SslCertificate resources.
 func (c *Ssl) List() (*compute.SslCertificateList, error) {
 	return c.service.SslCertificates.List(c.projectId).Do()
 }

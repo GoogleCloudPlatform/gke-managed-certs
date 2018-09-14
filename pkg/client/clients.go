@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-* Provides clients which managed-certificate-controller uses to talk to api server and GCLB, to perform its tasks.
- */
+// Package client provides clients which are used to communicate with api server and GCLB.
 package client
 
 import (
@@ -24,16 +22,20 @@ import (
 
 	"k8s.io/client-go/rest"
 
+	"managed-certs-gke/pkg/client/configmap"
+	"managed-certs-gke/pkg/client/ingress"
+	"managed-certs-gke/pkg/client/ssl"
 	"managed-certs-gke/third_party/client/clientset/versioned"
 	"managed-certs-gke/third_party/client/informers/externalversions"
 )
 
+// Clients are used to communicate with api server and GCLB
 type Clients struct {
 	// ConfigMap manages ConfigMap objects
-	ConfigMap ConfigMapClient
+	ConfigMap configmap.Client
 
 	// Ingress manages Ingress objects
-	Ingress *Ingress
+	Ingress *ingress.Ingress
 
 	// Mcrt manages ManagedCertificate custom resources
 	Mcrt *versioned.Clientset
@@ -41,11 +43,11 @@ type Clients struct {
 	// McrtInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	McrtInformerFactory externalversions.SharedInformerFactory
 
-	// Ssl manages SslCertificate GCP resource
-	Ssl *Ssl
+	// Ssl manages SslCertificate GCP resources
+	Ssl *ssl.Ssl
 }
 
-func NewClients(cloudConfig string) (*Clients, error) {
+func New(cloudConfig string) (*Clients, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
@@ -54,14 +56,14 @@ func NewClients(cloudConfig string) (*Clients, error) {
 	mcrt := versioned.NewForConfigOrDie(config)
 	factory := externalversions.NewSharedInformerFactory(mcrt, 0)
 
-	ssl, err := NewSsl(cloudConfig)
+	ssl, err := ssl.New(cloudConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Clients{
-		ConfigMap:           NewConfigMap(config),
-		Ingress:             NewIngress(config),
+		ConfigMap:           configmap.New(config),
+		Ingress:             ingress.New(config),
 		Mcrt:                mcrt,
 		McrtInformerFactory: factory,
 		Ssl:                 ssl,

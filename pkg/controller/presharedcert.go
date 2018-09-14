@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"managed-certs-gke/pkg/utils"
+	"managed-certs-gke/pkg/utils/annotation"
 )
 
 func (c *Controller) updatePreSharedCertAnnotation() {
@@ -46,7 +46,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 	for _, ingress := range ingresses.Items {
 		glog.Infof("Update pre-shared-cert annotation for ingress %s", ingress.Name)
 
-		mcrts, exists := utils.ParseAnnotation(&ingress)
+		mcrts, exists := annotation.Parse(&ingress)
 		if !exists {
 			continue
 		}

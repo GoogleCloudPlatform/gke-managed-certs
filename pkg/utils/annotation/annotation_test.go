@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package annotation
 
 import (
 	"reflect"
@@ -48,7 +48,7 @@ func newIngress(annotationValue string) *api.Ingress {
 func TestParseAnnotation(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
-			output, existsNonEmpty := ParseAnnotation(newIngress(testCase.input))
+			output, existsNonEmpty := Parse(newIngress(testCase.input))
 
 			if existsNonEmpty != testCase.existsNonEmpty || !reflect.DeepEqual(output, testCase.output) {
 				t.Errorf("Fail: annotation %s expected to be non empty (%t), in fact is (%t). The extracted names expected to be %v, in fact are %v", testCase.input, testCase.existsNonEmpty, existsNonEmpty, testCase.output, output)
@@ -58,7 +58,7 @@ func TestParseAnnotation(t *testing.T) {
 }
 
 func TestParseAnnotationMissing(t *testing.T) {
-	if _, exists := ParseAnnotation(&api.Ingress{}); exists {
+	if _, exists := Parse(&api.Ingress{}); exists {
 		t.Errorf("Empty ingress should not have annotation")
 	}
 }

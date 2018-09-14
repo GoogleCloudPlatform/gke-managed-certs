@@ -23,7 +23,7 @@ import os.path
 import utils
 
 PROW_TEST = os.path.isfile("/etc/service-account/service-account.json")
-KUBECTL_NAME = "kubectl1_11" if PROW_TEST else "kubectl"
+KUBECTL_NAME = "./kubectl1_11" if PROW_TEST else "kubectl"
 
 def call(com, info=None):
   return command.call("{0} {1}".format(KUBECTL_NAME, com), info)
@@ -44,6 +44,6 @@ def install():
     return
 
   utils.printf("Get kubectl 1.11")
-  command.call("curl -L -o {0} https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl".format(KUBECTL_NAME))
-  command.call("chmod +x {0}".format(KUBECTL_NAME))
+  command.call("curl -L -o kubectl1_11 https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
+  command.call("chmod +x kubectl1_11")
   utils.printf("kubectl version: {0}".format(call_get_out("version")[0][0]))

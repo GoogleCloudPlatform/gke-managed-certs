@@ -14,10 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-* Provides operations for manipulating Ingress objects. Offers List() and Watch() operations which handle Ingress objects in all namespaces.
- */
-package client
+// Package ingress provides operations for manipulating Ingress objects.
+package ingress
 
 import (
 	api "k8s.io/api/extensions/v1beta1"
@@ -36,38 +34,30 @@ type Ingress struct {
 	client *v1beta1.ExtensionsV1beta1Client
 }
 
-func NewIngress(config *rest.Config) *Ingress {
+func New(config *rest.Config) *Ingress {
 	return &Ingress{
 		client: v1beta1.NewForConfigOrDie(config),
 	}
 }
 
-/*
-* Fetches a given Ingress object.
- */
+// Get fetches a given Ingress object.
 func (c *Ingress) Get(namespace string, name string) (*api.Ingress, error) {
 	return c.client.Ingresses(namespace).Get(name, v1.GetOptions{})
 }
 
-/*
-* Lists all Ingress objects in the cluster, from all namespaces.
- */
+// List fetches all Ingress objects in the cluster, from all namespaces.
 func (c *Ingress) List() (*api.IngressList, error) {
 	var result api.IngressList
 	err := c.client.RESTClient().Get().Resource(resource).Do().Into(&result)
 	return &result, err
 }
 
-/*
-* Updates a given Ingress object.
- */
+// Update updates a given Ingress object.
 func (c *Ingress) Update(ingress *api.Ingress) (*api.Ingress, error) {
 	return c.client.Ingresses(ingress.Namespace).Update(ingress)
 }
 
-/*
-* Watches all Ingress objects in the cluster, from all namespaces.
- */
+// Watch watches all Ingress objects in the cluster, from all namespaces.
 func (c *Ingress) Watch() (watch.Interface, error) {
 	opts := &v1.ListOptions{Watch: true}
 	return c.client.RESTClient().Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
