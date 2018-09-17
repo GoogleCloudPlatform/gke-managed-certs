@@ -48,7 +48,7 @@ func New(clients *client.Clients, ingressWatcherDelay time.Duration) *Controller
 			lister: mcrtInformer.Lister(),
 			synced: mcrtInformer.Informer().HasSynced,
 			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcrtQueue"),
-			ssl:    clients.Ssl,
+			ssl:    clients.SSL,
 			state:  newMcrtState(clients.ConfigMap),
 		},
 	}

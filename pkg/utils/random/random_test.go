@@ -17,7 +17,10 @@ limitations under the License.
 package random
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func newName(t *testing.T) string {
@@ -31,12 +34,30 @@ func newName(t *testing.T) string {
 
 func TestName_NonEmptyNameShorterThanLimit(t *testing.T) {
 	if name := newName(t); len(name) <= 0 || len(name) >= 64 {
-		t.Errorf("Random name %s has %d characters, should have between 0 and 63", name, len(name))
+		t.Errorf("Name %s has %d characters, want between 0 and 63", name, len(name))
 	}
 }
 
 func TestName_TwiceReturnsDifferent(t *testing.T) {
 	if name := newName(t); name == newName(t) {
-		t.Errorf("RandomName called twice returned the same name %s", name)
+		t.Errorf("Name called twice returned the same name %s, want different", name)
+	}
+}
+
+type fakeReader struct {
+}
+
+var fakeReaderError = errors.New("fakeReader cannot read")
+
+func (*fakeReader) Read(p []byte) (int, error) {
+	return 0, fakeReaderError
+}
+
+func TestName_OnRandomNumberGeneratorError(t *testing.T) {
+	uuid.SetRand(&fakeReader{})
+	name, err := Name()
+
+	if name != "" || err != fakeReaderError {
+		t.Errorf("Name %s, want empty; error %v, want fakeReaderError %v", name, err, fakeReaderError)
 	}
 }

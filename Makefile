@@ -56,6 +56,6 @@ run-test-in-docker: docker-builder
 	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make test'
 
 test:
-	find pkg -name '*_test.go' -exec dirname '{}' \; | sed -e 's/\(.*\)/.\/\1/g' | xargs godep go test
+	godep go test ./pkg/... -cover
 
 .PHONY: all build-binary build-binary-in-docker build-dev clean cross deps docker docker-builder docker-ci release release-ci run-test-in-docker test

@@ -35,9 +35,9 @@ import (
 
 const httpTimeout = 30 * time.Second
 
-type Ssl struct {
+type SSL struct {
 	service   *compute.Service
-	projectId string
+	projectID string
 }
 
 func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
@@ -65,7 +65,7 @@ func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
 	}
 }
 
-func New(cloudConfig string) (*Ssl, error) {
+func New(cloudConfig string) (*SSL, error) {
 	tokenSource, err := getTokenSource(cloudConfig)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func New(cloudConfig string) (*Ssl, error) {
 
 	glog.V(1).Infof("TokenSource: %v", tokenSource)
 
-	projectId, err := metadata.ProjectID()
+	projectID, err := metadata.ProjectID()
 	if err != nil {
 		return nil, fmt.Errorf("Could not fetch project id: %v", err)
 	}
@@ -86,14 +86,14 @@ func New(cloudConfig string) (*Ssl, error) {
 		return nil, err
 	}
 
-	return &Ssl{
+	return &SSL{
 		service:   service,
-		projectId: projectId,
+		projectID: projectID,
 	}, nil
 }
 
 // Create creates a new SslCertificate resource.
-func (c *Ssl) Create(sslCertificateName string, domains []string) error {
+func (c *SSL) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -102,18 +102,18 @@ func (c *Ssl) Create(sslCertificateName string, domains []string) error {
 		Type: "MANAGED",
 	}
 
-	_, err := c.service.SslCertificates.Insert(c.projectId, sslCertificate).Do()
+	_, err := c.service.SslCertificates.Insert(c.projectID, sslCertificate).Do()
 	return err
 }
 
 // Delete deletes an SslCertificate resource.
-func (c *Ssl) Delete(name string) error {
-	_, err := c.service.SslCertificates.Delete(c.projectId, name).Do()
+func (c *SSL) Delete(name string) error {
+	_, err := c.service.SslCertificates.Delete(c.projectID, name).Do()
 	return err
 }
 
 // Exists returns false if an SslCertificate is deleted and true if it either exists or an error has occurred.
-func (c *Ssl) Exists(name string) (bool, error) {
+func (c *SSL) Exists(name string) (bool, error) {
 	_, err := c.Get(name)
 	if err == nil {
 		return true, nil
@@ -128,11 +128,11 @@ func (c *Ssl) Exists(name string) (bool, error) {
 }
 
 // Get fetches an SslCertificate resource.
-func (c *Ssl) Get(name string) (*compute.SslCertificate, error) {
-	return c.service.SslCertificates.Get(c.projectId, name).Do()
+func (c *SSL) Get(name string) (*compute.SslCertificate, error) {
+	return c.service.SslCertificates.Get(c.projectID, name).Do()
 }
 
 // List fetches SslCertificate resources.
-func (c *Ssl) List() (*compute.SslCertificateList, error) {
-	return c.service.SslCertificates.List(c.projectId).Do()
+func (c *SSL) List() (*compute.SslCertificateList, error) {
+	return c.service.SslCertificates.List(c.projectID).Do()
 }

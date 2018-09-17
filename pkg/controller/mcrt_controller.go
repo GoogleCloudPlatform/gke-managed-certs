@@ -37,7 +37,7 @@ type McrtController struct {
 	lister mcrtlister.ManagedCertificateLister
 	synced cache.InformerSynced
 	queue  workqueue.RateLimitingInterface
-	ssl    *ssl.Ssl
+	ssl    *ssl.SSL
 	state  *McrtState
 }
 
