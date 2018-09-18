@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+// Package stage stores controller state and persists it in a Kubernetes ConfigMap.
+package state
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"managed-certs-gke/pkg/client/configmap"
+	"managed-certs-gke/pkg/controller/state/marshaller"
 )
 
 const (
@@ -35,7 +36,7 @@ const (
 	keySeparator       = ":"
 )
 
-type McrtState struct {
+type State struct {
 	sync.RWMutex
 
 	// Maps Managed Certificate to SslCertificate name. Keys are built with buildKey() and decoded with splitKey().
@@ -45,42 +46,38 @@ type McrtState struct {
 	configmap configmap.Client
 }
 
-/*
-* Transforms a namespace and name into a key in McrtState mapping.
- */
+// Transforms a namespace and name into a key in State mapping.
 func buildKey(namespace, name string) string {
 	return fmt.Sprintf("%s%s%s", namespace, keySeparator, name)
 }
 
-/*
-* Transforms a key in McrtState mapping back into a namespace and name.
- */
+// Transforms a key in State mapping back into a namespace and name.
 func splitKey(key string) (string, string) {
 	parts := strings.Split(key, keySeparator)
 	return parts[0], parts[1]
 }
 
-func newMcrtState(configmap configmap.Client) *McrtState {
+func New(configmap configmap.Client) *State {
 	mapping := make(map[string]string)
 
 	if config, err := configmap.Get(configMapNamespace, configMapName); err != nil && len(config.Data) > 0 {
-		mapping = unmarshal(config.Data)
+		mapping = marshaller.Unmarshal(config.Data)
 	}
 
-	return &McrtState{
+	return &State{
 		mapping:   mapping,
 		configmap: configmap,
 	}
 }
 
-func (state *McrtState) Delete(namespace, name string) {
+func (state *State) Delete(namespace, name string) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.mapping, buildKey(namespace, name))
 	state.persist()
 }
 
-func (state *McrtState) Get(namespace, name string) (string, bool) {
+func (state *State) Get(namespace, name string) (string, bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists := state.mapping[buildKey(namespace, name)]
@@ -92,7 +89,7 @@ type Key struct {
 	Name      string
 }
 
-func (state *McrtState) GetAllKeys() []Key {
+func (state *State) GetAllKeys() []Key {
 	var result []Key
 
 	state.RLock()
@@ -109,7 +106,7 @@ func (state *McrtState) GetAllKeys() []Key {
 	return result
 }
 
-func (state *McrtState) Put(namespace, name, value string) {
+func (state *State) Put(namespace, name, value string) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -117,9 +114,9 @@ func (state *McrtState) Put(namespace, name, value string) {
 	state.persist()
 }
 
-func (state *McrtState) persist() {
+func (state *State) persist() {
 	config := &api.ConfigMap{
-		Data: marshal(state.mapping),
+		Data: marshaller.Marshal(state.mapping),
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configMapName,
 		},
@@ -127,45 +124,4 @@ func (state *McrtState) persist() {
 	if err := state.configmap.UpdateOrCreate(configMapNamespace, config); err != nil {
 		runtime.HandleError(err)
 	}
-}
-
-/*
-* A type used to marshal contents of McertState to json
- */
-type configMapEntry struct {
-	Key   string
-	Value string
-}
-
-/*
-* Transforms a given map into another map with keys formed of characters allowed by ConfigMap and values that encode entries of initial map.
- */
-func marshal(m map[string]string) map[string]string {
-	result := make(map[string]string)
-	i := 0
-	for k, v := range m {
-		i++
-		key := fmt.Sprintf("%d", i)
-		value, _ := json.Marshal(configMapEntry{
-			Key:   k,
-			Value: v,
-		})
-		result[key] = string(value)
-	}
-
-	return result
-}
-
-/*
-* Transforms an encoded map back into a map with contents of McertState.
- */
-func unmarshal(m map[string]string) map[string]string {
-	result := make(map[string]string)
-	for _, v := range m {
-		var entry configMapEntry
-		_ = json.Unmarshal([]byte(v), &entry)
-		result[entry.Key] = entry.Value
-	}
-
-	return result
 }

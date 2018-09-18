@@ -47,6 +47,8 @@ spec:
                                         type: string
                         certificateName:
                             type: string
+                        expireTime:
+                            type: string
                 spec:
                     properties:
                         domains:

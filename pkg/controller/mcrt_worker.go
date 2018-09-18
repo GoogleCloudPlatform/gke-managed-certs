@@ -20,65 +20,14 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	compute "google.golang.org/api/compute/v0.alpha"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
 	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
+	"managed-certs-gke/pkg/controller/translate"
 	"managed-certs-gke/pkg/utils/equal"
 	"managed-certs-gke/pkg/utils/random"
 )
-
-const (
-	sslActive                              = "ACTIVE"
-	sslFailedNotVisible                    = "FAILED_NOT_VISIBLE"
-	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
-	sslFailedCaaForbidden                  = "FAILED_CAA_FORBIDDEN"
-	sslFailedRateLimited                   = "FAILED_RATE_LIMITED"
-	sslManagedCertificateStatusUnspecified = "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED"
-	sslProvisioning                        = "PROVISIONING"
-	sslProvisioningFailed                  = "PROVISIONING_FAILED"
-	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
-	sslRenewalFailed                       = "RENEWAL_FAILED"
-)
-
-func translateDomainStatus(status string) (string, error) {
-	switch status {
-	case sslProvisioning:
-		return "Provisioning", nil
-	case sslFailedNotVisible:
-		return "FailedNotVisible", nil
-	case sslFailedCaaChecking:
-		return "FailedCaaChecking", nil
-	case sslFailedCaaForbidden:
-		return "FailedCaaForbidden", nil
-	case sslFailedRateLimited:
-		return "FailedRateLimited", nil
-	case sslActive:
-		return "Active", nil
-	default:
-		return "", fmt.Errorf("Unexpected status %s", status)
-	}
-}
-
-func translateSslCertStatus(sslCert *compute.SslCertificate) (string, error) {
-	switch sslCert.Managed.Status {
-	case sslActive:
-		return "Active", nil
-	case sslManagedCertificateStatusUnspecified, "":
-		return "", nil
-	case sslProvisioning:
-		return "Provisioning", nil
-	case sslProvisioningFailed:
-		return "ProvisioningFailed", nil
-	case sslProvisioningFailedPermanently:
-		return "ProvisioningFailedPermanently", nil
-	case sslRenewalFailed:
-		return "RenewalFailed", nil
-	default:
-		return "", fmt.Errorf("Unexpected status %s of SslCertificate %v", sslCert.Managed.Status, sslCert)
-	}
-}
 
 func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
 	sslCertificateName, exists := c.state.Get(mcrt.Namespace, mcrt.Name)
@@ -91,15 +40,15 @@ func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
 		return err
 	}
 
-	mcrtStatus, err := translateSslCertStatus(sslCert)
+	status, err := translate.Status(sslCert.Managed.Status)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
 	}
-	mcrt.Status.CertificateStatus = mcrtStatus
+	mcrt.Status.CertificateStatus = status
 
 	domainStatus := make([]api.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
-		translatedStatus, err := translateDomainStatus(status)
+		translatedStatus, err := translate.DomainStatus(status)
 		if err != nil {
 			return err
 		}
@@ -112,6 +61,7 @@ func (c *McrtController) updateStatus(mcrt *api.ManagedCertificate) error {
 	mcrt.Status.DomainStatus = domainStatus
 
 	mcrt.Status.CertificateName = sslCert.Name
+	mcrt.Status.ExpireTime = sslCert.ExpireTime
 
 	_, err = c.mcrt.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
@@ -124,7 +74,7 @@ func (c *McrtController) createSslCertificateIfNeeded(sslCertificateName string,
 	}
 
 	if !exists {
-		//SslCertificate does not yet exist, create it
+		// SslCertificate does not yet exist, create it
 		glog.Infof("McrtController: create a new SslCertificate %s associated with Managed Certificate %s, based on state", sslCertificateName, mcrt.Name)
 		if err := c.ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
 			return err

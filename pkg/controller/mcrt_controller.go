@@ -28,6 +28,7 @@ import (
 
 	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 	"managed-certs-gke/pkg/client/ssl"
+	"managed-certs-gke/pkg/controller/state"
 	"managed-certs-gke/third_party/client/clientset/versioned"
 	mcrtlister "managed-certs-gke/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
@@ -38,7 +39,7 @@ type McrtController struct {
 	synced cache.InformerSynced
 	queue  workqueue.RateLimitingInterface
 	ssl    *ssl.SSL
-	state  *McrtState
+	state  *state.State
 }
 
 func (c *McrtController) Run(stopChannel <-chan struct{}) {

@@ -71,6 +71,10 @@ type ManagedCertificateStatus struct {
 	// Specifies the name of the provisioned managed certificate.
 	// +optional
 	CertificateName string `json:"certificateName,omitempty" protobuf:"bytes,4,opt,name=certificateName"`
+
+	// Specifies the expire time of the provisioned managed certificate.
+	// +optional
+	ExpireTime string `json:"expireTime,omitempty" protobuf:"bytes,5,opt,name=expireTime"`
 }
 
 // DomainStatus is a pair which associates domain name with status of certificate provisioning for this domain.

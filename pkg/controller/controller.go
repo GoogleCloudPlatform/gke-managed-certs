@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/controller/state"
 )
 
 type Controller struct {
@@ -49,7 +50,7 @@ func New(clients *client.Clients, ingressWatcherDelay time.Duration) *Controller
 			synced: mcrtInformer.Informer().HasSynced,
 			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcrtQueue"),
 			ssl:    clients.SSL,
-			state:  newMcrtState(clients.ConfigMap),
+			state:  state.New(clients.ConfigMap),
 		},
 	}
 

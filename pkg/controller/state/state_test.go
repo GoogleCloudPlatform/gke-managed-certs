@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package state
 
 import (
 	"fmt"
@@ -27,25 +27,25 @@ import (
 	"managed-certs-gke/pkg/client/configmap"
 )
 
-type FakeConfigMock struct {
+type fakeConfigMock struct {
 	getCount    int
 	changeCount int
 	t           *testing.T
 }
 
-var _ configmap.Client = (*FakeConfigMock)(nil)
+var _ configmap.Client = (*fakeConfigMock)(nil)
 
-func (f *FakeConfigMock) Get(namespace, name string) (*api.ConfigMap, error) {
+func (f *fakeConfigMock) Get(namespace, name string) (*api.ConfigMap, error) {
 	f.getCount++
 	return nil, nil
 }
 
-func (f *FakeConfigMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (f *fakeConfigMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
 	f.changeCount++
 	return nil
 }
 
-func (f *FakeConfigMock) Check(change int) {
+func (f *fakeConfigMock) Check(change int) {
 	if f.getCount != 1 {
 		f.t.Errorf("ConfigMap.Get() expected to be called 1 times, was %d", f.getCount)
 	}
@@ -54,13 +54,13 @@ func (f *FakeConfigMock) Check(change int) {
 	}
 }
 
-func deleteAndCheck(state *McrtState, namespace, name string, configmap *FakeConfigMock, changeCount *int) {
+func deleteAndCheck(state *State, namespace, name string, configmap *fakeConfigMock, changeCount *int) {
 	state.Delete(namespace, name)
 	(*changeCount)++
 	configmap.Check(*changeCount)
 }
 
-func putAndCheck(state *McrtState, namespace, name, value string, configmap *FakeConfigMock, changeCount *int) {
+func putAndCheck(state *State, namespace, name, value string, configmap *fakeConfigMock, changeCount *int) {
 	state.Put(namespace, name, value)
 	(*changeCount)++
 	configmap.Check(*changeCount)
@@ -115,8 +115,8 @@ func TestGetPutDelete(t *testing.T) {
 		t.Run(testCase.desc, func(t *testing.T) {
 			changeCount := 0
 
-			configmap := &FakeConfigMock{t: t}
-			sut := newMcrtState(configmap)
+			configmap := &fakeConfigMock{t: t}
+			sut := New(configmap)
 			configmap.Check(changeCount)
 
 			if testCase.initNamespace != "" || testCase.initName != "" {
@@ -148,15 +148,5 @@ func TestGetPutDelete(t *testing.T) {
 				t.Errorf("State should not contain %s:%s after delete, instead is %s", testCase.initNamespace, testCase.initName, value)
 			}
 		})
-	}
-}
-
-func TestMarshal(t *testing.T) {
-	m1 := map[string]string{"key1": "value2"}
-	m2 := unmarshal(marshal(m1))
-
-	v, e := m2["key1"]
-	if !e || v != "value2" {
-		t.Errorf("Marshalling and then unmarshalling mangles data, e: %t, v: %s", e, v)
 	}
 }
