@@ -19,9 +19,8 @@ limitations under the License.
 package gke
 
 import (
-	internalinterfaces "managed-certs-gke/third_party/client/informers/externalversions/internalinterfaces"
-
-	v1alpha1 "managed-certs-gke/third_party/client/informers/externalversions/gke.googleapis.com/v1alpha1"
+	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions/gke.googleapis.com/v1alpha1"
+	internalinterfaces "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

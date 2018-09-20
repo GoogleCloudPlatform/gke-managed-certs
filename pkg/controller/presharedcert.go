@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"managed-certs-gke/pkg/utils/annotation"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/annotation"
 )
 
 func (c *Controller) updatePreSharedCertAnnotation() {

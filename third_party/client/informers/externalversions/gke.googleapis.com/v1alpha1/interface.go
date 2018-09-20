@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	internalinterfaces "managed-certs-gke/third_party/client/informers/externalversions/internalinterfaces"
+	internalinterfaces "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

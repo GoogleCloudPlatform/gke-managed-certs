@@ -22,8 +22,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
 
-	"managed-certs-gke/pkg/client"
-	"managed-certs-gke/pkg/controller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
 )
 
 const managedCertificatesVersion = "0.0.1"

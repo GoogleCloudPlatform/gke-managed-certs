@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
-	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
-	"managed-certs-gke/pkg/controller/translate"
-	"managed-certs-gke/pkg/utils/equal"
-	"managed-certs-gke/pkg/utils/random"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/translate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/equal"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
 
 func (c *Controller) createSslCertificateIfNeeded(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {

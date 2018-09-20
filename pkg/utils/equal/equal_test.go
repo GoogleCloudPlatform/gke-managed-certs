@@ -19,8 +19,8 @@ package equal
 import (
 	"testing"
 
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	compute "google.golang.org/api/compute/v0.alpha"
-	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 var testCases = []struct {

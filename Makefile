@@ -11,7 +11,7 @@ build-binary: clean deps
 
 # Builds the managed certs controller binary using a docker builder image
 build-binary-in-docker: docker-builder
-	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make build-binary'
+	docker run -v `pwd`:/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/ ${NAME}-builder:latest bash -c 'cd /gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs && make build-binary'
 
 clean:
 	rm -f ${NAME}
@@ -53,7 +53,7 @@ release-ci: build-binary-in-docker run-test-in-docker docker-ci
 	make -C http-hello
 
 run-test-in-docker: docker-builder
-	docker run -v `pwd`:/gopath/src/managed-certs-gke/ ${NAME}-builder:latest bash -c 'cd /gopath/src/managed-certs-gke && make test'
+	docker run -v `pwd`:/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/ ${NAME}-builder:latest bash -c 'cd /gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs && make test'
 
 test:
 	godep go test ./pkg/... -cover

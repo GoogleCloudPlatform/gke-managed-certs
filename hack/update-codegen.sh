@@ -20,5 +20,12 @@ set -o pipefail
 
 go get -d k8s.io/code-generator/...
 
+REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
 $GOPATH/src/k8s.io/code-generator/generate-groups.sh all \
-  managed-certs-gke/third_party/client managed-certs-gke/pkg/apis gke.googleapis.com:v1alpha1
+  $REPOSITORY/third_party/client $REPOSITORY/pkg/apis gke.googleapis.com:v1alpha1
+
+# This hack is required as the autogens don't work for upper case letters in package names.
+# This issue: https://github.com/kubernetes/code-generator/issues/22 needs to be resolved to remove this hack.
+REPOSITORY_LOWER=`echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]'`
+mv $GOPATH/src/$REPOSITORY_LOWER/third_party/client/clientset/versioned/typed $GOPATH/src/$REPOSITORY/third_party/client/clientset/versioned
+find $GOPATH/src/$REPOSITORY/third_party -name "*.go" | xargs sed -i 's/googlecloudplatform/GoogleCloudPlatform/g'

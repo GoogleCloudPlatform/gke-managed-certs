@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
+	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 )
 
 type FakeGkeV1alpha1 struct {

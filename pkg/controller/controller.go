@@ -26,12 +26,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"managed-certs-gke/pkg/client"
-	"managed-certs-gke/pkg/client/ingress"
-	"managed-certs-gke/pkg/client/ssl"
-	"managed-certs-gke/pkg/controller/state"
-	"managed-certs-gke/third_party/client/clientset/versioned"
-	mcrtlister "managed-certs-gke/third_party/client/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ingress"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned"
+	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
 
 type Controller struct {

@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"sort"
 
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	compute "google.golang.org/api/compute/v0.alpha"
-	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 // Certificates compares Managed Certificate and SslCertificate for equality, i. e. if their domain sets are equal.

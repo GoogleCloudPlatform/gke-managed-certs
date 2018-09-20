@@ -22,7 +22,7 @@ import (
 
 	compute "google.golang.org/api/compute/v0.alpha"
 
-	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 const (

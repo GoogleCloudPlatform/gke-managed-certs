@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"managed-certs-gke/pkg/client/configmap"
-	"managed-certs-gke/pkg/controller/state/marshaller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state/marshaller"
 )
 
 const (

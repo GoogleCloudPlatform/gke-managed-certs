@@ -19,17 +19,17 @@ limitations under the License.
 package externalversions
 
 import (
-	versioned "managed-certs-gke/third_party/client/clientset/versioned"
-	internalinterfaces "managed-certs-gke/third_party/client/informers/externalversions/internalinterfaces"
 	reflect "reflect"
 	sync "sync"
 	time "time"
 
+	versioned "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned"
+	gkegoogleapiscom "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions/gke.googleapis.com"
+	internalinterfaces "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	gkegoogleapiscom "managed-certs-gke/third_party/client/informers/externalversions/gke.googleapis.com"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.

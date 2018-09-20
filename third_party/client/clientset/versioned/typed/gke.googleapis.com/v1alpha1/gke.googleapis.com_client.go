@@ -19,11 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"managed-certs-gke/third_party/client/clientset/versioned/scheme"
-
+	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/scheme"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 type GkeV1alpha1Interface interface {

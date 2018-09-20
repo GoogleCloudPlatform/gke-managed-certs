@@ -19,10 +19,10 @@ limitations under the License.
 package versioned
 
 import (
+	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	gkev1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 )
 
 type Interface interface {

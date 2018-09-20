@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1alpha1 "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 // ManagedCertificateLister helps list ManagedCertificates.

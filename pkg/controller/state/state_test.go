@@ -24,7 +24,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 
-	"managed-certs-gke/pkg/client/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
 )
 
 type fakeConfigMock struct {

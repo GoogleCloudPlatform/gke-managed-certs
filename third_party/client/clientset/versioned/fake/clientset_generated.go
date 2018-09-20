@@ -19,15 +19,14 @@ limitations under the License.
 package fake
 
 import (
-	clientset "managed-certs-gke/third_party/client/clientset/versioned"
-
+	clientset "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned"
+	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
+	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	gkev1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
-	fakegkev1alpha1 "managed-certs-gke/third_party/client/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.

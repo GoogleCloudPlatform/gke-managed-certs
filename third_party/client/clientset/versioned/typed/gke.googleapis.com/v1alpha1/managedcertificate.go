@@ -19,13 +19,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	scheme "managed-certs-gke/third_party/client/clientset/versioned/scheme"
-
+	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	scheme "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 // ManagedCertificatesGetter has a method to return a ManagedCertificateInterface.
