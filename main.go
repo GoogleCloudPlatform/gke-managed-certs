@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
@@ -30,7 +29,6 @@ import (
 const managedCertificatesVersion = "0.0.1"
 
 var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-var ingressWatcherDelay = flag.Duration("ingress-watcher-delay", time.Second, "The delay slept before polling for Ingress resources")
 
 func main() {
 	flag.Parse()
@@ -45,7 +43,7 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	controller := controller.New(clients, *ingressWatcherDelay)
+	controller := controller.New(clients)
 
 	go clients.McrtInformerFactory.Start(stopChannel)
 

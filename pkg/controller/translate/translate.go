@@ -14,11 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package translate translates SslCertificate statuses to ManagedCertificate statuses.
+// Package translate translates SslCertificate object to ManagedCertificate object.
 package translate
 
 import (
 	"fmt"
+
+	compute "google.golang.org/api/compute/v0.alpha"
+
+	api "managed-certs-gke/pkg/apis/gke.googleapis.com/v1alpha1"
 )
 
 const (
@@ -34,8 +38,37 @@ const (
 	sslRenewalFailed                       = "RENEWAL_FAILED"
 )
 
-// DomainStatus translates an SslCertificate domain status to ManagedCertificate domain status.
-func DomainStatus(status string) (string, error) {
+// Certificate translates an SslCertificate object to ManagedCertificate object.
+func Certificate(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate) error {
+	status, err := status(sslCert.Managed.Status)
+	if err != nil {
+		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
+	}
+	mcrt.Status.CertificateStatus = status
+
+	// Initialize with non-nil value to avoid ManagedCertificate CRD validation warnings
+	domainStatuses := make([]api.DomainStatus, 0)
+	for domain, status := range sslCert.Managed.DomainStatus {
+		translatedStatus, err := domainStatus(status)
+		if err != nil {
+			return err
+		}
+
+		domainStatuses = append(domainStatuses, api.DomainStatus{
+			Domain: domain,
+			Status: translatedStatus,
+		})
+	}
+	mcrt.Status.DomainStatus = domainStatuses
+
+	mcrt.Status.CertificateName = sslCert.Name
+	mcrt.Status.ExpireTime = sslCert.ExpireTime
+
+	return nil
+}
+
+// domainStatus translates an SslCertificate domain status to ManagedCertificate domain status.
+func domainStatus(status string) (string, error) {
 	switch status {
 	case sslProvisioning:
 		return "Provisioning", nil
@@ -54,8 +87,8 @@ func DomainStatus(status string) (string, error) {
 	}
 }
 
-// Status translates an SslCertificate status to ManagedCertificate status.
-func Status(status string) (string, error) {
+// status translates an SslCertificate status to ManagedCertificate status.
+func status(status string) (string, error) {
 	switch status {
 	case sslActive:
 		return "Active", nil

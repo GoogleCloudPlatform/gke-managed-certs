@@ -19,9 +19,6 @@ package ingress
 
 import (
 	api "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 )
@@ -40,11 +37,6 @@ func New(config *rest.Config) *Ingress {
 	}
 }
 
-// Get fetches a given Ingress object.
-func (c *Ingress) Get(namespace string, name string) (*api.Ingress, error) {
-	return c.client.Ingresses(namespace).Get(name, v1.GetOptions{})
-}
-
 // List fetches all Ingress objects in the cluster, from all namespaces.
 func (c *Ingress) List() (*api.IngressList, error) {
 	var result api.IngressList
@@ -55,10 +47,4 @@ func (c *Ingress) List() (*api.IngressList, error) {
 // Update updates a given Ingress object.
 func (c *Ingress) Update(ingress *api.Ingress) (*api.Ingress, error) {
 	return c.client.Ingresses(ingress.Namespace).Update(ingress)
-}
-
-// Watch watches all Ingress objects in the cluster, from all namespaces.
-func (c *Ingress) Watch() (watch.Interface, error) {
-	opts := &v1.ListOptions{Watch: true}
-	return c.client.RESTClient().Get().Resource(resource).VersionedParams(opts, scheme.ParameterCodec).Watch()
 }

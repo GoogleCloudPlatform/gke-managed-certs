@@ -27,13 +27,13 @@ import (
 )
 
 func (c *Controller) updatePreSharedCertAnnotation() {
-	ingresses, err := c.Ingress.ingress.List()
+	ingresses, err := c.ingress.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
 
-	sslCerts, err := c.Mcrt.ssl.List()
+	sslCerts, err := c.ssl.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
@@ -53,7 +53,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 
 		var sslCertNames []string
 		for _, mcrt := range mcrts {
-			if sslCertName, exists := c.Mcrt.state.Get(ingress.Namespace, mcrt); exists {
+			if sslCertName, exists := c.state.Get(ingress.Namespace, mcrt); exists {
 				if _, exists := sslCertsMap[sslCertName]; exists {
 					sslCertNames = append(sslCertNames, sslCertName)
 				}
@@ -70,7 +70,7 @@ func (c *Controller) updatePreSharedCertAnnotation() {
 		glog.Infof("Update pre-shared-cert annotation for ingress %s, found SslCertificate resource names to put in the annotation: %s", ingress.Name, strings.Join(sslCertNames, ", "))
 
 		ingress.Annotations["ingress.gcp.kubernetes.io/pre-shared-cert"] = strings.Join(sslCertNames, ", ")
-		if _, err := c.Ingress.ingress.Update(&ingress); err != nil {
+		if _, err := c.ingress.Update(&ingress); err != nil {
 			runtime.HandleError(err)
 			return
 		}

@@ -17,34 +17,14 @@ limitations under the License.
 package controller
 
 import (
-	"time"
-
-	api "k8s.io/api/extensions/v1beta1"
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-
-	"managed-certs-gke/pkg/client/ingress"
 )
 
-type IngressController struct {
-	ingress             *ingress.Ingress
-	queue               workqueue.RateLimitingInterface
-	ingressWatcherDelay time.Duration
-}
-
-func (c *IngressController) Run(stopChannel <-chan struct{}) {
-	defer c.queue.ShutDown()
-
-	go c.runWatcher()
-	go wait.Until(c.synchronizeAllIngresses, time.Minute, stopChannel)
-
-	<-stopChannel
-}
-
-func (c *IngressController) enqueue(ingress *api.Ingress) {
-	key, err := cache.MetaNamespaceKeyFunc(ingress)
+func (c *Controller) enqueue(obj interface{}) {
+	key, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		runtime.HandleError(err)
 		return
@@ -53,14 +33,26 @@ func (c *IngressController) enqueue(ingress *api.Ingress) {
 	c.queue.AddRateLimited(key)
 }
 
-func (c *IngressController) synchronizeAllIngresses() {
-	ingresses, err := c.ingress.List()
+func (c *Controller) enqueueAll() {
+	mcrts, err := c.lister.List(labels.Everything())
 	if err != nil {
+		//TODO(krzyk) generate k8s event - can't fetch mcrt
 		runtime.HandleError(err)
 		return
 	}
 
-	for _, ingress := range ingresses.Items {
-		c.enqueue(&ingress)
+	if len(mcrts) <= 0 {
+		glog.Info("Controller: no Managed Certificates found in cluster")
+		return
+	}
+
+	var names []string
+	for _, mcrt := range mcrts {
+		names = append(names, mcrt.Name)
+	}
+
+	glog.Infof("Controller: enqueuing Managed Certificates found in cluster: %+v", names)
+	for _, mcrt := range mcrts {
+		c.enqueue(mcrt)
 	}
 }

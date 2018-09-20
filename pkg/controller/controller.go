@@ -27,42 +27,45 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"managed-certs-gke/pkg/client"
+	"managed-certs-gke/pkg/client/ingress"
+	"managed-certs-gke/pkg/client/ssl"
 	"managed-certs-gke/pkg/controller/state"
+	"managed-certs-gke/third_party/client/clientset/versioned"
+	mcrtlister "managed-certs-gke/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
 
 type Controller struct {
-	Ingress IngressController
-	Mcrt    McrtController
+	mcrt    *versioned.Clientset
+	lister  mcrtlister.ManagedCertificateLister
+	synced  cache.InformerSynced
+	queue   workqueue.RateLimitingInterface
+	ssl     *ssl.SSL
+	state   *state.State
+	ingress *ingress.Ingress
 }
 
-func New(clients *client.Clients, ingressWatcherDelay time.Duration) *Controller {
+func New(clients *client.Clients) *Controller {
 	mcrtInformer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
-		Ingress: IngressController{
-			ingress:             clients.Ingress,
-			queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
-			ingressWatcherDelay: ingressWatcherDelay,
-		},
-		Mcrt: McrtController{
-			mcrt:   clients.Mcrt,
-			lister: mcrtInformer.Lister(),
-			synced: mcrtInformer.Informer().HasSynced,
-			queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "mcrtQueue"),
-			ssl:    clients.SSL,
-			state:  state.New(clients.ConfigMap),
-		},
+		mcrt:    clients.Mcrt,
+		lister:  mcrtInformer.Lister(),
+		synced:  mcrtInformer.Informer().HasSynced,
+		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
+		ssl:     clients.SSL,
+		state:   state.New(clients.ConfigMap),
+		ingress: clients.Ingress,
 	}
 
 	mcrtInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			controller.Mcrt.enqueue(obj)
+			controller.enqueue(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			controller.Mcrt.enqueue(new)
+			controller.enqueue(new)
 		},
 		DeleteFunc: func(obj interface{}) {
-			controller.Mcrt.enqueue(obj)
+			controller.enqueue(obj)
 		},
 	})
 
@@ -71,22 +74,19 @@ func New(clients *client.Clients, ingressWatcherDelay time.Duration) *Controller
 
 func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	defer runtime.HandleCrash()
-
-	done := make(chan struct{})
-	defer close(done)
+	defer c.queue.ShutDown()
 
 	glog.Info("Controller.Run()")
 
 	glog.Info("Waiting for Managed Certificate cache sync")
-	if !cache.WaitForCacheSync(stopChannel, c.Mcrt.synced) {
+	if !cache.WaitForCacheSync(stopChannel, c.synced) {
 		return fmt.Errorf("Timed out waiting for Managed Certificate cache sync")
 	}
 	glog.Info("Managed Certificate cache synced")
 
-	go c.Mcrt.Run(done)
-	go c.Ingress.Run(done)
+	go wait.Until(c.runWorker, time.Second, stopChannel)
+	go wait.Until(c.synchronizeAllMcrts, time.Minute, stopChannel)
 
-	go wait.Until(c.runIngressWorker, time.Second, stopChannel)
 	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
