@@ -25,8 +25,8 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/informers/externalversions"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 )
 
 // Clients are used to communicate with api server and GCLB

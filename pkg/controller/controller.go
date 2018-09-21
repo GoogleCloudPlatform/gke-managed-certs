@@ -29,9 +29,9 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
+	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/clientset/versioned"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/third_party/client/listers/gke.googleapis.com/v1alpha1"
 )
 
 type Controller struct {
@@ -46,18 +46,19 @@ type Controller struct {
 
 func New(clients *client.Clients) *Controller {
 	mcrtInformer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
+	informer := mcrtInformer.Informer()
 
 	controller := &Controller{
 		mcrt:    clients.Mcrt,
 		lister:  mcrtInformer.Lister(),
-		synced:  mcrtInformer.Informer().HasSynced,
+		synced:  informer.HasSynced,
 		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
 		ssl:     clients.SSL,
 		state:   state.New(clients.ConfigMap),
 		ingress: clients.Ingress,
 	}
 
-	mcrtInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			controller.enqueue(obj)
 		},
