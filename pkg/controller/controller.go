@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
@@ -35,30 +36,31 @@ import (
 )
 
 type Controller struct {
-	mcrt    *versioned.Clientset
+	event   *event.Event
+	ingress *ingress.Ingress
 	lister  mcrtlister.ManagedCertificateLister
-	synced  cache.InformerSynced
+	mcrt    *versioned.Clientset
 	queue   workqueue.RateLimitingInterface
 	ssl     *ssl.SSL
 	state   *state.State
-	ingress *ingress.Ingress
+	synced  cache.InformerSynced
 }
 
 func New(clients *client.Clients) *Controller {
-	mcrtInformer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
-	informer := mcrtInformer.Informer()
+	informer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
+		event:   clients.Event,
+		ingress: clients.Ingress,
+		lister:  informer.Lister(),
 		mcrt:    clients.Mcrt,
-		lister:  mcrtInformer.Lister(),
-		synced:  informer.HasSynced,
 		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
 		ssl:     clients.SSL,
 		state:   state.New(clients.ConfigMap),
-		ingress: clients.Ingress,
+		synced:  informer.Informer().HasSynced,
 	}
 
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			controller.enqueue(obj)
 		},

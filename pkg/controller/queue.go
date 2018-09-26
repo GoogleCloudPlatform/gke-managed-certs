@@ -36,7 +36,6 @@ func (c *Controller) enqueue(obj interface{}) {
 func (c *Controller) enqueueAll() {
 	mcrts, err := c.lister.List(labels.Everything())
 	if err != nil {
-		//TODO(krzyk) generate k8s event - can't fetch mcrt
 		runtime.HandleError(err)
 		return
 	}

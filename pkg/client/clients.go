@@ -20,9 +20,11 @@ package client
 import (
 	"fmt"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
@@ -33,6 +35,9 @@ import (
 type Clients struct {
 	// ConfigMap manages ConfigMap objects
 	ConfigMap configmap.Client
+
+	// Event manages Event objects
+	Event *event.Event
 
 	// Ingress manages Ingress objects
 	Ingress *ingress.Ingress
@@ -63,6 +68,7 @@ func New(cloudConfig string) (*Clients, error) {
 
 	return &Clients{
 		ConfigMap:           configmap.New(config),
+		Event:               event.New(kubernetes.NewForConfigOrDie(config)),
 		Ingress:             ingress.New(config),
 		Mcrt:                mcrt,
 		McrtInformerFactory: factory,

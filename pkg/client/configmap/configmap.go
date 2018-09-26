@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-* Provides operations for manipulating ConfigMap objects.
- */
+// Package configmap provides operations for manipulating ConfigMap objects.
 package configmap
 
 import (

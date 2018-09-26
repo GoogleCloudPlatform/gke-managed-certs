@@ -19,7 +19,6 @@ package ssl
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
@@ -28,9 +27,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.alpha"
-	"google.golang.org/api/googleapi"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const httpTimeout = 30 * time.Second
@@ -112,15 +112,14 @@ func (c *SSL) Delete(name string) error {
 	return err
 }
 
-// Exists returns false if an SslCertificate is deleted and true if it either exists or an error has occurred.
+// Exists returns true if an SslCertificate exists, false if it is deleted. Error is not nil if an error has occurred.
 func (c *SSL) Exists(name string) (bool, error) {
 	_, err := c.Get(name)
 	if err == nil {
 		return true, nil
 	}
 
-	gerr, ok := err.(*googleapi.Error)
-	if ok && gerr.Code == http.StatusNotFound {
+	if http.IsNotFound(err) {
 		return false, nil
 	}
 
