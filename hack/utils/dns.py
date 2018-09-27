@@ -26,51 +26,25 @@ import time
 import utils
 
 RECORD_LENGTH = 20
-PROW_TEST = os.path.isfile("/etc/service-account/service-account.json")
-
-def switch_to_certsbridge_conf():
-  configurations, success = command.call_get_out("gcloud config configurations list --filter=name=certsbridge")
-  configuration_exists = len(configurations) > 0
-
-  if not configuration_exists:
-    command.call("gcloud config configurations create certsbridge", "Create gcloud conf certsbridge")
-    command.call("gcloud config set compute/zone europe-west1-b")
-    command.call("gcloud config set project certsbridge-dev")
-
-    if PROW_TEST:
-      command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
-  else:
-    command.call("gcloud config configurations activate certsbridge", "Switch gcloud conf to certsbridge")
-
-def switch_to_default_conf():
-  command.call("gcloud config configurations activate default", "Switch gcloud conf to default")
+PROJECT = "certsbridge-dev"
 
 def clean_up(zone_name):
   clear_dns_zone(zone_name)
-
-  if PROW_TEST:
-    clear_conf()
-
-def clear_conf():
-  command.call("echo y | gcloud config configurations delete certsbridge", "Remove gcloud conf certsbridge")
 
 def clear_dns_zone(zone_name):
   """
   Removes A sub-records of com.certsbridge from a given DNS zone.
   """
   utils.printf("Removing all sub-records of com.certsbridge from zone {0}".format(zone_name))
-  switch_to_certsbridge_conf()
 
-  output = command.call_get_out("gcloud dns record-sets list --zone {0} --filter=type=A | grep certsbridge.com | tr -s ' ' | cut -d ' ' -f 1,4".format(zone_name))[0]
+  output = command.call_get_out("gcloud dns record-sets list --zone {0} --project {1} --filter=type=A | grep certsbridge.com | tr -s ' ' | cut -d ' ' -f 1,4".format(zone_name, PROJECT))[0]
 
-  command.call("gcloud dns record-sets transaction start --zone {0}".format(zone_name))
+  command.call("gcloud dns record-sets transaction start --zone {0} --project {1}".format(zone_name, PROJECT))
   for line in output:
     domain, ip = line.split(" ")
-    command.call("gcloud dns record-sets transaction remove --zone {0} --name='{1}' --type=A --ttl=300 {2}".format(zone_name, domain, ip), "Remove DNS record for domain {0}".format(domain))
+    command.call("gcloud dns record-sets transaction remove --zone {0} --project {1} --name='{2}' --type=A --ttl=300 {3}".format(zone_name, PROJECT, domain, ip), "Remove DNS record for domain {0}".format(domain))
 
-  command.call("gcloud dns record-sets transaction execute --zone {0}".format(zone_name))
-
-  switch_to_default_conf()
+  command.call("gcloud dns record-sets transaction execute --zone {0} --project {1}".format(zone_name, PROJECT))
 
 def create_random_domains(zone_name):
   """
@@ -81,9 +55,7 @@ def create_random_domains(zone_name):
   ip = output[0]
   utils.printf("Creating random domains pointing at ip {0}".format(ip))
 
-  switch_to_certsbridge_conf()
-
-  command.call("gcloud dns record-sets transaction start --zone {0}".format(zone_name))
+  command.call("gcloud dns record-sets transaction start --zone {0} --project {1}".format(zone_name, PROJECT))
 
   result = []
 
@@ -92,10 +64,8 @@ def create_random_domains(zone_name):
     domain = "{0}.{1}.certsbridge.com".format(record, zone_name)
     result.append(domain)
 
-    command.call("gcloud dns record-sets transaction add --zone {0} --name='{1}' --type=A --ttl=300 {2}".format(zone_name, domain, ip), "Add DNS record for domain {0} to ip {1}".format(domain, ip))
+    command.call("gcloud dns record-sets transaction add --zone {0} --project {1} --name='{2}' --type=A --ttl=300 {3}".format(zone_name, PROJECT, domain, ip), "Add DNS record for domain {0} to ip {1}".format(domain, ip))
 
-  command.call("gcloud dns record-sets transaction execute --zone {0}".format(zone_name))
-
-  switch_to_default_conf()
+  command.call("gcloud dns record-sets transaction execute --zone {0} --project {1}".format(zone_name, PROJECT))
 
   return result

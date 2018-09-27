@@ -19,6 +19,39 @@ set -o nounset
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-${SCRIPT_ROOT}/hack/e2e.py $@ && exitcode=$? || exitcode=$?
+SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
 
-exit $exitcode
+function init {
+  if [ -f $SERVICE_ACCOUNT_KEY ]
+  then
+    echo "Configuring registry authentication"
+    gcloud auth activate-service-account --key-file=${SERVICE_ACCOUNT_KEY}
+    gcloud auth configure-docker
+
+    echo "Install kubectl 1.11"
+    curl -L -o kubectl https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl
+    chmod +x kubectl
+  fi
+
+  export PATH=$PWD:$PATH
+  echo "Prepend \$PATH with CWD: $PATH"
+  echo "Kubectl version: `kubectl version`"
+
+  if [ -f $SERVICE_ACCOUNT_KEY ]
+  then
+    echo "Set namespace default"
+    kubectl config set-context `kubectl config current-context` --namespace=default
+  fi
+}
+
+function main {
+  init
+
+  ${SCRIPT_ROOT}/hack/e2e.py $@ && exitcode=$? || exitcode=$?
+
+  #go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m --args --ginkgo.v=true --report-dir=/workspace/_artifacts --disable-log-dump
+
+  exit $exitcode
+}
+
+main

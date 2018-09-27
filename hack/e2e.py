@@ -29,7 +29,6 @@ from utils import kubectl
 from utils import utils
 
 SCRIPT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-PROW_TEST = os.path.isfile("/etc/service-account/service-account.json")
 
 def delete_ssl_certificates():
   utils.printf("Remove all existing SslCertificate objects")
@@ -46,11 +45,11 @@ def get_ssl_certificates():
 
 def delete_managed_certificates():
   utils.printf("Delete ManagedCertificate objects")
-  names, success = kubectl.call_get_out("get mcrt -o go-template='{{range .items}}{{.metadata.name}}{{\"\\n\"}}{{end}}'")
+  names, success = command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.metadata.name}}{{\"\\n\"}}{{end}}'")
 
   if success:
     for name in names:
-      kubectl.call("delete mcrt {0}".format(name))
+      command.call("kubectl delete mcrt {0}".format(name))
 
 def get_firewall_rules():
   uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter='network=e2e AND name=mcrt' --uri 2>/dev/null")
@@ -61,7 +60,7 @@ def delete_firewall_rules():
     command.call("echo y | gcloud compute firewall-rules delete {0}".format(uri))
 
 def get_managed_certificate_statuses():
-  return kubectl.call_get_out("get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
+  return command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
 
 def get_http_statuses(domains):
   statuses = []
@@ -87,20 +86,6 @@ def expect_ssl_certificates(count):
     utils.printf("ok")
   else:
     utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
-
-def init():
-  if not PROW_TEST:
-    return
-
-  utils.printf("Configure registry authentication")
-  command.call("gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json")
-  command.call("gcloud auth configure-docker")
-
-  kubectl.install()
-
-  utils.printf("Set namespace default")
-  current_context = kubectl.call_get_out("config current-context")[0][0]
-  kubectl.call("config set-context {0} --namespace=default".format(current_context))
 
 def tearDown(zone):
   utils.printf("Clean up, delete firewall rules, k8s objects, all SslCertificate resources and created DNS records")
@@ -129,7 +114,7 @@ spec:
 """.format(i, domain))
       f.flush()
 
-    kubectl.call("create -f /tmp/managed-certificate.yaml", "Deploy test{0}-certificate ManagedCertificate custom object".format(i))
+    command.call("kubectl create -f /tmp/managed-certificate.yaml", "Deploy test{0}-certificate ManagedCertificate custom object".format(i))
     i += 1
 
 def test(zone):
@@ -167,8 +152,6 @@ def test(zone):
     utils.printf("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
     sys.exit(1)
 
-  kubectl.call("annotate ingress test-ingress gke.googleapis.com/managed-certificates-", "Remove managed-certificates annotation")
-  kubectl.call("annotate ingress test-ingress ingress.gcp.kubernetes.io/pre-shared-cert-", "Remove pre-shared-cert annotation")
   kubectl.delete(SCRIPT_ROOT, "ingress.yaml")
   delete_managed_certificates()
 
@@ -178,8 +161,6 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--zone", dest="zone", default="managedcertsgke")
   args = parser.parse_args()
-
-  init()
 
   tearDown(args.zone)
   test(args.zone)

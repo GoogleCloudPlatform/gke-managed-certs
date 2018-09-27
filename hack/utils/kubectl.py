@@ -19,31 +19,11 @@ Wrapper around kubectl
 """
 
 import command
-import os.path
-import utils
-
-PROW_TEST = os.path.isfile("/etc/service-account/service-account.json")
-KUBECTL_NAME = "./kubectl1_11" if PROW_TEST else "kubectl"
-
-def call(com, info=None):
-  return command.call("{0} {1}".format(KUBECTL_NAME, com), info)
-
-def call_get_out(com):
-  return command.call_get_out("{0} {1}".format(KUBECTL_NAME, com))
 
 def create(script_root, *file_names):
   for file_name in file_names:
-    call("create -f {0}/deploy/{1}".format(script_root, file_name))
+    command.call("kubectl create -f {0}/deploy/{1}".format(script_root, file_name))
 
 def delete(script_root, *file_names):
   for file_name in file_names:
-    call("delete -f {0}/deploy/{1} --ignore-not-found=true".format(script_root, file_name))
-
-def install():
-  if not PROW_TEST:
-    return
-
-  utils.printf("Get kubectl 1.11")
-  command.call("curl -L -o kubectl1_11 https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl")
-  command.call("chmod +x kubectl1_11")
-  utils.printf("kubectl version: {0}".format(call_get_out("version")[0][0]))
+    command.call("kubectl delete -f {0}/deploy/{1} --ignore-not-found=true".format(script_root, file_name))
