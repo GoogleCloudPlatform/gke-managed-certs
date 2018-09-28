@@ -20,31 +20,9 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
-GET_FIREWALL_RULES="gcloud compute firewall-rules list --filter='name:(mcrt) AND network:(e2e)' --uri"
 GET_SSL_CERTIFICATES="gcloud compute ssl-certificates list --uri"
 DNS_ZONE="managedcertsgke"
 DNS_PROJECT="certsbridge-dev"
-
-function create_firewall_rules {
-  if [ -z ${INSTANCE_PREFIX:-} ]
-  then
-    echo "INSTANCE_PREFIX env not set"
-  else
-    echo "Create firewall rule"
-    gcloud compute firewall-rules create mcrt-$INSTANCE_PREFIX --network=$INSTANCE_PREFIX --allow=tcp,udp,icmp,esp,ah,sctp
-  fi
-}
-
-function delete_firewall_rules {
-  echo "Delete firewall rules for networks matching e2e"
-  echo $GET_FIREWALL_RULES
-  for uri in `$GET_FIREWALL_RULES`
-  do
-    echo y | gcloud compute firewall-rules delete $uri
-  done
-
-  [[ `$GET_FIREWALL_RULES | wc --lines` == "0" ]]
-}
 
 # Calls either kubectl create or kubectl delete on all k8s yaml files in the
 # deploy/ directory, depending on argument
@@ -137,7 +115,6 @@ function init {
 }
 
 function tear_down {
-  #backoff delete_firewall_rules
   kubectl_all "delete"
   delete_managed_certificates
   backoff delete_ssl_certificates
@@ -145,7 +122,6 @@ function tear_down {
 }
 
 function set_up {
-  #create_firewall_rules
   kubectl_all "create"
 }
 
