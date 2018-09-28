@@ -28,24 +28,6 @@ import utils
 RECORD_LENGTH = 20
 PROJECT = "certsbridge-dev"
 
-def clean_up(zone_name):
-  clear_dns_zone(zone_name)
-
-def clear_dns_zone(zone_name):
-  """
-  Removes A sub-records of com.certsbridge from a given DNS zone.
-  """
-  utils.printf("Removing all sub-records of com.certsbridge from zone {0}".format(zone_name))
-
-  output = command.call_get_out("gcloud dns record-sets list --zone {0} --project {1} --filter=type=A | grep certsbridge.com | tr -s ' ' | cut -d ' ' -f 1,4".format(zone_name, PROJECT))[0]
-
-  command.call("gcloud dns record-sets transaction start --zone {0} --project {1}".format(zone_name, PROJECT))
-  for line in output:
-    domain, ip = line.split(" ")
-    command.call("gcloud dns record-sets transaction remove --zone {0} --project {1} --name='{2}' --type=A --ttl=300 {3}".format(zone_name, PROJECT, domain, ip), "Remove DNS record for domain {0}".format(domain))
-
-  command.call("gcloud dns record-sets transaction execute --zone {0} --project {1}".format(zone_name, PROJECT))
-
 def create_random_domains(zone_name):
   """
   Generates 2 random domain names in zone_name, under top-level domain com.certsbridge

@@ -25,20 +25,9 @@ import urllib2
 
 from utils import command
 from utils import dns
-from utils import kubectl
 from utils import utils
 
 SCRIPT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
-def delete_ssl_certificates():
-  utils.printf("Remove all existing SslCertificate objects")
-
-  ssl_certificates = get_ssl_certificates()
-
-  for uri in ssl_certificates:
-    command.call("echo y | gcloud compute ssl-certificates delete {0}".format(uri))
-
-  return ssl_certificates
 
 def get_ssl_certificates():
   return command.call_get_out("gcloud compute ssl-certificates list --uri")[0]
@@ -50,14 +39,6 @@ def delete_managed_certificates():
   if success:
     for name in names:
       command.call("kubectl delete mcrt {0}".format(name))
-
-def get_firewall_rules():
-  uris, _ = command.call_get_out("gcloud compute firewall-rules list --filter='network=e2e AND name=mcrt' --uri 2>/dev/null")
-  return uris
-
-def delete_firewall_rules():
-  for uri in get_firewall_rules():
-    command.call("echo y | gcloud compute firewall-rules delete {0}".format(uri))
 
 def get_managed_certificate_statuses():
   return command.call_get_out("kubectl get mcrt -o go-template='{{range .items}}{{.status.certificateStatus}}{{\"\\n\"}}{{end}}'")[0]
@@ -87,18 +68,6 @@ def expect_ssl_certificates(count):
   else:
     utils.printf("instead found the following: {0}".format("\n".join(get_ssl_certificates())))
 
-def tearDown(zone):
-  utils.printf("Clean up, delete firewall rules, k8s objects, all SslCertificate resources and created DNS records")
-
-  utils.printf("Delete firewall rules for networks matching e2e")
-  utils.backoff(delete_firewall_rules, lambda _: len(get_firewall_rules()) == 0)
-
-  kubectl.delete(SCRIPT_ROOT, "ingress.yaml", "managed-certificate-controller.yaml")
-  delete_managed_certificates()
-  kubectl.delete(SCRIPT_ROOT, "managedcertificates-crd.yaml", "http-hello.yaml", "rbac.yaml")
-  utils.backoff(delete_ssl_certificates, lambda ssl_certificates: len(ssl_certificates) == 0)
-  dns.clean_up(zone)
-
 def create_managed_certificates(domains):
   i = 1
   for domain in domains:
@@ -118,15 +87,7 @@ spec:
     i += 1
 
 def test(zone):
-  utils.printf("Create firewall rules, random DNS records, set up k8s objects")
-
-  instance_prefix = os.getenv("INSTANCE_PREFIX")
-  if instance_prefix is not None:
-    command.call("gcloud compute firewall-rules create mcrt-{0} --network={0} --allow=tcp,udp,icmp,esp,ah,sctp".format(instance_prefix))
-  else:
-    utils.printf("INSTANCE_PREFIX env is not set")
-
-  kubectl.create(SCRIPT_ROOT, "rbac.yaml", "managedcertificates-crd.yaml", "ingress.yaml")
+  utils.printf("Create random DNS records")
 
   domains = dns.create_random_domains(zone)
 
@@ -134,7 +95,7 @@ def test(zone):
 
   create_managed_certificates(domains)
 
-  kubectl.create(SCRIPT_ROOT, "managed-certificate-controller.yaml", "http-hello.yaml")
+  command.call("kubectl annotate ingress test-ingress gke.googleapis.com/managed-certificates=test1-certificate,test2-certificate")
 
   expect_ssl_certificates(3)
 
@@ -152,7 +113,7 @@ def test(zone):
     utils.printf("statuses are: {0}. HTTP requests failed, exiting with failure.".format(", ".join(get_http_statuses(domains))))
     sys.exit(1)
 
-  kubectl.delete(SCRIPT_ROOT, "ingress.yaml")
+  command.call("kubectl delete -f {0}/deploy/ingress.yaml --ignore-not-found=true".format(SCRIPT_ROOT))
   delete_managed_certificates()
 
   expect_ssl_certificates(1)
@@ -162,9 +123,7 @@ def main():
   parser.add_argument("--zone", dest="zone", default="managedcertsgke")
   args = parser.parse_args()
 
-  tearDown(args.zone)
   test(args.zone)
-  tearDown(args.zone)
 
 if __name__ == '__main__':
   main()
