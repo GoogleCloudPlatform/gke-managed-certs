@@ -37,12 +37,13 @@ function create_firewall_rules {
 
 function delete_firewall_rules {
   echo "Delete firewall rules for networks matching e2e"
-  for uri in `$GET_FIREWALL_RULES 2>/dev/null`
+  echo $GET_FIREWALL_RULES
+  for uri in `$GET_FIREWALL_RULES`
   do
     echo y | gcloud compute firewall-rules delete $uri
   done
 
-  [[ `$GET_FIREWALL_RULES 2>/dev/null | wc --lines` == "0" ]]
+  [[ `$GET_FIREWALL_RULES | wc --lines` == "0" ]]
 }
 
 # Calls either kubectl create or kubectl delete on all k8s yaml files in the
@@ -136,7 +137,7 @@ function init {
 }
 
 function tear_down {
-  backoff delete_firewall_rules
+  #backoff delete_firewall_rules
   kubectl_all "delete"
   delete_managed_certificates
   backoff delete_ssl_certificates
@@ -144,7 +145,7 @@ function tear_down {
 }
 
 function set_up {
-  create_firewall_rules
+  #create_firewall_rules
   kubectl_all "create"
 }
 
