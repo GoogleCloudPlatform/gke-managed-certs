@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 type ConfigMap struct {
@@ -48,11 +50,11 @@ func (c ConfigMap) Get(namespace, name string) (*api.ConfigMap, error) {
 func (c ConfigMap) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
 	configmaps := c.client.ConfigMaps(namespace)
 
-	if _, err := configmaps.Update(configmap); err != nil {
-		if _, err := configmaps.Create(configmap); err != nil {
-			return err
-		}
+	_, err := configmaps.Update(configmap)
+	if !http.IsNotFound(err) {
+		return err
 	}
 
-	return nil
+	_, err = configmaps.Create(configmap)
+	return err
 }
