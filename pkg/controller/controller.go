@@ -90,7 +90,7 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 	go wait.Until(c.runWorker, time.Second, stopChannel)
 	go wait.Until(c.synchronizeAllMcrts, time.Minute, stopChannel)
 
-	go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
+	// go wait.Until(c.updatePreSharedCertAnnotation, time.Minute, stopChannel)
 
 	glog.Info("Controller waiting for stop signal or error")
 
