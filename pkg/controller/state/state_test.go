@@ -17,55 +17,127 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
 )
 
-type fakeConfigMock struct {
+type configMap interface {
+	configmap.Client
+	check(int)
+}
+
+// configMapMock counts the number of calls made to its methods.
+type configMapMock struct {
 	getCount    int
 	changeCount int
 	t           *testing.T
 }
 
-var _ configmap.Client = (*fakeConfigMock)(nil)
-
-func (f *fakeConfigMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	f.getCount++
-	return nil, nil
+func (c *configMapMock) check(change int) {
+	if c.getCount != 1 {
+		c.t.Errorf("ConfigMap.Get() called %d times, want 1", c.getCount)
+	}
+	if c.changeCount != change {
+		c.t.Errorf("ConfigMap.UpdateOrCreate() called %d times, want %d", c.changeCount, change)
+	}
 }
 
-func (f *fakeConfigMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	f.changeCount++
+// failConfigMapMock fails Get and UpdateOrCreate with an error.
+type failConfigMapMock struct {
+	configMapMock
+}
+
+var _ configmap.Client = (*failConfigMapMock)(nil)
+
+func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return nil, errors.New("Fake error - failed to get a config map")
+}
+
+func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
+	return errors.New("Fake error - failed to update or create a config map")
+}
+
+func newFail(t *testing.T) *failConfigMapMock {
+	return &failConfigMapMock{
+		configMapMock{
+			t: t,
+		},
+	}
+}
+
+// emptyConfigMapMock represents a config map that is not initialized with any data.
+type emptyConfigMapMock struct {
+	configMapMock
+}
+
+var _ configmap.Client = (*emptyConfigMapMock)(nil)
+
+func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return &api.ConfigMap{Data: map[string]string{}}, nil
+}
+
+func (c *emptyConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
 	return nil
 }
 
-func (f *fakeConfigMock) Check(change int) {
-	if f.getCount != 1 {
-		f.t.Errorf("ConfigMap.Get() expected to be called 1 times, was %d", f.getCount)
-	}
-	if f.changeCount != change {
-		f.t.Errorf("ConfigMap.UpdateOrCreate() expected to be called %d times, was %d", change, f.changeCount)
+func newEmpty(t *testing.T) *emptyConfigMapMock {
+	return &emptyConfigMapMock{
+		configMapMock{
+			t: t,
+		},
 	}
 }
 
-func deleteAndCheck(state *State, key Key, configmap *fakeConfigMock, changeCount *int) {
+// filledConfigMapMock represents a config map that is initialized with data.
+type filledConfigMapMock struct {
+	configMapMock
+}
+
+var _ configmap.Client = (*filledConfigMapMock)(nil)
+
+func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return &api.ConfigMap{Data: map[string]string{"1": "{\"Key\":\"default:cat\",\"Value\":\"1\"}"}}, nil
+}
+
+func (c *filledConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
+	return nil
+}
+
+func newFilled(t *testing.T) *filledConfigMapMock {
+	return &filledConfigMapMock{
+		configMapMock{
+			t: t,
+		},
+	}
+}
+
+func deleteAndCheck(state *State, key Key, configmap configMap, changeCount *int) {
 	state.Delete(key.Namespace, key.Name)
 	(*changeCount)++
-	configmap.Check(*changeCount)
+	configmap.check(*changeCount)
 }
 
-func putAndCheck(state *State, key Key, value string, configmap *fakeConfigMock, changeCount *int) {
+func putAndCheck(state *State, key Key, value string, configmap configMap, changeCount *int) {
 	state.Put(key.Namespace, key.Name, value)
 	(*changeCount)++
-	configmap.Check(*changeCount)
+	configmap.check(*changeCount)
 }
 
+// Implementation of sorting for state Keys.
 type keys []Key
 
 func (k keys) Len() int {
@@ -88,31 +160,42 @@ func eq(a, b []Key) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func TestGetPutDelete(t *testing.T) {
+func TestState(t *testing.T) {
 	testCases := []struct {
-		initKey   Key
-		initVal   string
-		testKey   Key
-		outExists bool
-		outVal    string
-		desc      string
+		configmap    configMap
+		initKey      Key
+		initVal      string
+		testKey      Key
+		outExists    bool
+		outVal       string
+		expectedKeys []Key
+		desc         string
 	}{
-		{Key{"", ""}, "", Key{"default", "cat"}, false, "", "Lookup argument in empty state"},
-		{Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", "Insert and lookup same argument, same namespaces"},
-		{Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", "Insert and lookup same argument, different namespaces"},
-		{Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", "Insert and lookup different arguments, same namespace"},
+		{newFail(t), Key{"", ""}, "", Key{"default", "cat"}, false, "", nil, "Failing configmap - lookup argument in empty state"},
+		{newFail(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Failing configmap - insert and lookup same argument, same namespaces"},
+		{newFail(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Failing configmap - insert and lookup same argument, different namespaces"},
+		{newFail(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "tea"}}, "Failing configmap - insert and lookup different arguments, same namespace"},
+		{newEmpty(t), Key{"", ""}, "", Key{"default", "cat"}, false, "", nil, "Empty configmap - lookup argument in empty state"},
+		{newEmpty(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Empty configmap - insert and lookup same argument, same namespaces"},
+		{newEmpty(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Empty configmap - insert and lookup same argument, different namespaces"},
+		{newEmpty(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "tea"}}, "Empty configmap - insert and lookup different arguments, same namespace"},
+		{newFilled(t), Key{"", ""}, "", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Filled configmap - lookup argument in empty state"},
+		{newFilled(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Filled configmap - insert and lookup same argument, same namespaces"},
+		{newFilled(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Filled configmap - insert and lookup same argument, different namespaces"},
+		{newFilled(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "cat"}, Key{"default", "tea"}}, "Filled configmap - insert and lookup different arguments, same namespace"},
 	}
+
+	runtime.ErrorHandlers = nil
 
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			changeCount := 0
 
-			configmap := &fakeConfigMock{t: t}
-			sut := New(configmap)
-			configmap.Check(changeCount)
+			sut := New(testCase.configmap)
+			testCase.configmap.check(changeCount)
 
 			if testCase.initKey.Namespace != "" || testCase.initKey.Name != "" {
-				putAndCheck(sut, testCase.initKey, testCase.initVal, configmap, &changeCount)
+				putAndCheck(sut, testCase.initKey, testCase.initVal, testCase.configmap, &changeCount)
 			}
 
 			if value, exists := sut.Get(testCase.testKey.Namespace, testCase.testKey.Name); exists != testCase.outExists {
@@ -121,24 +204,21 @@ func TestGetPutDelete(t *testing.T) {
 				t.Errorf("%+v mapped to %s, want %s", testCase.testKey, value, testCase.outVal)
 			}
 
-			deleteAndCheck(sut, Key{"non existing namespace", "non existing key"}, configmap, &changeCount)
+			deleteAndCheck(sut, Key{"non existing namespace", "non existing key"}, testCase.configmap, &changeCount)
 
 			foo := Key{"custom", "foo"}
-			putAndCheck(sut, foo, "2", configmap, &changeCount)
+			putAndCheck(sut, foo, "2", testCase.configmap, &changeCount)
 
 			bar := Key{"custom", "bar"}
-			putAndCheck(sut, bar, "3", configmap, &changeCount)
+			putAndCheck(sut, bar, "3", testCase.configmap, &changeCount)
 
 			mcrts := sut.GetAllKeys()
-			expected := []Key{foo, bar}
-			if testCase.initKey.Namespace != "" {
-				expected = append(expected, testCase.initKey)
-			}
+			expected := append(testCase.expectedKeys, foo, bar)
 			if !eq(mcrts, expected) {
 				t.Errorf("All ManagedCertificates are %v, want %v", mcrts, expected)
 			}
 
-			deleteAndCheck(sut, testCase.initKey, configmap, &changeCount)
+			deleteAndCheck(sut, testCase.initKey, testCase.configmap, &changeCount)
 
 			if value, exists := sut.Get(testCase.initKey.Namespace, testCase.initKey.Name); exists {
 				t.Errorf("%+v mapped to %s after delete, want key missing", testCase.initKey, value)

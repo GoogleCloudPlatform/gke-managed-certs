@@ -60,7 +60,7 @@ func splitKey(key string) (string, string) {
 func New(configmap configmap.Client) *State {
 	mapping := make(map[string]string)
 
-	if config, err := configmap.Get(configMapNamespace, configMapName); err != nil && len(config.Data) > 0 {
+	if config, err := configmap.Get(configMapNamespace, configMapName); err == nil && len(config.Data) > 0 {
 		mapping = marshaller.Unmarshal(config.Data)
 	}
 

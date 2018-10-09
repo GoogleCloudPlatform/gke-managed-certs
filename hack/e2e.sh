@@ -111,6 +111,9 @@ function init {
   then
     echo "Set namespace default"
     kubectl config set-context `kubectl config current-context` --namespace=default
+
+    echo "Install godep"
+    go get github.com/tools/godep
   fi
 }
 
