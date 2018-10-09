@@ -41,8 +41,7 @@ docker-builder:
 # Formats go source code with gofmt
 gofmt:
 	gofmt -w main.go
-	gofmt -w pkg
-	gofmt -w http-hello
+	find . -mindepth 1 -maxdepth 1 -name Godeps -o -name vendor -prune -o -type d -print | xargs gofmt -w
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
 release: build-binary-in-docker run-test-in-docker docker clean

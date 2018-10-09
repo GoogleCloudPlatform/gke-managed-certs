@@ -130,13 +130,15 @@ function main {
   tear_down
   set_up
 
-  ${SCRIPT_ROOT}/hack/e2e.py --zone=$DNS_ZONE && exitcode=$? || exitcode=$?
+  ${SCRIPT_ROOT}/hack/e2e.py --zone=$DNS_ZONE && exitcodepy=$? || exitcodepy=$?
 
-  #go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m --args --ginkgo.v=true --report-dir=/workspace/_artifacts --disable-log-dump
+  export KUBECONFIG=${KUBECONFIG:-${HOME}/.kube/config}
+  export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gke}
+  godep go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m && exitcode=$? || exitcode=$?
 
   tear_down
 
-  exit $exitcode
+  exit $exitcodepy && $exitcode
 }
 
 while getopts "z:" opt; do

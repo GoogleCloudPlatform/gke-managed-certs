@@ -51,21 +51,21 @@ var k8sNotFound = &k8s_errors.StatusError{
 	},
 }
 
-var isNotFoundTestCases = []struct {
-	in  error
-	out bool
-}{
-	{nil, false},
-	{normal, false},
-	{googleNormal, false},
-	{googleNotFound, true},
-	{googleQuotaExceeded, false},
-	{k8sNormal, false},
-	{k8sNotFound, true},
-}
-
 func TestIsNotFound(t *testing.T) {
-	for _, testCase := range isNotFoundTestCases {
+	testCases := []struct {
+		in  error
+		out bool
+	}{
+		{nil, false},
+		{normal, false},
+		{googleNormal, false},
+		{googleNotFound, true},
+		{googleQuotaExceeded, false},
+		{k8sNormal, false},
+		{k8sNotFound, true},
+	}
+
+	for _, testCase := range testCases {
 		out := IsNotFound(testCase.in)
 		if out != testCase.out {
 			t.Errorf("IsNotFound(%v) = %t, want %t", testCase.in, out, testCase.out)
@@ -73,21 +73,21 @@ func TestIsNotFound(t *testing.T) {
 	}
 }
 
-var isQuotaExceededTestCases = []struct {
-	in  error
-	out bool
-}{
-	{nil, false},
-	{normal, false},
-	{googleNormal, false},
-	{googleNotFound, false},
-	{googleQuotaExceeded, true},
-	{k8sNormal, false},
-	{k8sNotFound, false},
-}
-
 func TestIsQuotaExceeded(t *testing.T) {
-	for _, testCase := range isQuotaExceededTestCases {
+	testCases := []struct {
+		in  error
+		out bool
+	}{
+		{nil, false},
+		{normal, false},
+		{googleNormal, false},
+		{googleNotFound, false},
+		{googleQuotaExceeded, true},
+		{k8sNormal, false},
+		{k8sNotFound, false},
+	}
+
+	for _, testCase := range testCases {
 		out := IsQuotaExceeded(testCase.in)
 		if out != testCase.out {
 			t.Errorf("IsQuotaExceeded(%v) = %t, want %t", testCase.in, out, testCase.out)
@@ -95,21 +95,21 @@ func TestIsQuotaExceeded(t *testing.T) {
 	}
 }
 
-var ignoreTestCases = []struct {
-	in  error
-	out error
-}{
-	{nil, nil},
-	{normal, normal},
-	{googleNormal, googleNormal},
-	{googleNotFound, nil},
-	{googleQuotaExceeded, googleQuotaExceeded},
-	{k8sNormal, k8sNormal},
-	{k8sNotFound, nil},
-}
-
 func TestIgnoreNotFound(t *testing.T) {
-	for _, testCase := range ignoreTestCases {
+	testCases := []struct {
+		in  error
+		out error
+	}{
+		{nil, nil},
+		{normal, normal},
+		{googleNormal, googleNormal},
+		{googleNotFound, nil},
+		{googleQuotaExceeded, googleQuotaExceeded},
+		{k8sNormal, k8sNormal},
+		{k8sNotFound, nil},
+	}
+
+	for _, testCase := range testCases {
 		out := IgnoreNotFound(testCase.in)
 		if out != testCase.out {
 			t.Errorf("IgnoreNotFound(%v) = %v, want %v", testCase.in, out, testCase.out)

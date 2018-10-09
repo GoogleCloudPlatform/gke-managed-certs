@@ -23,23 +23,23 @@ import (
 	compute "google.golang.org/api/compute/v0.alpha"
 )
 
-var testCases = []struct {
-	mcrtDomains    []string
-	sslCertDomains []string
-	equal          bool
-	desc           string
-}{
-	{nil, nil, true, "nil == nil"},
-	{[]string{}, []string{}, true, "[] == []"},
-	{nil, []string{}, true, "nil == []"},
-	{[]string{}, nil, true, "[] == nil"},
-	{[]string{"a"}, nil, false, "[a] != nil"},
-	{[]string{"a"}, []string{}, false, "[a] != []"},
-	{[]string{"a"}, []string{"b"}, false, "[a] != [b]"},
-	{[]string{"a", "b"}, []string{"b", "a"}, true, "[a, b] == [b, a]"},
-}
-
 func TestCertificates(t *testing.T) {
+	var testCases = []struct {
+		mcrtDomains    []string
+		sslCertDomains []string
+		equal          bool
+		desc           string
+	}{
+		{nil, nil, true, "nil == nil"},
+		{[]string{}, []string{}, true, "[] == []"},
+		{nil, []string{}, true, "nil == []"},
+		{[]string{}, nil, true, "[] == nil"},
+		{[]string{"a"}, nil, false, "[a] != nil"},
+		{[]string{"a"}, []string{}, false, "[a] != []"},
+		{[]string{"a"}, []string{"b"}, false, "[a] != [b]"},
+		{[]string{"a", "b"}, []string{"b", "a"}, true, "[a, b] == [b, a]"},
+	}
+
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			mcrt := api.ManagedCertificate{

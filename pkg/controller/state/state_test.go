@@ -17,9 +17,9 @@ limitations under the License.
 package state
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -54,64 +54,56 @@ func (f *fakeConfigMock) Check(change int) {
 	}
 }
 
-func deleteAndCheck(state *State, namespace, name string, configmap *fakeConfigMock, changeCount *int) {
-	state.Delete(namespace, name)
+func deleteAndCheck(state *State, key Key, configmap *fakeConfigMock, changeCount *int) {
+	state.Delete(key.Namespace, key.Name)
 	(*changeCount)++
 	configmap.Check(*changeCount)
 }
 
-func putAndCheck(state *State, namespace, name, value string, configmap *fakeConfigMock, changeCount *int) {
-	state.Put(namespace, name, value)
+func putAndCheck(state *State, key Key, value string, configmap *fakeConfigMock, changeCount *int) {
+	state.Put(key.Namespace, key.Name, value)
 	(*changeCount)++
 	configmap.Check(*changeCount)
 }
 
-func buildExpected(namespaces []string, names []string) []Key {
-	var result []Key
-	for i := range namespaces {
-		if len(namespaces[i]) > 0 {
-			result = append(result, Key{
-				Namespace: namespaces[i],
-				Name:      names[i],
-			})
-		}
-	}
+type keys []Key
 
-	return result
+func (k keys) Len() int {
+	return len(k)
+}
+
+func (k keys) Swap(i, j int) {
+	k[i], k[j] = k[j], k[i]
+}
+
+func (k keys) Less(i, j int) bool {
+	ns := strings.Compare(k[i].Namespace, k[j].Namespace)
+	return ns < 0 || (ns == 0 && strings.Compare(k[i].Name, k[j].Name) < 0)
 }
 
 func eq(a, b []Key) bool {
-	var x, y []string
+	sort.Sort(keys(a))
+	sort.Sort(keys(b))
 
-	for i := range a {
-		x = append(x, fmt.Sprintf("%s:%s", a[i].Namespace, a[i].Name))
-		y = append(y, fmt.Sprintf("%s:%s", b[i].Namespace, b[i].Name))
-	}
-
-	sort.Strings(x)
-	sort.Strings(y)
-
-	return reflect.DeepEqual(x, y)
-}
-
-var getPutDeleteTests = []struct {
-	initNamespace string
-	initName      string
-	initVal       string
-	testNamespace string
-	testName      string
-	outExists     bool
-	outVal        string
-	desc          string
-}{
-	{"", "", "", "default", "cat", false, "", "Lookup argument in empty state"},
-	{"default", "cat", "1", "default", "cat", true, "1", "Insert and lookup same argument, same namespaces"},
-	{"default", "cat", "1", "system", "cat", false, "", "Insert and lookup same argument, different namespaces"},
-	{"default", "tea", "1", "default", "dog", false, "", "Insert and lookup different arguments, same namespace"},
+	return reflect.DeepEqual(a, b)
 }
 
 func TestGetPutDelete(t *testing.T) {
-	for _, testCase := range getPutDeleteTests {
+	testCases := []struct {
+		initKey   Key
+		initVal   string
+		testKey   Key
+		outExists bool
+		outVal    string
+		desc      string
+	}{
+		{Key{"", ""}, "", Key{"default", "cat"}, false, "", "Lookup argument in empty state"},
+		{Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", "Insert and lookup same argument, same namespaces"},
+		{Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", "Insert and lookup same argument, different namespaces"},
+		{Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", "Insert and lookup different arguments, same namespace"},
+	}
+
+	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			changeCount := 0
 
@@ -119,33 +111,37 @@ func TestGetPutDelete(t *testing.T) {
 			sut := New(configmap)
 			configmap.Check(changeCount)
 
-			if testCase.initNamespace != "" || testCase.initName != "" {
-				putAndCheck(sut, testCase.initNamespace, testCase.initName, testCase.initVal, configmap, &changeCount)
+			if testCase.initKey.Namespace != "" || testCase.initKey.Name != "" {
+				putAndCheck(sut, testCase.initKey, testCase.initVal, configmap, &changeCount)
 			}
 
-			if value, exists := sut.Get(testCase.testNamespace, testCase.testName); exists != testCase.outExists {
-				t.Errorf("Expected key %s:%s to exist in state to be %t", testCase.testNamespace, testCase.testName, testCase.outExists)
-			} else {
-				if value != testCase.outVal {
-					t.Errorf("Expected key %s:%s to be mapped to %s, instead is mapped to %s", testCase.testNamespace, testCase.testName, testCase.outVal, value)
-				}
+			if value, exists := sut.Get(testCase.testKey.Namespace, testCase.testKey.Name); exists != testCase.outExists {
+				t.Errorf("Expected key %+v to exist in state to be %t", testCase.testKey, testCase.outExists)
+			} else if value != testCase.outVal {
+				t.Errorf("%+v mapped to %s, want %s", testCase.testKey, value, testCase.outVal)
 			}
 
-			deleteAndCheck(sut, "non existing namespace", "non existing key", configmap, &changeCount)
+			deleteAndCheck(sut, Key{"non existing namespace", "non existing key"}, configmap, &changeCount)
 
-			putAndCheck(sut, "default", "foo", "2", configmap, &changeCount)
-			putAndCheck(sut, "default", "bar", "3", configmap, &changeCount)
+			foo := Key{"custom", "foo"}
+			putAndCheck(sut, foo, "2", configmap, &changeCount)
+
+			bar := Key{"custom", "bar"}
+			putAndCheck(sut, bar, "3", configmap, &changeCount)
 
 			mcrts := sut.GetAllKeys()
-			expected := buildExpected([]string{testCase.initNamespace, "default", "default"}, []string{testCase.initName, "foo", "bar"})
+			expected := []Key{foo, bar}
+			if testCase.initKey.Namespace != "" {
+				expected = append(expected, testCase.initKey)
+			}
 			if !eq(mcrts, expected) {
-				t.Errorf("All ManagedCertificates expected to equal %v, instead are %v", expected, mcrts)
+				t.Errorf("All ManagedCertificates are %v, want %v", mcrts, expected)
 			}
 
-			deleteAndCheck(sut, testCase.initNamespace, testCase.initName, configmap, &changeCount)
+			deleteAndCheck(sut, testCase.initKey, configmap, &changeCount)
 
-			if value, exists := sut.Get(testCase.initNamespace, testCase.initName); exists {
-				t.Errorf("State should not contain %s:%s after delete, instead is %s", testCase.initNamespace, testCase.initName, value)
+			if value, exists := sut.Get(testCase.initKey.Namespace, testCase.initKey.Name); exists {
+				t.Errorf("%+v mapped to %s after delete, want key missing", testCase.initKey, value)
 			}
 		})
 	}

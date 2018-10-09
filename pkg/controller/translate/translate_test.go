@@ -52,19 +52,19 @@ func mcrt(status string, domains []api.DomainStatus) *api.ManagedCertificate {
 	}
 }
 
-var testCases = []struct {
-	sslCertIn compute.SslCertificate
-	success   bool // translation should succeed
-	mcrtOut   *api.ManagedCertificate
-	desc      string
-}{
-	{sslCert("bad_status", nil), false, nil, "Wrong certificate status"},
-	{sslCert("ACTIVE", map[string]string{"example.com": "bad_status"}), false, nil, "Wrong domain status"},
-	{sslCert("ACTIVE", nil), true, mcrt("Active", []api.DomainStatus{}), "Nil domain statuses -> []{} domain status"},
-	{sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}), true, mcrt("Active", []api.DomainStatus{api.DomainStatus{Domain: "example.com", Status: "Active"}}), "Correct translation"},
-}
-
 func TestCertificate(t *testing.T) {
+	testCases := []struct {
+		sslCertIn compute.SslCertificate
+		success   bool // translation should succeed
+		mcrtOut   *api.ManagedCertificate
+		desc      string
+	}{
+		{sslCert("bad_status", nil), false, nil, "Wrong certificate status"},
+		{sslCert("ACTIVE", map[string]string{"example.com": "bad_status"}), false, nil, "Wrong domain status"},
+		{sslCert("ACTIVE", nil), true, mcrt("Active", []api.DomainStatus{}), "Nil domain statuses -> []{} domain status"},
+		{sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}), true, mcrt("Active", []api.DomainStatus{api.DomainStatus{Domain: "example.com", Status: "Active"}}), "Correct translation"},
+	}
+
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			var mcrt api.ManagedCertificate
