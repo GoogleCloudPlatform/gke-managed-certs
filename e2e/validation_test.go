@@ -57,7 +57,7 @@ func TestValidateCRD(t *testing.T) {
 			}
 
 			if _, ok := err.(*errors.StatusError); !ok {
-				t.Errorf("ManagedCertificate creation failed with error %T, want apimachinery errors.StatusError. Error details: %#v", err, err)
+				t.Errorf("ManagedCertificate creation failed with error %T, want apimachinery errors.StatusError. Error details: %s", err, err.Error())
 			}
 
 			// errors.StatusError is expected - to indicate validation error

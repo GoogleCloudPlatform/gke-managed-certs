@@ -135,9 +135,8 @@ function main {
 
   ${SCRIPT_ROOT}/hack/e2e.py --zone=$DNS_ZONE && exitcodepy=$? || exitcodepy=$?
 
-  export KUBECONFIG=${KUBECONFIG:-${HOME}/.kube/config}
-  export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gke}
-  godep go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m && exitcode=$? || exitcode=$?
+  make -C ${SCRIPT_ROOT} run-e2e-in-docker && exitcode=$? || exitcode=$?
+  #godep go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m && exitcode=$? || exitcode=$?
 
   tear_down
 
