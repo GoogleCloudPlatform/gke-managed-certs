@@ -136,7 +136,6 @@ function main {
   ${SCRIPT_ROOT}/hack/e2e.py --zone=$DNS_ZONE && exitcodepy=$? || exitcodepy=$?
 
   make -C ${SCRIPT_ROOT} run-e2e-in-docker && exitcode=$? || exitcode=$?
-  #godep go test ${SCRIPT_ROOT}/e2e/*go -v -test.timeout=60m && exitcode=$? || exitcode=$?
 
   tear_down
 
