@@ -17,12 +17,15 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
@@ -32,35 +35,58 @@ const (
 func TestValidateCRD(t *testing.T) {
 	testCases := []struct {
 		domains []string
+		success bool
 		desc    string
 	}{
-		{[]string{"a.com", "b.com"}, "Multiple domain names not allowed"},
-		{[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.com"}, "Domain >63 characters not allowed."},
-		{[]string{"*.example.com"}, "Domain with a wildcard not allowed"},
+		{[]string{"a.com", "b.com"}, false, "Multiple domain names not allowed"},
+		{[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.com"}, false, "Domain >63 chars not allowed"},
+		{[]string{"*.example.com"}, false, "Domain with a wildcard not allowed"},
+		{[]string{"example.com"}, true, "Single non-wildcard domain <=63 characters allowed"},
 	}
 
-	client, err := utils.CreateManagedCertificateClient()
+	client, err := client.New()
 	if err != nil {
 		t.Fatalf("Could not create client %s", err.Error())
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			mcrt := &api.ManagedCertificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("test-case-%d", i),
+				},
 				Spec: api.ManagedCertificateSpec{
 					Domains: testCase.domains,
 				},
-			}
-			_, err := client.GkeV1alpha1().ManagedCertificates(namespace).Create(mcrt)
-			if err == nil {
-				t.Errorf("ManagedCertificate created, want failure")
-			}
-
-			if _, ok := err.(*errors.StatusError); !ok {
-				t.Errorf("ManagedCertificate creation failed with error %T, want apimachinery errors.StatusError. Error details: %s", err, err.Error())
+				Status: api.ManagedCertificateStatus{
+					DomainStatus: []api.DomainStatus{},
+				},
 			}
 
-			// errors.StatusError is expected - to indicate validation error
+			nsClient := client.Mcrt.GkeV1alpha1().ManagedCertificates(namespace)
+			_, err := nsClient.Create(mcrt)
+			if err == nil && !testCase.success {
+				t.Errorf("Created, want failure")
+				return
+			}
+			if err == nil && testCase.success {
+				// Creation succeeded as expected, so now delete the managed certificate
+				if err := http.IgnoreNotFound(nsClient.Delete(mcrt.Name, &metav1.DeleteOptions{})); err != nil {
+					t.Error(err)
+				}
+
+				return
+			}
+
+			statusErr, ok := err.(*errors.StatusError)
+			if !ok {
+				t.Errorf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
+				return
+			}
+
+			if statusErr.Status().Reason != "Invalid" {
+				t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
+			}
 		})
 	}
 }

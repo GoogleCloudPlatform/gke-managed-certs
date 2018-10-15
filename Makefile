@@ -4,12 +4,13 @@ TAG?=dev
 REGISTRY?=eu.gcr.io/managed-certs-gke
 KUBECONFIG?=${HOME}/.kube/config
 KUBERNETES_PROVIDER?=gke
+ARTIFACTS?=/tmp/artifacts
+CLOUD_CONFIG?=$(shell gcloud info --format="value(config.paths.global_config_dir)")
+CLOUD_SDK_ROOT=$(shell gcloud info --format="value(installation.sdk_root)")
 
 name=managed-certificate-controller
 runner_image=${name}-runner
 runner_path=/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/
-gcloud_sdk_root=`gcloud info --format="value(installation.sdk_root)"`
-gcloud_config_dir=`gcloud info --format="value(config.paths.global_config_dir)"`
 
 auth-configure-docker:
 	test -f /etc/service-account/service-account.json && \
@@ -44,9 +45,11 @@ docker-runner-builder:
 	docker build -t ${runner_image} runner
 
 e2e:
+	mkdir -p /tmp/artifacts && \
+	CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
-	godep go test ./e2e/... -v -test.timeout=60m
+	godep go test ./e2e/... -v -test.timeout=60m | go-junit-report > /tmp/artifacts/e2e.xml
 
 # Formats go source code with gofmt
 gofmt:
@@ -62,10 +65,11 @@ release-ci: build-binary-in-docker run-test-in-docker docker
 
 run-e2e-in-docker: docker-runner-builder auth-configure-docker
 	docker run -v `pwd`:${runner_path} \
-		-v ${gcloud_sdk_root}:${gcloud_sdk_root} \
-		-v ${gcloud_config_dir}:/root/.config/gcloud \
+		-v ${CLOUD_SDK_ROOT}:${CLOUD_SDK_ROOT} \
+		-v ${CLOUD_CONFIG}:/root/.config/gcloud \
 		-v ${KUBECONFIG}:/root/.kube/config \
-		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e'
+		-v ${ARTIFACTS}:/tmp/artifacts \
+		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e DNS_ZONE=${DNS_ZONE} CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT}'
 
 run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make test'

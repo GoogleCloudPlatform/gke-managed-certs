@@ -18,5 +18,7 @@ LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
 
-RUN apt-get update && apt-get --yes install libseccomp-dev && go version && go get github.com/tools/godep && godep version
+RUN apt-get update && apt-get --yes install libseccomp-dev && go version \
+	&& go get github.com/tools/godep && godep version \
+	&& go get github.com/jstemmer/go-junit-report
 CMD ["/bin/bash"]
