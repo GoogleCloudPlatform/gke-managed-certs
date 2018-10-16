@@ -23,28 +23,27 @@ import (
 	"strings"
 
 	"golang.org/x/oauth2"
-	compute "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v0.beta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
-	defaultHost = ""
+	defaultHost     = ""
 )
 
 type Clients struct {
 	// Mcrt manages ManagedCertificate custom resources
 	Mcrt *versioned.Clientset
 
-	// SSL manages SslCertificate GCP resources
-	SSL *ssl.SSL
+	// Compute manages GCP resources
+	Compute *compute.Service
 }
 
 func New() (*Clients, error) {
@@ -53,14 +52,14 @@ func New() (*Clients, error) {
 		return nil, err
 	}
 
-	_, err = getComputeClient()
+	compute, err = getComputeClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Clients{
-		Mcrt: mcrt,
-		//SSL: ssl,
+		Mcrt:    mcrt,
+		Compute: compute,
 	}, nil
 }
 

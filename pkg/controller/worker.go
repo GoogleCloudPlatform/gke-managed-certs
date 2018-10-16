@@ -20,13 +20,12 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	compute "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v0.beta"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/translate"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/equal"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
@@ -58,7 +57,7 @@ func (c *Controller) createSslCertificateIfNeeded(sslCertificateName string, mcr
 		return nil, err
 	}
 
-	if !equal.Certificates(*mcrt, *sslCert) {
+	if !certificate.Equal(*mcrt, *sslCert) {
 		glog.Infof("Controller: ManagedCertificate %v and SslCertificate %v are different, removing SslCertificate", mcrt, sslCert)
 		if err := http.IgnoreNotFound(c.ssl.Delete(sslCertificateName)); err != nil {
 			c.event.TransientBackendError(mcrt, err)
@@ -112,7 +111,7 @@ func (c *Controller) handle(key string) error {
 		return err
 	}
 
-	if err := translate.Certificate(*sslCert, mcrt); err != nil {
+	if err := certificate.CopyStatus(*sslCert, mcrt); err != nil {
 		return err
 	}
 

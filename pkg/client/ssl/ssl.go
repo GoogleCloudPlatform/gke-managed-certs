@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v0.beta"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 

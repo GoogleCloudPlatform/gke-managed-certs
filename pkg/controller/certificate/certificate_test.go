@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package translate
+package certificate
 
 import (
 	"reflect"
 	"testing"
 
-	compute "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 )
@@ -52,7 +52,7 @@ func mcrt(status string, domains []api.DomainStatus) *api.ManagedCertificate {
 	}
 }
 
-func TestCertificate(t *testing.T) {
+func TestCopyStatus(t *testing.T) {
 	testCases := []struct {
 		sslCertIn compute.SslCertificate
 		success   bool // translation should succeed
@@ -68,7 +68,7 @@ func TestCertificate(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			var mcrt api.ManagedCertificate
-			err := Certificate(testCase.sslCertIn, &mcrt)
+			err := CopyStatus(testCase.sslCertIn, &mcrt)
 
 			if (err == nil) != testCase.success {
 				t.Errorf("Translation err: %s, want success: %t", err.Error(), testCase.success)
@@ -80,6 +80,44 @@ func TestCertificate(t *testing.T) {
 
 			if !reflect.DeepEqual(&mcrt, testCase.mcrtOut) {
 				t.Errorf("ManagedCertificate after Certificate(%#v) = %v, want %v", testCase.sslCertIn, mcrt, testCase.mcrtOut)
+			}
+		})
+	}
+}
+
+func TestEqual(t *testing.T) {
+	var testCases = []struct {
+		mcrtDomains    []string
+		sslCertDomains []string
+		expected       bool
+		desc           string
+	}{
+		{nil, nil, true, "nil == nil"},
+		{[]string{}, []string{}, true, "[] == []"},
+		{nil, []string{}, true, "nil == []"},
+		{[]string{}, nil, true, "[] == nil"},
+		{[]string{"a"}, nil, false, "[a] != nil"},
+		{[]string{"a"}, []string{}, false, "[a] != []"},
+		{[]string{"a"}, []string{"b"}, false, "[a] != [b]"},
+		{[]string{"a", "b"}, []string{"b", "a"}, true, "[a, b] == [b, a]"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
+			mcrt := api.ManagedCertificate{
+				Spec: api.ManagedCertificateSpec{
+					Domains: testCase.mcrtDomains,
+				},
+			}
+			sslCert := compute.SslCertificate{
+				Managed: &compute.SslCertificateManagedSslCertificate{
+					Domains: testCase.sslCertDomains,
+				},
+				Type: "MANAGED",
+			}
+
+			if result := Equal(mcrt, sslCert); result != testCase.expected {
+				t.Errorf("Equal(mcrt, sslCert) = %t, want %t. ManagedCertificate: %v, SslCertificate: %v", result, testCase.expected, mcrt, sslCert)
 			}
 		})
 	}

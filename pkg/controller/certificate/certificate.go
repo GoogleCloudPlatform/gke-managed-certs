@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package translate translates SslCertificate object to ManagedCertificate object.
-package translate
+// Package certificate contains helper methods for performing operations on SslCertificate and ManagedCertificate objects.
+package certificate
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 
-	compute "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 )
@@ -38,8 +40,8 @@ const (
 	sslRenewalFailed                       = "RENEWAL_FAILED"
 )
 
-// Certificate translates an SslCertificate object to ManagedCertificate object.
-func Certificate(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate) error {
+// CopyStatus sets ManagedCertificate status based on SslCertificate object.
+func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate) error {
 	status, err := status(sslCert.Managed.Status)
 	if err != nil {
 		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
@@ -65,6 +67,19 @@ func Certificate(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate) e
 	mcrt.Status.ExpireTime = sslCert.ExpireTime
 
 	return nil
+}
+
+// Equal compares ManagedCertificate and SslCertificate for equality, i. e. if their domain sets are equal.
+func Equal(mcrt api.ManagedCertificate, sslCert compute.SslCertificate) bool {
+	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
+	copy(mcrtDomains, mcrt.Spec.Domains)
+	sort.Strings(mcrtDomains)
+
+	sslCertDomains := make([]string, len(sslCert.Managed.Domains))
+	copy(sslCertDomains, sslCert.Managed.Domains)
+	sort.Strings(sslCertDomains)
+
+	return reflect.DeepEqual(mcrtDomains, sslCertDomains)
 }
 
 // domainStatus translates an SslCertificate domain status to ManagedCertificate domain status.
