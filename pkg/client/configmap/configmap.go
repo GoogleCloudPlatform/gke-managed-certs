@@ -27,7 +27,7 @@ import (
 )
 
 type ConfigMap struct {
-	client *v1.CoreV1Client
+	client v1.CoreV1Interface
 }
 
 type Client interface {

@@ -1808,6 +1808,11 @@
 			"Rev": "3e32c8333043fc2c058455f4d32986a89d31b05b"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/kubernetes/typed/core/v1/fake",
+			"Comment": "kubernetes-1.12.0-beta.1-13-g3e32c833",
+			"Rev": "3e32c8333043fc2c058455f4d32986a89d31b05b"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/kubernetes/typed/events/v1beta1",
 			"Comment": "kubernetes-1.12.0-beta.1-13-g3e32c833",
 			"Rev": "3e32c8333043fc2c058455f4d32986a89d31b05b"
