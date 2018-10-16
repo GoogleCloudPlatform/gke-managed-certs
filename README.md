@@ -19,7 +19,11 @@ To install Managed Certificates in your own cluster on GCP, you need to:
 ```console
 $ kubectl create -f deploy/managedcertificates-crd.yaml
 ```
-2. Deploy the managed-certificate-controller  
+2. Deploy RBAC rules
+```console
+$ kubectl create -f deploy/rbac.yaml
+```
+3. Deploy the managed-certificate-controller
 ```console
 $ kubectl create -f deploy/managed-certificate-controller.yaml
 ```
