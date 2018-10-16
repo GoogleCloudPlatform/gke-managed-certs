@@ -52,14 +52,14 @@ func New() (*Clients, error) {
 		return nil, err
 	}
 
-	compute, err = getComputeClient()
+	computeClient, err := getComputeClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Clients{
 		Mcrt:    mcrt,
-		Compute: compute,
+		Compute: computeClient,
 	}, nil
 }
 
