@@ -20,8 +20,8 @@ package event
 import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 
@@ -29,10 +29,12 @@ import (
 )
 
 const (
-	component             = "managed-certificate-controller"
-	namespace             = ""
-	tooManyCertificates   = "TooManyCertificates"
-	transientBackendError = "TransientBackendError"
+	component                   = "managed-certificate-controller"
+	namespace                   = ""
+	reasonCreate                = "Create"
+	reasonDelete                = "Delete"
+	reasonTooManyCertificates   = "TooManyCertificates"
+	reasonTransientBackendError = "TransientBackendError"
 )
 
 type Event struct {
@@ -40,21 +42,37 @@ type Event struct {
 }
 
 // New creates an event recorder to send custom events to Kubernetes.
-func New(client kubernetes.Interface) *Event {
+func New(client kubernetes.Interface) (*Event, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.V(4).Infof)
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace)})
-	return &Event{
-		recorder: broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: component}),
+
+	eventsScheme := runtime.NewScheme()
+	if err := api.AddToScheme(eventsScheme); err != nil {
+		return nil, err
 	}
+
+	return &Event{
+		recorder: broadcaster.NewRecorder(eventsScheme, v1.EventSource{Component: component}),
+	}, nil
 }
 
-// TooManyCertificates creates an event if quota for maximum number of SslCertificates per GCP project is exceeded.
+// Create creates an event when an SslCertificate associated with ManagedCertificate is created.
+func (c *Event) Create(mcrt *api.ManagedCertificate, sslCertificateName string) {
+	c.recorder.Eventf(mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
+}
+
+// Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
+func (c *Event) Delete(mcrt *api.ManagedCertificate, sslCertificateName string) {
+	c.recorder.Eventf(mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
+}
+
+// TooManyCertificates creates an event when quota for maximum number of SslCertificates per GCP project is exceeded.
 func (c *Event) TooManyCertificates(mcrt *api.ManagedCertificate, err error) {
-	c.recorder.Event(mcrt, v1.EventTypeWarning, tooManyCertificates, err.Error())
+	c.recorder.Event(mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
 }
 
-// TransientBackendError creates an event if a transient error occurrs when calling GCP API.
+// TransientBackendError creates an event when a transient error occurrs when calling GCP API.
 func (c *Event) TransientBackendError(mcrt *api.ManagedCertificate, err error) {
-	c.recorder.Event(mcrt, v1.EventTypeWarning, transientBackendError, err.Error())
+	c.recorder.Event(mcrt, v1.EventTypeWarning, reasonTransientBackendError, err.Error())
 }

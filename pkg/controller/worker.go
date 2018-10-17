@@ -39,7 +39,7 @@ func (c *Controller) createSslCertificateIfNeeded(sslCertificateName string, mcr
 
 	if !exists {
 		// SslCertificate does not yet exist, create it
-		glog.Infof("Controller: create SslCertificate %s for Managed Certificate %s:%s, based on state", sslCertificateName, mcrt.Namespace, mcrt.Name)
+		glog.Infof("Create SslCertificate %s for Managed Certificate %s:%s, based on state", sslCertificateName, mcrt.Namespace, mcrt.Name)
 		if err := c.ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
 			if http.IsQuotaExceeded(err) {
 				c.event.TooManyCertificates(mcrt, err)
@@ -49,6 +49,7 @@ func (c *Controller) createSslCertificateIfNeeded(sslCertificateName string, mcr
 			c.event.TransientBackendError(mcrt, err)
 			return nil, err
 		}
+		c.event.Create(mcrt, sslCertificateName)
 	}
 
 	sslCert, err := c.ssl.Get(sslCertificateName)
@@ -58,13 +59,14 @@ func (c *Controller) createSslCertificateIfNeeded(sslCertificateName string, mcr
 	}
 
 	if !certificate.Equal(*mcrt, *sslCert) {
-		glog.Infof("Controller: ManagedCertificate %v and SslCertificate %v are different, removing SslCertificate", mcrt, sslCert)
+		glog.Infof("ManagedCertificate %v and SslCertificate %v are different, removing SslCertificate", mcrt, sslCert)
 		if err := http.IgnoreNotFound(c.ssl.Delete(sslCertificateName)); err != nil {
 			c.event.TransientBackendError(mcrt, err)
 			return nil, err
 		}
 
-		glog.Infof("Controller: SslCertificate %s deleted", sslCertificateName)
+		c.event.Delete(mcrt, sslCertificateName)
+		glog.Infof("SslCertificate %s deleted", sslCertificateName)
 	}
 
 	return sslCert, nil
@@ -83,7 +85,7 @@ func (c *Controller) createSslCertificateNameIfNeeded(mcrt *api.ManagedCertifica
 		return "", err
 	}
 
-	glog.Infof("Controller: add to state SslCertificate name %s for Managed Certificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
+	glog.Infof("Add to state SslCertificate name %s for Managed Certificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
 	c.state.Put(mcrt.Namespace, mcrt.Name, sslCertificateName)
 	return sslCertificateName, nil
 }
@@ -99,7 +101,7 @@ func (c *Controller) handle(key string) error {
 		return err
 	}
 
-	glog.Infof("Controller: handling Managed Certificate %s:%s", mcrt.Namespace, mcrt.Name)
+	glog.Infof("Handling Managed Certificate %s:%s", mcrt.Namespace, mcrt.Name)
 
 	sslCertificateName, err := c.createSslCertificateNameIfNeeded(mcrt)
 	if err != nil {
@@ -177,7 +179,7 @@ func (c *Controller) randomName() (string, error) {
 func (c *Controller) removeSslCertificate(namespace, name string) error {
 	sslCertificateName, exists := c.state.Get(namespace, name)
 	if !exists {
-		glog.Infof("Controller: Can't find in state SslCertificate for Managed Certificate %s:%s", namespace, name)
+		glog.Infof("Can't find in state SslCertificate for Managed Certificate %s:%s", namespace, name)
 		return nil
 	}
 
@@ -189,7 +191,7 @@ func (c *Controller) removeSslCertificate(namespace, name string) error {
 
 	if !exists {
 		// SslCertificate already deleted
-		glog.Infof("Controller: SslCertificate %s for Managed Certificate %s:%s already deleted", sslCertificateName, namespace, name)
+		glog.Infof("SslCertificate %s for Managed Certificate %s:%s already deleted", sslCertificateName, namespace, name)
 		return nil
 	}
 
@@ -199,7 +201,7 @@ func (c *Controller) removeSslCertificate(namespace, name string) error {
 	}
 
 	// Successfully deleted SslCertificate
-	glog.Infof("Controller: successfully deleted SslCertificate %s for Managed Certificate %s:%s", sslCertificateName, namespace, name)
+	glog.Infof("Successfully deleted SslCertificate %s for Managed Certificate %s:%s", sslCertificateName, namespace, name)
 	return nil
 }
 
@@ -210,7 +212,7 @@ func (c *Controller) synchronizeState() {
 		// key identifies a Managed Certificate known in state
 		if _, err := c.lister.ManagedCertificates(key.Namespace).Get(key.Name); http.IsNotFound(err) {
 			// Managed Certificate exists in state, but does not exist in cluster
-			glog.Infof("Controller: Managed Certificate %s:%s in state but not in cluster", key.Namespace, key.Name)
+			glog.Infof("Managed Certificate %s:%s in state but not in cluster", key.Namespace, key.Name)
 
 			err := c.removeSslCertificate(key.Namespace, key.Name)
 			if err == nil {

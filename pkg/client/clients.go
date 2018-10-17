@@ -62,9 +62,14 @@ func New(cloudConfig string) (*Clients, error) {
 		return nil, err
 	}
 
+	event, err := event.New(kubernetes.NewForConfigOrDie(config))
+	if err != nil {
+		return nil, err
+	}
+
 	return &Clients{
 		ConfigMap:           configmap.New(config),
-		Event:               event.New(kubernetes.NewForConfigOrDie(config)),
+		Event:               event,
 		Mcrt:                mcrt,
 		McrtInformerFactory: factory,
 		SSL:                 ssl,
