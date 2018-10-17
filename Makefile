@@ -49,7 +49,7 @@ e2e:
 	CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
-	godep go test ./e2e/... -v -test.timeout=60m | go-junit-report > /tmp/artifacts/e2e.xml
+	godep go test ./e2e/... -v -test.timeout=60m | go-junit-report > /tmp/artifacts/junit_01.xml
 
 # Formats go source code with gofmt
 gofmt:
