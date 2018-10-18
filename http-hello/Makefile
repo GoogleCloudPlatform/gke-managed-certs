@@ -1,28 +1,18 @@
 all: build docker clean
 
-TAG?=dev
-REGISTRY?=eu.gcr.io/managed-certs-gke
-NAME=http-hello
-DOCKER_IMAGE=${REGISTRY}/${NAME}:${TAG}
+TAG ?= dev
+registry = eu.gcr.io/managed-certs-gke
+name = http-hello
+docker_image = ${registry}/${name}:${TAG}
 
 build:
-	CGO_ENABLED=0 GOOS=linux go build -o ${NAME} -ldflags '-extldflags "-static"'
+	CGO_ENABLED=0 GOOS=linux go build -o ${name} -ldflags '-extldflags "-static"'
 
 clean:
-	rm -f ${NAME}
+	rm -f ${name}
 
 docker: build
-	docker build --pull -t ${DOCKER_IMAGE} .
-	docker push ${DOCKER_IMAGE}
+	docker build --pull -t ${docker_image} .
+	docker push ${docker_image}
 
-docker-ci: build
-	docker build --pull -t ${DOCKER_IMAGE} .
-	gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json
-	gcloud auth configure-docker
-	docker push ${DOCKER_IMAGE}
-
-release: docker clean
-
-release-ci: docker-ci
-
-.PHONY: all build clean docker docker-ci release release-ci
+.PHONY: all build clean docker

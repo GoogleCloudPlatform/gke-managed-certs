@@ -24,16 +24,15 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/version"
 )
-
-const managedCertificatesVersion = "0.0.1"
 
 var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 func main() {
 	flag.Parse()
 
-	glog.V(1).Infof("Managed certificates %s controller starting", managedCertificatesVersion)
+	glog.V(1).Infof("managed-certificates-controller %s starting. Latest commit hash: %s", version.Version, version.GitCommit)
 
 	//To handle SIGINT gracefully
 	stopChannel := server.SetupSignalHandler()

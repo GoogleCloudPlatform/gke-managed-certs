@@ -1,12 +1,17 @@
 all: gofmt build-binary-in-docker run-test-in-docker clean cross
 
-TAG?=dev
-REGISTRY?=eu.gcr.io/managed-certs-gke
-KUBECONFIG?=${HOME}/.kube/config
-KUBERNETES_PROVIDER?=gke
-ARTIFACTS?=/tmp/artifacts
-CLOUD_CONFIG?=$(shell gcloud info --format="value(config.paths.global_config_dir)")
-CLOUD_SDK_ROOT=$(shell gcloud info --format="value(installation.sdk_root)")
+TAG ?= dev
+REGISTRY ?= gcr.io/google_containers
+KUBECONFIG ?= ${HOME}/.kube/config
+KUBERNETES_PROVIDER ?= gke
+ARTIFACTS ?= /tmp/artifacts
+CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
+CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
+
+# Latest commit hash for current branch
+GIT_COMMIT ?= $(shell git rev-parse HEAD)
+# This version-strategy uses git tags to set the version string
+VERSION ?= $(shell git describe --tags --always --dirty)
 
 name=managed-certificate-controller
 runner_image=${name}-runner
@@ -19,11 +24,13 @@ auth-configure-docker:
 
 # Builds the managed certs controller binary
 build-binary: clean deps
-	godep go build -o ${name}
+	pkg=github.com/GoogleCloudPlatform/gke-managed-certs; \
+	ld_flags="-X $${pkg}/pkg/version.Version=${VERSION} -X $${pkg}/pkg/version.GitCommit=${GIT_COMMIT}"; \
+	godep go build -o ${name} -ldflags "$${ld_flags}"
 
 # Builds the managed certs controller binary using a docker runner image
 build-binary-in-docker: docker-runner-builder
-	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make build-binary'
+	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make build-binary GIT_COMMIT=${GIT_COMMIT} VERSION=${VERSION}'
 
 clean:
 	rm -f ${name}
