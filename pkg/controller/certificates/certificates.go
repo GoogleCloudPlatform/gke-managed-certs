@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package certificate contains helper methods for performing operations on SslCertificate and ManagedCertificate objects.
-package certificate
+// Package certificates contains helper methods for performing operations on SslCertificate and ManagedCertificate objects.
+package certificates
 
 import (
 	"fmt"

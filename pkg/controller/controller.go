@@ -27,19 +27,17 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 )
 
 type Controller struct {
-	event  *event.Event
 	lister mcrtlister.ManagedCertificateLister
 	mcrt   *versioned.Clientset
 	queue  workqueue.RateLimitingInterface
-	ssl    *ssl.SSL
+	ssl    sslcertificatemanager.SslCertificateManager
 	state  *state.State
 	synced cache.InformerSynced
 }
@@ -48,11 +46,10 @@ func New(clients *client.Clients) *Controller {
 	informer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
 
 	controller := &Controller{
-		event:  clients.Event,
 		lister: informer.Lister(),
 		mcrt:   clients.Mcrt,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		ssl:    clients.SSL,
+		ssl:    sslcertificatemanager.New(clients),
 		state:  state.New(clients.ConfigMap),
 		synced: informer.Informer().HasSynced,
 	}
@@ -94,4 +91,9 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 
 	glog.Info("Controller shutting down")
 	return nil
+}
+
+func (c *Controller) runWorker() {
+	for c.processNext() {
+	}
 }

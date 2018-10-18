@@ -35,7 +35,7 @@ import (
 
 const httpTimeout = 30 * time.Second
 
-type SSL struct {
+type Ssl struct {
 	service   *compute.Service
 	projectID string
 }
@@ -65,7 +65,7 @@ func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
 	}
 }
 
-func New(cloudConfig string) (*SSL, error) {
+func New(cloudConfig string) (*Ssl, error) {
 	tokenSource, err := getTokenSource(cloudConfig)
 	if err != nil {
 		return nil, err
@@ -86,14 +86,14 @@ func New(cloudConfig string) (*SSL, error) {
 		return nil, err
 	}
 
-	return &SSL{
+	return &Ssl{
 		service:   service,
 		projectID: projectID,
 	}, nil
 }
 
 // Create creates a new SslCertificate resource.
-func (c *SSL) Create(sslCertificateName string, domains []string) error {
+func (c *Ssl) Create(sslCertificateName string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -107,13 +107,13 @@ func (c *SSL) Create(sslCertificateName string, domains []string) error {
 }
 
 // Delete deletes an SslCertificate resource.
-func (c *SSL) Delete(name string) error {
+func (c *Ssl) Delete(name string) error {
 	_, err := c.service.SslCertificates.Delete(c.projectID, name).Do()
 	return err
 }
 
 // Exists returns true if an SslCertificate exists, false if it is deleted. Error is not nil if an error has occurred.
-func (c *SSL) Exists(name string) (bool, error) {
+func (c *Ssl) Exists(name string) (bool, error) {
 	_, err := c.Get(name)
 	if err == nil {
 		return true, nil
@@ -127,11 +127,11 @@ func (c *SSL) Exists(name string) (bool, error) {
 }
 
 // Get fetches an SslCertificate resource.
-func (c *SSL) Get(name string) (*compute.SslCertificate, error) {
+func (c *Ssl) Get(name string) (*compute.SslCertificate, error) {
 	return c.service.SslCertificates.Get(c.projectID, name).Do()
 }
 
 // List fetches SslCertificate resources.
-func (c *SSL) List() (*compute.SslCertificateList, error) {
+func (c *Ssl) List() (*compute.SslCertificateList, error) {
 	return c.service.SslCertificates.List(c.projectID).Do()
 }

@@ -44,8 +44,8 @@ type Clients struct {
 	// McrtInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	McrtInformerFactory externalversions.SharedInformerFactory
 
-	// SSL manages SslCertificate GCP resources
-	SSL *ssl.SSL
+	// Ssl manages SslCertificate GCP resources
+	Ssl *ssl.Ssl
 }
 
 func New(cloudConfig string) (*Clients, error) {
@@ -72,6 +72,6 @@ func New(cloudConfig string) (*Clients, error) {
 		Event:               event,
 		Mcrt:                mcrt,
 		McrtInformerFactory: factory,
-		SSL:                 ssl,
+		Ssl:                 ssl,
 	}, nil
 }

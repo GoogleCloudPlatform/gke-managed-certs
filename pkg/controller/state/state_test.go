@@ -18,9 +18,6 @@ package state
 
 import (
 	"errors"
-	"reflect"
-	"sort"
-	"strings"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -67,7 +64,7 @@ func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.Conf
 	return errors.New("Fake error - failed to update or create a config map")
 }
 
-func newFail(t *testing.T) *failConfigMapMock {
+func newFails(t *testing.T) *failConfigMapMock {
 	return &failConfigMapMock{
 		configMapMock{
 			t: t,
@@ -125,64 +122,66 @@ func newFilled(t *testing.T) *filledConfigMapMock {
 	}
 }
 
-func deleteAndCheck(state *State, key Key, configmap configMap, changeCount *int) {
-	state.Delete(key.Namespace, key.Name)
+func deleteAndCheck(state *State, t tuple, configmap configMap, changeCount *int) {
+	state.Delete(t.Namespace, t.Name)
 	(*changeCount)++
 	configmap.check(*changeCount)
 }
 
-func putAndCheck(state *State, key Key, value string, configmap configMap, changeCount *int) {
-	state.Put(key.Namespace, key.Name, value)
+func putAndCheck(state *State, t tuple, configmap configMap, changeCount *int) {
+	state.Put(t.Namespace, t.Name, t.Value)
 	(*changeCount)++
 	configmap.check(*changeCount)
 }
 
-// Implementation of sorting for state Keys.
-type keys []Key
+func contains(expected []tuple, namespace, name, value string) bool {
+	for _, t := range expected {
+		if t.Namespace == namespace && t.Name == name && t.Value == value {
+			return true
+		}
+	}
 
-func (k keys) Len() int {
-	return len(k)
+	return false
 }
 
-func (k keys) Swap(i, j int) {
-	k[i], k[j] = k[j], k[i]
+type tuple struct {
+	Namespace string
+	Name      string
+	Value     string
 }
 
-func (k keys) Less(i, j int) bool {
-	ns := strings.Compare(k[i].Namespace, k[j].Namespace)
-	return ns < 0 || (ns == 0 && strings.Compare(k[i].Name, k[j].Name) < 0)
+func (t tuple) empty() bool {
+	return t.Namespace == "" && t.Name == ""
 }
 
-func eq(a, b []Key) bool {
-	sort.Sort(keys(a))
-	sort.Sort(keys(b))
-
-	return reflect.DeepEqual(a, b)
-}
+var emptytp = tuple{"", "", ""}
+var defcat1 = tuple{"default", "cat", "1"}
+var defcate = tuple{"default", "cat", ""}
+var defdoge = tuple{"default", "dog", ""}
+var syscate = tuple{"system", "cat", ""}
+var deftea1 = tuple{"default", "tea", "1"}
 
 func TestState(t *testing.T) {
 	testCases := []struct {
-		configmap    configMap
-		initKey      Key
-		initVal      string
-		testKey      Key
-		outExists    bool
-		outVal       string
-		expectedKeys []Key
-		desc         string
+		configmap configMap
+		init      tuple
+		test      tuple
+		exists    bool
+		expected  []tuple
+		desc      string
 	}{
-		{newFail(t), Key{"", ""}, "", Key{"default", "cat"}, false, "", nil, "Failing configmap - lookup argument in empty state"},
-		{newFail(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Failing configmap - insert and lookup same argument, same namespaces"},
-		{newFail(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Failing configmap - insert and lookup same argument, different namespaces"},
-		{newFail(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "tea"}}, "Failing configmap - insert and lookup different arguments, same namespace"},
-		{newEmpty(t), Key{"", ""}, "", Key{"default", "cat"}, false, "", nil, "Empty configmap - lookup argument in empty state"},
-		{newEmpty(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Empty configmap - insert and lookup same argument, same namespaces"},
-		{newEmpty(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Empty configmap - insert and lookup same argument, different namespaces"},
-		{newEmpty(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "tea"}}, "Empty configmap - insert and lookup different arguments, same namespace"},
-		{newFilled(t), Key{"", ""}, "", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Filled configmap - lookup argument in empty state"},
-		{newFilled(t), Key{"default", "cat"}, "1", Key{"default", "cat"}, true, "1", []Key{Key{"default", "cat"}}, "Filled configmap - insert and lookup same argument, same namespaces"},
-		{newFilled(t), Key{"default", "cat"}, "1", Key{"system", "cat"}, false, "", []Key{Key{"default", "cat"}}, "Filled configmap - insert and lookup same argument, different namespaces"},
-		{newFilled(t), Key{"default", "tea"}, "1", Key{"default", "dog"}, false, "", []Key{Key{"default", "cat"}, Key{"default", "tea"}}, "Filled configmap - insert and lookup different arguments, same namespace"},
+		{newFails(t), emptytp, defcate, false, nil, "Failing configmap - lookup argument in empty state"},
+		{newFails(t), defcat1, defcat1, true, []tuple{defcat1}, "Failing configmap - insert and lookup same argument, same namespaces"},
+		{newFails(t), defcat1, syscate, false, []tuple{defcat1}, "Failing configmap - insert and lookup same argument, different namespaces"},
+		{newFails(t), deftea1, defdoge, false, []tuple{deftea1}, "Failing configmap - insert and lookup different arguments, same namespace"},
+		{newEmpty(t), emptytp, defcate, false, nil, "Empty configmap - lookup argument in empty state"},
+		{newEmpty(t), defcat1, defcat1, true, []tuple{defcat1}, "Empty configmap - insert and lookup same argument, same namespaces"},
+		{newEmpty(t), defcat1, syscate, false, []tuple{defcat1}, "Empty configmap - insert and lookup same argument, different namespaces"},
+		{newEmpty(t), deftea1, defdoge, false, []tuple{deftea1}, "Empty configmap - insert and lookup different arguments, same namespace"},
+		{newFilled(t), emptytp, defcat1, true, []tuple{defcat1}, "Filled configmap - lookup argument in empty state"},
+		{newFilled(t), defcat1, defcat1, true, []tuple{defcat1}, "Filled configmap - insert and lookup same argument, same namespaces"},
+		{newFilled(t), defcat1, syscate, false, []tuple{defcat1}, "Filled configmap - insert and lookup same argument, different namespaces"},
+		{newFilled(t), deftea1, defdoge, false, []tuple{defcat1, deftea1}, "Filled configmap - insert and lookup different arguments, same namespace"},
 	}
 
 	runtime.ErrorHandlers = nil
@@ -194,34 +193,41 @@ func TestState(t *testing.T) {
 			sut := New(testCase.configmap)
 			testCase.configmap.check(changeCount)
 
-			if testCase.initKey.Namespace != "" || testCase.initKey.Name != "" {
-				putAndCheck(sut, testCase.initKey, testCase.initVal, testCase.configmap, &changeCount)
+			if !testCase.init.empty() {
+				putAndCheck(sut, testCase.init, testCase.configmap, &changeCount)
 			}
 
-			if value, exists := sut.Get(testCase.testKey.Namespace, testCase.testKey.Name); exists != testCase.outExists {
-				t.Errorf("Expected key %+v to exist in state to be %t", testCase.testKey, testCase.outExists)
-			} else if value != testCase.outVal {
-				t.Errorf("%+v mapped to %s, want %s", testCase.testKey, value, testCase.outVal)
+			if value, exists := sut.Get(testCase.test.Namespace, testCase.test.Name); exists != testCase.exists {
+				t.Errorf("Expected %s:%s to exist in state to be %t", testCase.test.Namespace, testCase.test.Name, testCase.exists)
+			} else if value != testCase.test.Value {
+				t.Errorf("%s:%s mapped to %s, want %s", testCase.test.Namespace, testCase.test.Name, value, testCase.test.Value)
 			}
 
-			deleteAndCheck(sut, Key{"non existing namespace", "non existing key"}, testCase.configmap, &changeCount)
+			deleteAndCheck(sut, tuple{"non existing namespace", "non existing name", ""}, testCase.configmap, &changeCount)
 
-			foo := Key{"custom", "foo"}
-			putAndCheck(sut, foo, "2", testCase.configmap, &changeCount)
+			foo := tuple{"custom", "foo", "2"}
+			putAndCheck(sut, foo, testCase.configmap, &changeCount)
 
-			bar := Key{"custom", "bar"}
-			putAndCheck(sut, bar, "3", testCase.configmap, &changeCount)
+			bar := tuple{"custom", "bar", "3"}
+			putAndCheck(sut, bar, testCase.configmap, &changeCount)
 
-			mcrts := sut.GetAllKeys()
-			expected := append(testCase.expectedKeys, foo, bar)
-			if !eq(mcrts, expected) {
-				t.Errorf("All ManagedCertificates are %v, want %v", mcrts, expected)
+			expected := append(testCase.expected, foo, bar)
+			allEntriesCounter := 0
+			sut.Foreach(func(namespace, name, value string) {
+				allEntriesCounter++
+				if !contains(expected, namespace, name, value) {
+					t.Errorf("{%s, %s, %s} missing in %v", namespace, name, value, expected)
+				}
+			})
+
+			if allEntriesCounter != len(expected) {
+				t.Errorf("Found %d entries, want %d", allEntriesCounter, len(expected))
 			}
 
-			deleteAndCheck(sut, testCase.initKey, testCase.configmap, &changeCount)
+			deleteAndCheck(sut, testCase.init, testCase.configmap, &changeCount)
 
-			if value, exists := sut.Get(testCase.initKey.Namespace, testCase.initKey.Name); exists {
-				t.Errorf("%+v mapped to %s after delete, want key missing", testCase.initKey, value)
+			if value, exists := sut.Get(testCase.init.Namespace, testCase.init.Name); exists {
+				t.Errorf("%s:%s mapped to %s after delete, want key missing", testCase.init.Namespace, testCase.init.Name, value)
 			}
 		})
 	}

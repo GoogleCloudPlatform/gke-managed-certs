@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package stage stores controller state and persists it in a Kubernetes ConfigMap.
+// Package stage stores controller state and persists it in a ConfigMap.
 package state
 
 import (
@@ -77,33 +77,26 @@ func (state *State) Delete(namespace, name string) {
 	state.persist()
 }
 
+func (state *State) Foreach(f func(namespace, name, sslCertificateName string)) {
+	mappingCopy := make(map[string]string)
+
+	state.RLock()
+	for k, v := range state.mapping {
+		mappingCopy[k] = v
+	}
+	state.RUnlock()
+
+	for k, v := range mappingCopy {
+		namespace, name := splitKey(k)
+		f(namespace, name, v)
+	}
+}
+
 func (state *State) Get(namespace, name string) (string, bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists := state.mapping[buildKey(namespace, name)]
 	return value, exists
-}
-
-type Key struct {
-	Namespace string
-	Name      string
-}
-
-func (state *State) GetAllKeys() []Key {
-	var result []Key
-
-	state.RLock()
-	defer state.RUnlock()
-
-	for key := range state.mapping {
-		namespace, name := splitKey(key)
-		result = append(result, Key{
-			Namespace: namespace,
-			Name:      name,
-		})
-	}
-
-	return result
 }
 
 func (state *State) Put(namespace, name, value string) {

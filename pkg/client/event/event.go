@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	component                   = "managed-certificate-controller"
-	namespace                   = ""
-	reasonCreate                = "Create"
-	reasonDelete                = "Delete"
-	reasonTooManyCertificates   = "TooManyCertificates"
-	reasonTransientBackendError = "TransientBackendError"
+	component                 = "managed-certificate-controller"
+	namespace                 = ""
+	reasonCreate              = "Create"
+	reasonDelete              = "Delete"
+	reasonTooManyCertificates = "TooManyCertificates"
+	reasonBackendError        = "BackendError"
 )
 
 type Event struct {
@@ -57,22 +57,22 @@ func New(client kubernetes.Interface) (*Event, error) {
 	}, nil
 }
 
+// BackendError creates an event when a transient error occurrs when calling GCP API.
+func (c *Event) BackendError(mcrt api.ManagedCertificate, err error) {
+	c.recorder.Event(&mcrt, v1.EventTypeWarning, reasonBackendError, err.Error())
+}
+
 // Create creates an event when an SslCertificate associated with ManagedCertificate is created.
-func (c *Event) Create(mcrt *api.ManagedCertificate, sslCertificateName string) {
-	c.recorder.Eventf(mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
+func (c *Event) Create(mcrt api.ManagedCertificate, sslCertificateName string) {
+	c.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
 }
 
 // Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
-func (c *Event) Delete(mcrt *api.ManagedCertificate, sslCertificateName string) {
-	c.recorder.Eventf(mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
+func (c *Event) Delete(mcrt api.ManagedCertificate, sslCertificateName string) {
+	c.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
 }
 
 // TooManyCertificates creates an event when quota for maximum number of SslCertificates per GCP project is exceeded.
-func (c *Event) TooManyCertificates(mcrt *api.ManagedCertificate, err error) {
-	c.recorder.Event(mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
-}
-
-// TransientBackendError creates an event when a transient error occurrs when calling GCP API.
-func (c *Event) TransientBackendError(mcrt *api.ManagedCertificate, err error) {
-	c.recorder.Event(mcrt, v1.EventTypeWarning, reasonTransientBackendError, err.Error())
+func (c *Event) TooManyCertificates(mcrt api.ManagedCertificate, err error) {
+	c.recorder.Event(&mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
 }

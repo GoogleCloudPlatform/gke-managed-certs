@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -41,7 +43,7 @@ func (c *Controller) enqueueAll() {
 	}
 
 	if len(mcrts) <= 0 {
-		glog.Info("Controller: no Managed Certificates found in cluster")
+		glog.Info("No ManagedCertificates found in cluster")
 		return
 	}
 
@@ -50,8 +52,54 @@ func (c *Controller) enqueueAll() {
 		names = append(names, mcrt.Name)
 	}
 
-	glog.Infof("Controller: enqueuing Managed Certificates found in cluster: %+v", names)
+	glog.Infof("Enqueuing ManagedCertificates found in cluster: %+v", names)
 	for _, mcrt := range mcrts {
 		c.enqueue(mcrt)
 	}
+}
+
+func (c *Controller) handle(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+
+	mcrt, err := c.lister.ManagedCertificates(namespace).Get(name)
+	if err != nil {
+		return err
+	}
+
+	if err := c.syncManagedCertificate(mcrt); err != nil {
+		return err
+	}
+
+	_, err = c.mcrt.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
+	return err
+}
+
+func (c *Controller) processNext() bool {
+	obj, shutdown := c.queue.Get()
+
+	if shutdown {
+		return false
+	}
+
+	defer c.queue.Done(obj)
+
+	key, ok := obj.(string)
+	if !ok {
+		c.queue.Forget(obj)
+		runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
+		return true
+	}
+
+	err := c.handle(key)
+	if err == nil {
+		c.queue.Forget(obj)
+		return true
+	}
+
+	c.queue.AddRateLimited(obj)
+	runtime.HandleError(err)
+	return true
 }
