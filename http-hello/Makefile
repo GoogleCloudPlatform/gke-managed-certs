@@ -1,9 +1,9 @@
 all: build docker clean
 
 TAG ?= dev
-registry = eu.gcr.io/managed-certs-gke
+REGISTRY ?= gcr.io/k8s-image-staging
 name = http-hello
-docker_image = ${registry}/${name}:${TAG}
+docker_image = ${REGISTRY}/${name}:${TAG}
 
 build:
 	CGO_ENABLED=0 GOOS=linux go build -o ${name} -ldflags '-extldflags "-static"'

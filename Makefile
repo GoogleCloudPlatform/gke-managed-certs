@@ -1,7 +1,7 @@
 all: gofmt build-binary-in-docker run-test-in-docker clean cross
 
 TAG ?= dev
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= gcr.io/k8s-image-staging
 KUBECONFIG ?= ${HOME}/.kube/config
 KUBERNETES_PROVIDER ?= gke
 ARTIFACTS ?= /tmp/artifacts
