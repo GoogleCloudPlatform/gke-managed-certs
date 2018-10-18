@@ -44,7 +44,7 @@ deps:
 
 # Builds and pushes a docker image with managed certs controller binary
 docker: auth-configure-docker
-	docker build --pull -t ${REGISTRY}/${name}:${TAG} .
+	docker build --pull -t ${REGISTRY}/${name}:${TAG} -t ${REGISTRY}/${name}:${VERSION} .
 	docker push ${REGISTRY}/${name}:${TAG}
 
 # Builds a runner image, i. e. an image used to build a managed-certificate-controller binary and to run its tests.
