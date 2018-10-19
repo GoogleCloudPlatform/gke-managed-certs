@@ -23,16 +23,20 @@ import (
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 type SslCertificateManager struct {
-	client *client.Clients
+	event event.Event
+	ssl   ssl.Ssl
 }
 
 func New(client *client.Clients) SslCertificateManager {
 	return SslCertificateManager{
-		client: client,
+		event: client.Event,
+		ssl:   client.Ssl,
 	}
 }
 
@@ -40,16 +44,19 @@ func New(client *client.Clients) SslCertificateManager {
 // is exceeded or BackendError event if another generic error occurs. On success it generates a Create event.
 func (s SslCertificateManager) Create(sslCertificateName string, mcrt api.ManagedCertificate) error {
 	glog.Infof("Creating SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
-	if err := s.client.Ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
+
+	if err := s.ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
 		if http.IsQuotaExceeded(err) {
-			s.client.Event.TooManyCertificates(mcrt, err)
+			s.event.TooManyCertificates(mcrt, err)
 			return err
 		}
 
-		s.client.Event.BackendError(mcrt, err)
+		s.event.BackendError(mcrt, err)
 		return err
 	}
-	s.client.Event.Create(mcrt, sslCertificateName)
+
+	s.event.Create(mcrt, sslCertificateName)
+
 	glog.Infof("Created SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
 	return nil
 }
@@ -58,17 +65,21 @@ func (s SslCertificateManager) Create(sslCertificateName string, mcrt api.Manage
 // event. If the SslCertificate object exists and is successfully deleted, a Delete event is generated.
 func (s SslCertificateManager) Delete(sslCertificateName string, mcrt *api.ManagedCertificate) error {
 	glog.Infof("Deleting SslCertificate %s", sslCertificateName)
-	if err := http.IgnoreNotFound(s.client.Ssl.Delete(sslCertificateName)); err != nil {
+
+	err := s.ssl.Delete(sslCertificateName)
+
+	if err == nil && mcrt != nil {
+		s.event.Delete(*mcrt, sslCertificateName)
+	}
+
+	if http.IgnoreNotFound(err) != nil {
 		if mcrt != nil {
-			s.client.Event.BackendError(*mcrt, err)
+			s.event.BackendError(*mcrt, err)
 		}
 
 		return err
 	}
 
-	if mcrt != nil {
-		s.client.Event.Delete(*mcrt, sslCertificateName)
-	}
 	glog.Infof("Deleted SslCertificate %s", sslCertificateName)
 	return nil
 }
@@ -76,10 +87,10 @@ func (s SslCertificateManager) Delete(sslCertificateName string, mcrt *api.Manag
 // Exists returns true if an SslCertificate exists, false if it is deleted. Error is not nil if an error has occurred
 // and in such case a BackendError event is generated.
 func (s SslCertificateManager) Exists(sslCertificateName string, mcrt *api.ManagedCertificate) (bool, error) {
-	exists, err := s.client.Ssl.Exists(sslCertificateName)
+	exists, err := s.ssl.Exists(sslCertificateName)
 	if err != nil {
 		if mcrt != nil {
-			s.client.Event.BackendError(*mcrt, err)
+			s.event.BackendError(*mcrt, err)
 		}
 		return false, err
 	}
@@ -89,13 +100,13 @@ func (s SslCertificateManager) Exists(sslCertificateName string, mcrt *api.Manag
 
 // Get fetches an SslCertificate object. On error a BackendError event is generated.
 func (s SslCertificateManager) Get(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
-	sslCert, err := s.client.Ssl.Get(sslCertificateName)
+	sslCert, err := s.ssl.Get(sslCertificateName)
 	if err != nil {
 		if mcrt != nil {
-			s.client.Event.BackendError(*mcrt, err)
+			s.event.BackendError(*mcrt, err)
 		}
 		return nil, err
 	}
 
-	return sslCert, err
+	return sslCert, nil
 }

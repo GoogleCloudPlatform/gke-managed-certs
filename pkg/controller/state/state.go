@@ -43,7 +43,7 @@ type State struct {
 	mapping map[string]string
 
 	// Manages ConfigMap objects
-	configmap configmap.Client
+	configmap configmap.ConfigMap
 }
 
 // Transforms a namespace and name into a key in State mapping.
@@ -57,7 +57,7 @@ func splitKey(key string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func New(configmap configmap.Client) *State {
+func New(configmap configmap.ConfigMap) *State {
 	mapping := make(map[string]string)
 
 	if config, err := configmap.Get(configMapNamespace, configMapName); err == nil && len(config.Data) > 0 {

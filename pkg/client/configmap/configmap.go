@@ -26,28 +26,28 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-type ConfigMap struct {
-	client v1.CoreV1Interface
-}
-
-type Client interface {
+type ConfigMap interface {
 	Get(namespace, name string) (*api.ConfigMap, error)
 	UpdateOrCreate(namespace string, configmap *api.ConfigMap) error
 }
 
+type configMapImpl struct {
+	client v1.CoreV1Interface
+}
+
 func New(config *rest.Config) ConfigMap {
-	return ConfigMap{
+	return configMapImpl{
 		client: v1.NewForConfigOrDie(config),
 	}
 }
 
 // Get fetches a ConfigMap.
-func (c ConfigMap) Get(namespace, name string) (*api.ConfigMap, error) {
+func (c configMapImpl) Get(namespace, name string) (*api.ConfigMap, error) {
 	return c.client.ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 }
 
 // UpdateOrCreate updates or creates a ConfigMap.
-func (c ConfigMap) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (c configMapImpl) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
 	configmaps := c.client.ConfigMaps(namespace)
 
 	_, err := configmaps.Update(configmap)

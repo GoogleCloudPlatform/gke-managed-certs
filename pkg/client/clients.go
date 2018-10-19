@@ -33,10 +33,10 @@ import (
 // Clients are used to communicate with api server and GCLB
 type Clients struct {
 	// ConfigMap manages ConfigMap objects
-	ConfigMap configmap.Client
+	ConfigMap configmap.ConfigMap
 
 	// Event manages Event objects
-	Event *event.Event
+	Event event.Event
 
 	// Mcrt manages ManagedCertificate custom resources
 	Mcrt *versioned.Clientset
@@ -45,7 +45,7 @@ type Clients struct {
 	McrtInformerFactory externalversions.SharedInformerFactory
 
 	// Ssl manages SslCertificate GCP resources
-	Ssl *ssl.Ssl
+	Ssl ssl.Ssl
 }
 
 func New(cloudConfig string) (*Clients, error) {

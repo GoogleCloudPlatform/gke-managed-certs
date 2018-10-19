@@ -71,7 +71,7 @@ func TestUpdateOrCreate(t *testing.T) {
 		createCalled := false
 		fakeClient.AddReactor("create", resource, buildCreateFunc(&createCalled))
 
-		sut := ConfigMap{
+		sut := configMapImpl{
 			client: fakeClient,
 		}
 		err := sut.UpdateOrCreate(namespace, &api.ConfigMap{})

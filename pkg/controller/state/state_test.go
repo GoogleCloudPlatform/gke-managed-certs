@@ -27,7 +27,7 @@ import (
 )
 
 type configMap interface {
-	configmap.Client
+	configmap.ConfigMap
 	check(int)
 }
 
@@ -52,7 +52,7 @@ type failConfigMapMock struct {
 	configMapMock
 }
 
-var _ configmap.Client = (*failConfigMapMock)(nil)
+var _ configmap.ConfigMap = (*failConfigMapMock)(nil)
 
 func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++
@@ -77,7 +77,7 @@ type emptyConfigMapMock struct {
 	configMapMock
 }
 
-var _ configmap.Client = (*emptyConfigMapMock)(nil)
+var _ configmap.ConfigMap = (*emptyConfigMapMock)(nil)
 
 func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++
@@ -102,7 +102,7 @@ type filledConfigMapMock struct {
 	configMapMock
 }
 
-var _ configmap.Client = (*filledConfigMapMock)(nil)
+var _ configmap.ConfigMap = (*filledConfigMapMock)(nil)
 
 func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++

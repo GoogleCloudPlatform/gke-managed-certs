@@ -37,12 +37,19 @@ const (
 	reasonBackendError        = "BackendError"
 )
 
-type Event struct {
+type Event interface {
+	BackendError(mcrt api.ManagedCertificate, err error)
+	Create(mcrt api.ManagedCertificate, sslCertificateName string)
+	Delete(mcrt api.ManagedCertificate, sslCertificateName string)
+	TooManyCertificates(mcrt api.ManagedCertificate, err error)
+}
+
+type eventImpl struct {
 	recorder record.EventRecorder
 }
 
 // New creates an event recorder to send custom events to Kubernetes.
-func New(client kubernetes.Interface) (*Event, error) {
+func New(client kubernetes.Interface) (Event, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.V(4).Infof)
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace)})
@@ -52,27 +59,27 @@ func New(client kubernetes.Interface) (*Event, error) {
 		return nil, err
 	}
 
-	return &Event{
+	return &eventImpl{
 		recorder: broadcaster.NewRecorder(eventsScheme, v1.EventSource{Component: component}),
 	}, nil
 }
 
 // BackendError creates an event when a transient error occurrs when calling GCP API.
-func (c *Event) BackendError(mcrt api.ManagedCertificate, err error) {
-	c.recorder.Event(&mcrt, v1.EventTypeWarning, reasonBackendError, err.Error())
+func (e eventImpl) BackendError(mcrt api.ManagedCertificate, err error) {
+	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonBackendError, err.Error())
 }
 
 // Create creates an event when an SslCertificate associated with ManagedCertificate is created.
-func (c *Event) Create(mcrt api.ManagedCertificate, sslCertificateName string) {
-	c.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
+func (e eventImpl) Create(mcrt api.ManagedCertificate, sslCertificateName string) {
+	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
 }
 
 // Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
-func (c *Event) Delete(mcrt api.ManagedCertificate, sslCertificateName string) {
-	c.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
+func (e eventImpl) Delete(mcrt api.ManagedCertificate, sslCertificateName string) {
+	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
 }
 
 // TooManyCertificates creates an event when quota for maximum number of SslCertificates per GCP project is exceeded.
-func (c *Event) TooManyCertificates(mcrt api.ManagedCertificate, err error) {
-	c.recorder.Event(&mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
+func (e eventImpl) TooManyCertificates(mcrt api.ManagedCertificate, err error) {
+	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
 }
