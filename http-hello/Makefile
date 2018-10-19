@@ -1,7 +1,7 @@
 all: build docker clean
 
 TAG ?= dev
-REGISTRY ?= gcr.io/k8s-image-staging
+REGISTRY ?= eu.gcr.io/managed-certs-gke
 name = http-hello
 docker_image = ${REGISTRY}/${name}:${TAG}
 
