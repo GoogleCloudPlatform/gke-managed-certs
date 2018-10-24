@@ -44,7 +44,7 @@ func main() {
 
 	controller := controller.New(clients)
 
-	go clients.McrtInformerFactory.Start(stopChannel)
+	go clients.InformerFactory.Start(stopChannel)
 
 	if err = controller.Run(stopChannel); err != nil {
 		glog.Fatal("Error running controller: %v", err)

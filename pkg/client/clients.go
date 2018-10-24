@@ -32,17 +32,17 @@ import (
 
 // Clients are used to communicate with api server and GCLB
 type Clients struct {
+	// Clientset manages ManagedCertificate custom resources
+	Clientset versioned.Interface
+
 	// ConfigMap manages ConfigMap objects
 	ConfigMap configmap.ConfigMap
 
 	// Event manages Event objects
 	Event event.Event
 
-	// Mcrt manages ManagedCertificate custom resources
-	Mcrt *versioned.Clientset
-
-	// McrtInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
-	McrtInformerFactory externalversions.SharedInformerFactory
+	// InfomerFactory produces informers and listers which handle ManagedCertificate custom resources
+	InformerFactory externalversions.SharedInformerFactory
 
 	// Ssl manages SslCertificate GCP resources
 	Ssl ssl.Ssl
@@ -54,8 +54,8 @@ func New(cloudConfig string) (*Clients, error) {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
 
-	mcrt := versioned.NewForConfigOrDie(config)
-	factory := externalversions.NewSharedInformerFactory(mcrt, 0)
+	clientset := versioned.NewForConfigOrDie(config)
+	factory := externalversions.NewSharedInformerFactory(clientset, 0)
 
 	ssl, err := ssl.New(cloudConfig)
 	if err != nil {
@@ -68,10 +68,10 @@ func New(cloudConfig string) (*Clients, error) {
 	}
 
 	return &Clients{
-		ConfigMap:           configmap.New(config),
-		Event:               event,
-		Mcrt:                mcrt,
-		McrtInformerFactory: factory,
-		Ssl:                 ssl,
+		Clientset:       clientset,
+		ConfigMap:       configmap.New(config),
+		Event:           event,
+		InformerFactory: factory,
+		Ssl:             ssl,
 	}, nil
 }

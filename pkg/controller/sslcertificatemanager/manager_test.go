@@ -132,10 +132,7 @@ func TestCreate(t *testing.T) {
 
 	for _, testCase := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
-		sut := SslCertificateManager{
-			event: event,
-			ssl:   testCase.sslIn,
-		}
+		sut := New(event, testCase.sslIn)
 
 		err := sut.Create("", testCase.mcrtIn)
 
@@ -175,10 +172,7 @@ func TestDelete(t *testing.T) {
 
 	for _, testCase := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
-		sut := SslCertificateManager{
-			event: event,
-			ssl:   testCase.sslIn,
-		}
+		sut := New(event, testCase.sslIn)
 
 		err := sut.Delete("", testCase.mcrtIn)
 
@@ -216,10 +210,7 @@ func TestExists(t *testing.T) {
 
 	for _, testCase := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
-		sut := SslCertificateManager{
-			event: event,
-			ssl:   testCase.sslIn,
-		}
+		sut := New(event, testCase.sslIn)
 
 		exists, err := sut.Exists("", testCase.mcrtIn)
 
@@ -255,10 +246,7 @@ func TestGet(t *testing.T) {
 
 	for _, testCase := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
-		sut := SslCertificateManager{
-			event: event,
-			ssl:   testCase.sslIn,
-		}
+		sut := New(event, testCase.sslIn)
 
 		sslCert, err := sut.Get("", testCase.mcrtIn)
 

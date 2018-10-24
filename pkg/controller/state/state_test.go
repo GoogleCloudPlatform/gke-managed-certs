@@ -122,21 +122,21 @@ func newFilled(t *testing.T) *filledConfigMapMock {
 	}
 }
 
-func deleteAndCheck(state *State, t tuple, configmap configMap, changeCount *int) {
+func deleteAndCheck(state State, t tuple, configmap configMap, changeCount *int) {
 	state.Delete(t.Namespace, t.Name)
 	(*changeCount)++
 	configmap.check(*changeCount)
 }
 
-func putAndCheck(state *State, t tuple, configmap configMap, changeCount *int) {
+func putAndCheck(state State, t tuple, configmap configMap, changeCount *int) {
 	state.Put(t.Namespace, t.Name, t.Value)
 	(*changeCount)++
 	configmap.check(*changeCount)
 }
 
-func contains(expected []tuple, namespace, name, value string) bool {
+func contains(expected []tuple, namespace, name string) bool {
 	for _, t := range expected {
-		if t.Namespace == namespace && t.Name == name && t.Value == value {
+		if t.Namespace == namespace && t.Name == name {
 			return true
 		}
 	}
@@ -213,10 +213,10 @@ func TestState(t *testing.T) {
 
 			expected := append(testCase.expected, foo, bar)
 			allEntriesCounter := 0
-			sut.Foreach(func(namespace, name, value string) {
+			sut.ForeachKey(func(namespace, name string) {
 				allEntriesCounter++
-				if !contains(expected, namespace, name, value) {
-					t.Errorf("{%s, %s, %s} missing in %v", namespace, name, value, expected)
+				if !contains(expected, namespace, name) {
+					t.Errorf("{%s, %s} missing in %v", namespace, name, expected)
 				}
 			})
 

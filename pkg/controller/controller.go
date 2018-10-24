@@ -27,30 +27,27 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
 )
 
 type Controller struct {
 	lister mcrtlister.ManagedCertificateLister
-	mcrt   *versioned.Clientset
 	queue  workqueue.RateLimitingInterface
-	ssl    sslcertificatemanager.SslCertificateManager
-	state  *state.State
+	sync   sync.Sync
 	synced cache.InformerSynced
 }
 
 func New(clients *client.Clients) *Controller {
-	informer := clients.McrtInformerFactory.Gke().V1alpha1().ManagedCertificates()
+	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
+	lister := informer.Lister()
 
 	controller := &Controller{
-		lister: informer.Lister(),
-		mcrt:   clients.Mcrt,
+		lister: lister,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		ssl:    sslcertificatemanager.New(clients),
-		state:  state.New(clients.ConfigMap),
+		sync:   sync.New(clients.Clientset, lister, sslcertificatemanager.New(clients.Event, clients.Ssl), state.New(clients.ConfigMap)),
 		synced: informer.Informer().HasSynced,
 	}
 
@@ -96,4 +93,9 @@ func (c *Controller) Run(stopChannel <-chan struct{}) error {
 func (c *Controller) runWorker() {
 	for c.processNext() {
 	}
+}
+
+func (c *Controller) synchronizeAllMcrts() {
+	c.sync.State()
+	c.enqueueAll()
 }

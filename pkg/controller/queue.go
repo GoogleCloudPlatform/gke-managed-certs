@@ -64,16 +64,10 @@ func (c *Controller) handle(key string) error {
 		return err
 	}
 
-	mcrt, err := c.lister.ManagedCertificates(namespace).Get(name)
-	if err != nil {
+	if err := c.sync.ManagedCertificate(namespace, name); err != nil {
 		return err
 	}
 
-	if err := c.syncManagedCertificate(mcrt); err != nil {
-		return err
-	}
-
-	_, err = c.mcrt.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
 }
 

@@ -36,7 +36,14 @@ const (
 	keySeparator       = ":"
 )
 
-type State struct {
+type State interface {
+	Delete(namespace, name string)
+	ForeachKey(f func(namespace, name string))
+	Get(namespace, name string) (string, bool)
+	Put(namespace, name, value string)
+}
+
+type stateImpl struct {
 	sync.RWMutex
 
 	// Maps Managed Certificate to SslCertificate name. Keys are built with buildKey() and decoded with splitKey().
@@ -57,49 +64,49 @@ func splitKey(key string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func New(configmap configmap.ConfigMap) *State {
+func New(configmap configmap.ConfigMap) State {
 	mapping := make(map[string]string)
 
 	if config, err := configmap.Get(configMapNamespace, configMapName); err == nil && len(config.Data) > 0 {
 		mapping = marshaller.Unmarshal(config.Data)
 	}
 
-	return &State{
+	return stateImpl{
 		mapping:   mapping,
 		configmap: configmap,
 	}
 }
 
-func (state *State) Delete(namespace, name string) {
+func (state stateImpl) Delete(namespace, name string) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.mapping, buildKey(namespace, name))
 	state.persist()
 }
 
-func (state *State) Foreach(f func(namespace, name, sslCertificateName string)) {
-	mappingCopy := make(map[string]string)
+func (state stateImpl) ForeachKey(f func(namespace, name string)) {
+	var keys []string
 
 	state.RLock()
-	for k, v := range state.mapping {
-		mappingCopy[k] = v
+	for k := range state.mapping {
+		keys = append(keys, k)
 	}
 	state.RUnlock()
 
-	for k, v := range mappingCopy {
+	for _, k := range keys {
 		namespace, name := splitKey(k)
-		f(namespace, name, v)
+		f(namespace, name)
 	}
 }
 
-func (state *State) Get(namespace, name string) (string, bool) {
+func (state stateImpl) Get(namespace, name string) (string, bool) {
 	state.RLock()
 	defer state.RUnlock()
 	value, exists := state.mapping[buildKey(namespace, name)]
 	return value, exists
 }
 
-func (state *State) Put(namespace, name, value string) {
+func (state stateImpl) Put(namespace, name, value string) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -107,7 +114,7 @@ func (state *State) Put(namespace, name, value string) {
 	state.persist()
 }
 
-func (state *State) persist() {
+func (state stateImpl) persist() {
 	config := &api.ConfigMap{
 		Data: marshaller.Marshal(state.mapping),
 		ObjectMeta: metav1.ObjectMeta{
