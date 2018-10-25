@@ -40,14 +40,16 @@ type Sync interface {
 type syncImpl struct {
 	clientset versioned.Interface
 	lister    mcrtlister.ManagedCertificateLister
+	random    random.Random
 	ssl       sslcertificatemanager.SslCertificateManager
 	state     state.State
 }
 
-func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateLister, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
+func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateLister, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
 	return syncImpl{
 		clientset: clientset,
 		lister:    lister,
+		random:    random,
 		ssl:       ssl,
 		state:     state,
 	}
@@ -60,7 +62,7 @@ func (s syncImpl) ensureSslCertificateName(mcrt *api.ManagedCertificate) (string
 		return sslCertificateName, nil
 	}
 
-	sslCertificateName, err := random.Name()
+	sslCertificateName, err := s.random.Name()
 	if err != nil {
 		return "", err
 	}

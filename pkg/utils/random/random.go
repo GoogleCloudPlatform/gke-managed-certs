@@ -25,14 +25,26 @@ import (
 
 const (
 	maxNameLength = 63
+	namePrefix    = "mcrt"
 )
 
+type Random interface {
+	Name() (string, error)
+}
+
+type randomImpl struct {
+}
+
+func New() Random {
+	return randomImpl{}
+}
+
 // Name generates a random name for SslCertificate resource.
-func Name() (string, error) {
+func (r randomImpl) Name() (string, error) {
 	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
 	} else {
-		generatedName := fmt.Sprintf("mcrt%s", uid.String())
+		generatedName := fmt.Sprintf("%s%s", namePrefix, uid.String())
 		maxLength := maxNameLength
 		if len(generatedName) < maxLength {
 			maxLength = len(generatedName)

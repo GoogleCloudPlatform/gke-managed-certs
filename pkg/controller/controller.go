@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
 
 type Controller struct {
@@ -47,7 +48,7 @@ func New(clients *client.Clients) *Controller {
 	controller := &Controller{
 		lister: lister,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		sync:   sync.New(clients.Clientset, lister, sslcertificatemanager.New(clients.Event, clients.Ssl), state.New(clients.ConfigMap)),
+		sync:   sync.New(clients.Clientset, lister, random.New(), sslcertificatemanager.New(clients.Event, clients.Ssl), state.New(clients.ConfigMap)),
 		synced: informer.Informer().HasSynced,
 	}
 

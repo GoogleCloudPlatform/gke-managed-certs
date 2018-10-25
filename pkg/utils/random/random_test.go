@@ -23,8 +23,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func newName(t *testing.T) string {
-	if name, err := Name(); err != nil {
+func newName(r Random, t *testing.T) string {
+	if name, err := r.Name(); err != nil {
 		t.Errorf("Failed to create random name: %v", err)
 		return ""
 	} else {
@@ -33,13 +33,15 @@ func newName(t *testing.T) string {
 }
 
 func TestName_NonEmptyNameShorterThanLimit(t *testing.T) {
-	if name := newName(t); len(name) <= 0 || len(name) >= 64 {
+	sut := New()
+	if name := newName(sut, t); len(name) <= 0 || len(name) >= 64 {
 		t.Errorf("Name %s has %d characters, want between 0 and 63", name, len(name))
 	}
 }
 
 func TestName_TwiceReturnsDifferent(t *testing.T) {
-	if name := newName(t); name == newName(t) {
+	sut := New()
+	if name := newName(sut, t); name == newName(sut, t) {
 		t.Errorf("Name called twice returned the same name %s, want different", name)
 	}
 }
@@ -55,7 +57,8 @@ func (*fakeReader) Read(p []byte) (int, error) {
 
 func TestName_OnRandomNumberGeneratorError(t *testing.T) {
 	uuid.SetRand(&fakeReader{})
-	name, err := Name()
+	sut := New()
+	name, err := sut.Name()
 
 	if name != "" || err != fakeReaderError {
 		t.Errorf("Name %s, want empty; error %v, want fakeReaderError %v", name, err, fakeReaderError)

@@ -103,6 +103,23 @@ func (f fakeClientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
 	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
 }
 
+// Fake random
+type fakeRandom struct {
+	name string
+	err  error
+}
+
+func newRandom(err error, name string) fakeRandom {
+	return fakeRandom{
+		name: name,
+		err:  err,
+	}
+}
+
+func (f fakeRandom) Name() (string, error) {
+	return f.name, f.err
+}
+
 // Fake state
 type fakeState struct {
 	mapping map[string]string

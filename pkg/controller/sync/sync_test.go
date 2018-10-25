@@ -71,9 +71,12 @@ var differentMcrt = &api.ManagedCertificate{
 	},
 }
 
-var failsNormalErr = newLister(normalError, nil)
-var failsNotFound = newLister(k8sNotFound, nil)
-var success = newLister(nil, mcrt)
+var listerFailsNormalErr = newLister(normalError, nil)
+var listerFailsNotFound = newLister(k8sNotFound, nil)
+var listerSuccess = newLister(nil, mcrt)
+
+var randomFailsNormalErr = newRandom(normalError, "")
+var randomSuccess = newRandom(nil, sslCertificateName)
 
 func empty() *fakeState {
 	return newState("", "", "")
@@ -84,6 +87,7 @@ func withEntry() *fakeState {
 
 type in struct {
 	lister       fakeLister
+	random       fakeRandom
 	state        *fakeState
 	mcrt         *api.ManagedCertificate
 	sslCreateErr []error
@@ -102,35 +106,40 @@ var testCases = []struct {
 	{
 		"Lister fails with generic error, state is empty",
 		in{
-			lister: failsNormalErr,
+			lister: listerFailsNormalErr,
+			random: randomSuccess,
 			state:  empty(),
 		}, false, false, normalError,
 	},
 	{
 		"Lister fails with generic error, entry in state",
 		in{
-			lister: failsNormalErr,
+			lister: listerFailsNormalErr,
+			random: randomSuccess,
 			state:  withEntry(),
 		}, true, false, normalError,
 	},
 	{
 		"Lister fails with not found, state is empty",
 		in{
-			lister: failsNotFound,
+			lister: listerFailsNotFound,
+			random: randomSuccess,
 			state:  empty(),
 		}, false, false, nil,
 	},
 	{
 		"Lister fails with not found, entry in state, success to delete ssl cert",
 		in{
-			lister: failsNotFound,
+			lister: listerFailsNotFound,
+			random: randomSuccess,
 			state:  withEntry(),
 		}, false, false, nil,
 	},
 	{
 		"Lister fails with not found, entry in state, ssl cert already deleted",
 		in{
-			lister:       failsNotFound,
+			lister:       listerFailsNotFound,
+			random:       randomSuccess,
 			state:        withEntry(),
 			sslDeleteErr: []error{googleNotFound},
 		}, false, false, nil,
@@ -138,7 +147,8 @@ var testCases = []struct {
 	{
 		"Lister fails with not found, entry in state, ssl cert fails to delete",
 		in{
-			lister:       failsNotFound,
+			lister:       listerFailsNotFound,
+			random:       randomSuccess,
 			state:        withEntry(),
 			sslDeleteErr: []error{normalError},
 		}, true, false, normalError,
@@ -146,21 +156,40 @@ var testCases = []struct {
 	{
 		"Lister success, state empty",
 		in{
-			lister: success,
+			lister: listerSuccess,
+			random: randomSuccess,
 			state:  empty(),
 		}, true, true, nil,
 	},
 	{
 		"Lister success, entry in state",
 		in{
-			lister: success,
+			lister: listerSuccess,
+			random: randomSuccess,
+			state:  withEntry(),
+		}, true, true, nil,
+	},
+	{
+		"Lister success, state empty, random fails",
+		in{
+			lister: listerSuccess,
+			random: randomFailsNormalErr,
+			state:  empty(),
+		}, false, false, normalError,
+	},
+	{
+		"Lister success, entry in state, random fails",
+		in{
+			lister: listerSuccess,
+			random: randomFailsNormalErr,
 			state:  withEntry(),
 		}, true, true, nil,
 	},
 	{
 		"Lister success, state empty, ssl cert exists fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        empty(),
 			sslExistsErr: []error{normalError},
 		}, true, false, normalError,
@@ -168,7 +197,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, ssl cert exists fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			sslExistsErr: []error{normalError},
 		}, true, false, normalError,
@@ -176,7 +206,8 @@ var testCases = []struct {
 	{
 		"Lister success, state empty, ssl cert create fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        empty(),
 			sslCreateErr: []error{normalError},
 		}, true, false, normalError,
@@ -184,7 +215,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, ssl cert create fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			sslCreateErr: []error{normalError},
 		}, true, false, normalError,
@@ -192,7 +224,8 @@ var testCases = []struct {
 	{
 		"Lister success, state empty, ssl cert get fails",
 		in{
-			lister:    success,
+			lister:    listerSuccess,
+			random:    randomSuccess,
 			state:     empty(),
 			sslGetErr: []error{normalError},
 		}, true, false, normalError,
@@ -200,7 +233,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, ssl cert get fails",
 		in{
-			lister:    success,
+			lister:    listerSuccess,
+			random:    randomSuccess,
 			state:     withEntry(),
 			sslGetErr: []error{normalError},
 		}, true, false, normalError,
@@ -208,7 +242,8 @@ var testCases = []struct {
 	{
 		"Lister success, state empty, ssl cert get fails",
 		in{
-			lister:    success,
+			lister:    listerSuccess,
+			random:    randomSuccess,
 			state:     empty(),
 			mcrt:      mcrt,
 			sslGetErr: []error{normalError},
@@ -217,7 +252,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, ssl cert get fails",
 		in{
-			lister:    success,
+			lister:    listerSuccess,
+			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      mcrt,
 			sslGetErr: []error{normalError},
@@ -226,7 +262,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch",
 		in{
-			lister: success,
+			lister: listerSuccess,
+			random: randomSuccess,
 			state:  withEntry(),
 			mcrt:   differentMcrt,
 		}, true, true, nil,
@@ -234,7 +271,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{googleNotFound},
@@ -243,7 +281,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch and deletion fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{normalError},
@@ -252,7 +291,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert creation fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslCreateErr: []error{normalError},
@@ -261,7 +301,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert creation fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslCreateErr: []error{normalError},
@@ -271,7 +312,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert get fails",
 		in{
-			lister:    success,
+			lister:    listerSuccess,
+			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      differentMcrt,
 			sslGetErr: []error{nil, normalError},
@@ -280,7 +322,8 @@ var testCases = []struct {
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert get fails",
 		in{
-			lister:       success,
+			lister:       listerSuccess,
+			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{googleNotFound},
@@ -298,7 +341,7 @@ func TestManagedCertificate(t *testing.T) {
 
 			ssl := newSsl(sslCertificateName, testCase.in.mcrt, testCase.in.sslCreateErr, testCase.in.sslDeleteErr, testCase.in.sslExistsErr, testCase.in.sslGetErr)
 
-			sut := New(clientset, testCase.in.lister, ssl, testCase.in.state)
+			sut := New(clientset, testCase.in.lister, testCase.in.random, ssl, testCase.in.state)
 
 			err := sut.ManagedCertificate(namespace, name)
 
