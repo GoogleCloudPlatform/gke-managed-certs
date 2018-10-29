@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
@@ -44,16 +44,14 @@ func TestValidateCRD(t *testing.T) {
 		{[]string{"example.com"}, true, "Single non-wildcard domain <=63 characters allowed"},
 	}
 
-	client, err := client.New()
-	if err != nil {
-		t.Fatalf("Could not create client %s", err.Error())
-	}
+	client := utils.Setup(t)
+	defer utils.TearDown(t, client)
 
 	for i, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			mcrt := &api.ManagedCertificate{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("test-case-%d", i),
+					Name: fmt.Sprintf("validate-crd-%d", i),
 				},
 				Spec: api.ManagedCertificateSpec{
 					Domains: testCase.domains,
@@ -63,7 +61,7 @@ func TestValidateCRD(t *testing.T) {
 				},
 			}
 
-			nsClient := client.Mcrt.GkeV1alpha1().ManagedCertificates(namespace)
+			nsClient := client.Clientset.GkeV1alpha1().ManagedCertificates(namespace)
 			_, err := nsClient.Create(mcrt)
 			if err == nil && !testCase.success {
 				t.Errorf("Created, want failure")

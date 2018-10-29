@@ -24,13 +24,11 @@ import (
 
 	"golang.org/x/oauth2"
 	compute "google.golang.org/api/compute/v0.beta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
@@ -39,15 +37,18 @@ const (
 )
 
 type Clients struct {
-	// Mcrt manages ManagedCertificate custom resources
-	Mcrt *versioned.Clientset
+	// Clientset manages ManagedCertificate custom resources
+	Clientset versioned.Interface
 
 	// Compute manages GCP resources
 	Compute *compute.Service
+
+	// ProjectID is the id of the project in which e2e tests are run
+	ProjectID string
 }
 
 func New() (*Clients, error) {
-	mcrt, err := getMcrtClient()
+	clientset, err := getMcrtClient()
 	if err != nil {
 		return nil, err
 	}
@@ -57,29 +58,19 @@ func New() (*Clients, error) {
 		return nil, err
 	}
 
+	projectID, err := gcloud("config", "list", "--format=value(core.project)")
+	if err != nil {
+		return nil, err
+	}
+
 	return &Clients{
-		Mcrt:    mcrt,
-		Compute: computeClient,
+		Clientset: clientset,
+		Compute:   computeClient,
+		ProjectID: projectID,
 	}, nil
 }
 
-func (c *Clients) RemoveAll(namespace string) error {
-	nsClient := c.Mcrt.GkeV1alpha1().ManagedCertificates(namespace)
-	mcrts, err := nsClient.List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, mcrt := range mcrts.Items {
-		if err := http.IgnoreNotFound(nsClient.Delete(mcrt.Name, &metav1.DeleteOptions{})); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func getMcrtClient() (*versioned.Clientset, error) {
+func getMcrtClient() (versioned.Interface, error) {
 	kubeConfig := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 	c, err := clientcmd.LoadFromFile(kubeConfig)
 	if err != nil {
@@ -95,18 +86,17 @@ func getMcrtClient() (*versioned.Clientset, error) {
 	return versioned.NewForConfig(config)
 }
 
-func getAccessTokenFromGcloud() (string, error) {
+func gcloud(command ...string) (string, error) {
 	gcloudBin := fmt.Sprintf("%s/bin/gcloud", os.Getenv(cloudSdkRootEnv))
-	out, err := exec.Command(gcloudBin, "auth", "print-access-token").Output()
+	out, err := exec.Command(gcloudBin, command...).Output()
 	if err != nil {
 		return "", err
 	}
-	token := strings.Replace(string(out), "\n", "", -1)
-	return token, nil
+	return strings.Replace(string(out), "\n", "", -1), nil
 }
 
 func getComputeClient() (*compute.Service, error) {
-	accessToken, err := getAccessTokenFromGcloud()
+	accessToken, err := gcloud("auth", "print-access-token")
 	if err != nil {
 		return nil, err
 	}
