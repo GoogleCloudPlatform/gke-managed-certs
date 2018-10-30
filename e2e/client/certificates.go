@@ -18,10 +18,12 @@ package client
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
@@ -41,8 +43,8 @@ func (c *Clients) DeleteAllManagedCertificates(namespace string) error {
 	return nil
 }
 
-func (c *Clients) DeleteAllSslCertificates() error {
-	names, err := c.getSslCertificatesNames()
+func (c *Clients) DeleteOwnSslCertificates() error {
+	names, err := c.getOwnSslCertificatesNames()
 	if err != nil {
 		return err
 	}
@@ -53,7 +55,7 @@ func (c *Clients) DeleteAllSslCertificates() error {
 		return err
 	}
 
-	names, err = c.getSslCertificatesNames()
+	names, err = c.getOwnSslCertificatesNames()
 	if err != nil {
 		return err
 	}
@@ -76,14 +78,16 @@ func (c *Clients) deleteSslCertificates(names []string) error {
 	return nil
 }
 
-func (c *Clients) getSslCertificatesNames() ([]string, error) {
+func (c *Clients) getOwnSslCertificatesNames() ([]string, error) {
 	sslCertificates, err := c.Compute.SslCertificates.List(c.ProjectID).Do()
 	if err != nil {
 		return nil, err
 	}
 	var names []string
 	for _, sslCertificate := range sslCertificates.Items {
-		names = append(names, sslCertificate.Name)
+		if strings.HasPrefix(sslCertificate.Name, config.SslCertificateNamePrefix) {
+			names = append(names, sslCertificate.Name)
+		}
 	}
 
 	return names, nil

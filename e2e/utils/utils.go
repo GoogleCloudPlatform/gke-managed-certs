@@ -65,7 +65,7 @@ func TearDown(t *testing.T, client *client.Clients) {
 	client.DeleteAllManagedCertificates(apiv1.NamespaceAll)
 
 	err := func() error {
-		if err := Retry(client.DeleteAllSslCertificates); err != nil {
+		if err := Retry(client.DeleteOwnSslCertificates); err != nil {
 			return err
 		}
 

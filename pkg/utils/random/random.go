@@ -21,11 +21,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 const (
 	maxNameLength = 63
-	namePrefix    = "mcrt"
 )
 
 type Random interface {
@@ -44,7 +45,7 @@ func (r randomImpl) Name() (string, error) {
 	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
 	} else {
-		generatedName := fmt.Sprintf("%s%s", namePrefix, uid.String())
+		generatedName := fmt.Sprintf("%s%s", config.SslCertificateNamePrefix, uid.String())
 		maxLength := maxNameLength
 		if len(generatedName) < maxLength {
 			maxLength = len(generatedName)
