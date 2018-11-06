@@ -21,41 +21,31 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	compute "google.golang.org/api/compute/v0.beta"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-func (c *Clients) DeleteAllManagedCertificates(namespace string) error {
-	nsClient := c.Clientset.GkeV1alpha1().ManagedCertificates(namespace)
-	mcrts, err := nsClient.List(metav1.ListOptions{})
+func (s sslCertificate) DeleteOwn() error {
+	names, err := s.getOwnNames()
 	if err != nil {
 		return err
 	}
 
-	for _, mcrt := range mcrts.Items {
-		if err := http.IgnoreNotFound(nsClient.Delete(mcrt.Name, &metav1.DeleteOptions{})); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *Clients) DeleteOwnSslCertificates() error {
-	names, err := c.getOwnSslCertificatesNames()
-	if err != nil {
-		return err
+	if len(names) == 0 {
+		return nil
 	}
 
 	glog.Infof("Delete SslCertificates: %v", names)
 
-	if err := c.deleteSslCertificates(names); err != nil {
-		return err
+	for _, name := range names {
+		if err := s.Delete(name); err != nil {
+			return err
+		}
 	}
 
-	names, err = c.getOwnSslCertificatesNames()
+	names, err = s.getOwnNames()
 	if err != nil {
 		return err
 	}
@@ -67,19 +57,21 @@ func (c *Clients) DeleteOwnSslCertificates() error {
 	return nil
 }
 
-func (c *Clients) deleteSslCertificates(names []string) error {
-	for _, name := range names {
-		_, err := c.Compute.SslCertificates.Delete(c.ProjectID, name).Do()
-		if !http.IsNotFound(err) {
-			return err
-		}
+func (s sslCertificate) Delete(name string) error {
+	_, err := s.sslCertificates.Delete(s.projectID, name).Do()
+	if http.IsNotFound(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
-func (c *Clients) getOwnSslCertificatesNames() ([]string, error) {
-	sslCertificates, err := c.Compute.SslCertificates.List(c.ProjectID).Do()
+func (s sslCertificate) Get(name string) (*compute.SslCertificate, error) {
+	return s.sslCertificates.Get(s.projectID, name).Do()
+}
+
+func (s sslCertificate) getOwnNames() ([]string, error) {
+	sslCertificates, err := s.sslCertificates.List(s.projectID).Do()
 	if err != nil {
 		return nil, err
 	}

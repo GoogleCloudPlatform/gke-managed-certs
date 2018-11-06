@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	maxRetries = 30
+	maxRetries = 40
 	timeout    = 30
 )
 
@@ -62,10 +62,10 @@ func Setup(t *testing.T) *client.Clients {
 }
 
 func TearDown(t *testing.T, client *client.Clients) {
-	client.DeleteAllManagedCertificates(apiv1.NamespaceAll)
+	client.ManagedCertificate.DeleteAll(apiv1.NamespaceAll)
 
 	err := func() error {
-		if err := Retry(client.DeleteOwnSslCertificates); err != nil {
+		if err := Retry(client.SslCertificate.DeleteOwn); err != nil {
 			return err
 		}
 

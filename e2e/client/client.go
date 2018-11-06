@@ -36,15 +36,22 @@ const (
 	defaultHost     = ""
 )
 
-type Clients struct {
+type managedCertificate struct {
 	// Clientset manages ManagedCertificate custom resources
-	Clientset versioned.Interface
+	clientset versioned.Interface
+}
 
-	// Compute manages GCP resources
-	Compute *compute.Service
+type sslCertificate struct {
+	// SslCertificates manages GCP SslCertificate resources
+	sslCertificates *compute.SslCertificatesService
 
 	// ProjectID is the id of the project in which e2e tests are run
-	ProjectID string
+	projectID string
+}
+
+type Clients struct {
+	ManagedCertificate managedCertificate
+	SslCertificate     sslCertificate
 }
 
 func New() (*Clients, error) {
@@ -64,9 +71,13 @@ func New() (*Clients, error) {
 	}
 
 	return &Clients{
-		Clientset: clientset,
-		Compute:   computeClient,
-		ProjectID: projectID,
+		ManagedCertificate: managedCertificate{
+			clientset: clientset,
+		},
+		SslCertificate: sslCertificate{
+			sslCertificates: computeClient.SslCertificates,
+			projectID:       projectID,
+		},
 	}, nil
 }
 

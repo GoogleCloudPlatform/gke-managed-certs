@@ -21,18 +21,11 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-const (
-	namespace = "default"
-)
-
-func TestValidateCRD(t *testing.T) {
+func TestCRDValidation(t *testing.T) {
 	testCases := []struct {
 		domains []string
 		success bool
@@ -49,27 +42,14 @@ func TestValidateCRD(t *testing.T) {
 
 	for i, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
-			mcrt := &api.ManagedCertificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("validate-crd-%d", i),
-				},
-				Spec: api.ManagedCertificateSpec{
-					Domains: testCase.domains,
-				},
-				Status: api.ManagedCertificateStatus{
-					DomainStatus: []api.DomainStatus{},
-				},
-			}
-
-			nsClient := client.Clientset.GkeV1alpha1().ManagedCertificates(namespace)
-			_, err := nsClient.Create(mcrt)
+			name := fmt.Sprintf("crd-validation-%d", i)
+			err := client.ManagedCertificate.Create(namespace, name, testCase.domains)
 			if err == nil && !testCase.success {
-				t.Errorf("Created, want failure")
-				return
+				t.Fatalf("Created, want failure")
 			}
 			if err == nil && testCase.success {
 				// Creation succeeded as expected, so now delete the managed certificate
-				if err := http.IgnoreNotFound(nsClient.Delete(mcrt.Name, &metav1.DeleteOptions{})); err != nil {
+				if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
 					t.Error(err)
 				}
 
@@ -78,8 +58,7 @@ func TestValidateCRD(t *testing.T) {
 
 			statusErr, ok := err.(*errors.StatusError)
 			if !ok {
-				t.Errorf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
-				return
+				t.Fatalf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
 			}
 
 			if statusErr.Status().Reason != "Invalid" {
