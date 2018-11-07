@@ -8,6 +8,12 @@ ARTIFACTS ?= /tmp/artifacts
 CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
 CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
 
+ifeq ($(origin INSTANCE_PREFIX),undefined)
+	PROJECT_ID = $(shell gcloud config list --format="value(core.project)")
+else
+	PROJECT_ID = $(INSTANCE_PREFIX)
+endif
+
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
 # This version-strategy uses git tags to set the version string
@@ -58,6 +64,7 @@ e2e:
 	CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
+	PROJECT_ID=${PROJECT_ID} \
 	godep go test ./e2e/... -v -test.timeout=60m -alsologtostderr -log_dir $${dest} | go-junit-report > $${dest}/junit_01.xml
 
 # Formats go source code with gofmt
@@ -78,7 +85,7 @@ run-e2e-in-docker: docker-runner-builder auth-configure-docker
 		-v ${CLOUD_CONFIG}:/root/.config/gcloud \
 		-v ${KUBECONFIG}:/root/.kube/config \
 		-v ${ARTIFACTS}:/tmp/artifacts \
-		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e DNS_ZONE=${DNS_ZONE} CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT}'
+		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e DNS_ZONE=${DNS_ZONE} CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} PROJECT_ID=${PROJECT_ID}'
 
 run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make test'

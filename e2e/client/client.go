@@ -35,6 +35,7 @@ import (
 const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
+	projectIDEnv = "PROJECT_ID"
 )
 
 type managedCertificate struct {
@@ -66,11 +67,7 @@ func New() (*Clients, error) {
 		return nil, err
 	}
 
-	projectID, err := gcloud("config", "list", "--format=value(core.project)")
-	if err != nil {
-		return nil, err
-	}
-
+	projectID := os.Getenv(projectIDEnv)
 	glog.Infof("projectID=%s", projectID)
 
 	return &Clients{
