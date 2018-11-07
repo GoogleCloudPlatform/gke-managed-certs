@@ -7,12 +7,7 @@ KUBERNETES_PROVIDER ?= gke
 ARTIFACTS ?= /tmp/artifacts
 CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
 CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
-
-ifeq ($(origin INSTANCE_PREFIX),undefined)
-	PROJECT_ID = $(shell gcloud config list --format="value(core.project)")
-else
-	PROJECT_ID = $(INSTANCE_PREFIX)
-endif
+PROJECT_ID ?= $(shell gcloud config list --format="value(core.project)")
 
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
@@ -83,6 +78,7 @@ run-e2e-in-docker: docker-runner-builder auth-configure-docker
 	docker run -v `pwd`:${runner_path} \
 		-v ${CLOUD_SDK_ROOT}:${CLOUD_SDK_ROOT} \
 		-v ${CLOUD_CONFIG}:/root/.config/gcloud \
+		-v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
 		-v ${KUBECONFIG}:/root/.kube/config \
 		-v ${ARTIFACTS}:/tmp/artifacts \
 		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e DNS_ZONE=${DNS_ZONE} CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} PROJECT_ID=${PROJECT_ID}'

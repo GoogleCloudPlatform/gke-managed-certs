@@ -107,10 +107,29 @@ func gcloud(command ...string) (string, error) {
 }
 
 func getComputeClient() (*compute.Service, error) {
+	gcloudAuthList, err := gcloud("auth", "list")
+	if err != nil {
+		return nil, err
+	}
+	glog.Infof("gcloud auth list: %s", gcloudAuthList)
+
+	gcloudInfo, err := gcloud("info")
+	if err != nil {
+		return nil, err
+	}
+	glog.Infof("gcloud info: %s", gcloudInfo)
+
+	gcloudConfigurations, err := gcloud("config", "configurations", "list")
+	if err != nil {
+		return nil, err
+	}
+	glog.Infof("gcloud config configurations list: %s", gcloudConfigurations)
+
 	accessToken, err := gcloud("auth", "print-access-token")
 	if err != nil {
 		return nil, err
 	}
+
 	token := &oauth2.Token{AccessToken: accessToken}
 	oauthClient := oauth2.NewClient(oauth2.NoContext, oauth2.StaticTokenSource(token))
 	return compute.New(oauthClient)
