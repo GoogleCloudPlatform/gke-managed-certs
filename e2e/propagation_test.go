@@ -51,13 +51,14 @@ func ensurePropagated(t *testing.T, client *client.Clients, name string) error {
 }
 
 func TestPropagation(t *testing.T) {
-	c := utils.Setup(t)
-	defer utils.TearDown(t, c)
+	t.Parallel()
 
-	testCases := []struct {
+	type testCase struct {
 		action func(client *client.Clients, mcrtName string) error
 		desc   string
-	}{
+	}
+
+	testCases := []testCase{
 		{
 			func(client *client.Clients, mcrtName string) error {
 				mcrt, err := client.ManagedCertificate.Get(namespace, mcrtName)
@@ -87,50 +88,55 @@ func TestPropagation(t *testing.T) {
 		},
 	}
 
-	for i, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
-			name := fmt.Sprintf("propagation-%d", i)
-			domain := fmt.Sprintf("example-%d.com", i)
-			if err := c.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
-				t.Fatalf("Creation failed: %s", err.Error())
-			}
+	client := utils.Setup(t)
+	defer utils.TearDown(t, client)
 
-			if err := ensurePropagated(t, c, name); err != nil {
-				t.Fatalf("Propagation failed: %s", err.Error())
-			}
+	for i, tc := range testCases {
+		go func(i int, tc testCase) {
+			t.Run(tc.desc, func(t *testing.T) {
+				name := fmt.Sprintf("propagation-%d", i)
+				domain := fmt.Sprintf("example-%d.com", i)
+				if err := client.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
+					t.Fatalf("Creation failed: %s", err.Error())
+				}
 
-			if err := testCase.action(c, name); err != nil {
-				t.Fatalf("Action failed: %s", err.Error())
-			}
+				if err := ensurePropagated(t, client, name); err != nil {
+					t.Fatalf("Propagation failed: %s", err.Error())
+				}
 
-			if err := ensurePropagated(t, c, name); err != nil {
-				t.Errorf("Propagation after action failed: %s", err.Error())
-			}
-		})
+				if err := tc.action(client, name); err != nil {
+					t.Fatalf("Action failed: %s", err.Error())
+				}
+
+				if err := ensurePropagated(t, client, name); err != nil {
+					t.Errorf("Propagation after action failed: %s", err.Error())
+				}
+			})
+		}(i, tc)
 	}
 
 	t.Run("Deleting ManagedCertificate deletes SslCertificate", func(t *testing.T) {
 		name := "propagation-to-be-deleted"
 		domain := "example-to-be-deleted.com"
-		if err := c.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
+		if err := client.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
 			t.Fatalf("Creation failed: %s", err.Error())
 		}
 
-		if err := ensurePropagated(t, c, name); err != nil {
+		if err := ensurePropagated(t, client, name); err != nil {
 			t.Fatalf("Propagation failed: %s", err.Error())
 		}
 
-		mcrt, err := c.ManagedCertificate.Get(namespace, name)
+		mcrt, err := client.ManagedCertificate.Get(namespace, name)
 		if err != nil {
 			t.Fatalf("%s", err.Error())
 		}
 
-		if err := c.ManagedCertificate.Delete(namespace, name); err != nil {
+		if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
 			t.Fatalf("%s", err.Error())
 		}
 
 		err = utils.Retry(func() error {
-			_, err := c.SslCertificate.Get(mcrt.Status.CertificateName)
+			_, err := client.SslCertificate.Get(mcrt.Status.CertificateName)
 			if http.IsNotFound(err) {
 				return nil
 			}

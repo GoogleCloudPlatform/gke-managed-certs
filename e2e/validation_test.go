@@ -26,11 +26,15 @@ import (
 )
 
 func TestCRDValidation(t *testing.T) {
-	testCases := []struct {
+	t.Parallel()
+
+	type testCase struct {
 		domains []string
 		success bool
 		desc    string
-	}{
+	}
+
+	testCases := []testCase{
 		{[]string{"a.com", "b.com"}, false, "Multiple domain names not allowed"},
 		{[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.com"}, false, "Domain >63 chars not allowed"},
 		{[]string{"*.example.com"}, false, "Domain with a wildcard not allowed"},
@@ -40,30 +44,32 @@ func TestCRDValidation(t *testing.T) {
 	client := utils.Setup(t)
 	defer utils.TearDown(t, client)
 
-	for i, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
-			name := fmt.Sprintf("crd-validation-%d", i)
-			err := client.ManagedCertificate.Create(namespace, name, testCase.domains)
-			if err == nil && !testCase.success {
-				t.Fatalf("Created, want failure")
-			}
-			if err == nil && testCase.success {
-				// Creation succeeded as expected, so now delete the managed certificate
-				if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
-					t.Error(err)
+	for i, tc := range testCases {
+		go func(i int, tc testCase) {
+			t.Run(tc.desc, func(t *testing.T) {
+				name := fmt.Sprintf("crd-validation-%d", i)
+				err := client.ManagedCertificate.Create(namespace, name, tc.domains)
+				if err == nil && !tc.success {
+					t.Fatalf("Created, want failure")
+				}
+				if err == nil && tc.success {
+					// Creation succeeded as expected, so now delete the managed certificate
+					if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
+						t.Error(err)
+					}
+
+					return
 				}
 
-				return
-			}
+				statusErr, ok := err.(*errors.StatusError)
+				if !ok {
+					t.Fatalf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
+				}
 
-			statusErr, ok := err.(*errors.StatusError)
-			if !ok {
-				t.Fatalf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
-			}
-
-			if statusErr.Status().Reason != "Invalid" {
-				t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
-			}
-		})
+				if statusErr.Status().Reason != "Invalid" {
+					t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
+				}
+			})
+		}(i, tc)
 	}
 }
