@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	compute "google.golang.org/api/compute/v0.beta"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -37,15 +38,15 @@ const (
 )
 
 type managedCertificate struct {
-	// Clientset manages ManagedCertificate custom resources
+	// clientset manages ManagedCertificate custom resources
 	clientset versioned.Interface
 }
 
 type sslCertificate struct {
-	// SslCertificates manages GCP SslCertificate resources
+	// sslCertificates manages GCP SslCertificate resources
 	sslCertificates *compute.SslCertificatesService
 
-	// ProjectID is the id of the project in which e2e tests are run
+	// projectID is the id of the project in which e2e tests are run
 	projectID string
 }
 
@@ -69,6 +70,8 @@ func New() (*Clients, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	glog.Infof("projectID=%s", projectID)
 
 	return &Clients{
 		ManagedCertificate: managedCertificate{
