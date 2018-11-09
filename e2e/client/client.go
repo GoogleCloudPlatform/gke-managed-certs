@@ -35,7 +35,7 @@ import (
 const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
-	projectIDEnv = "PROJECT_ID"
+	projectIDEnv    = "PROJECT_ID"
 )
 
 type managedCertificate struct {

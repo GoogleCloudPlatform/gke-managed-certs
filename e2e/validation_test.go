@@ -45,31 +45,30 @@ func TestCRDValidation(t *testing.T) {
 	defer utils.TearDown(t, client)
 
 	for i, tc := range testCases {
-		go func(i int, tc testCase) {
-			t.Run(tc.desc, func(t *testing.T) {
-				name := fmt.Sprintf("crd-validation-%d", i)
-				err := client.ManagedCertificate.Create(namespace, name, tc.domains)
-				if err == nil && !tc.success {
-					t.Fatalf("Created, want failure")
-				}
-				if err == nil && tc.success {
-					// Creation succeeded as expected, so now delete the managed certificate
-					if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
-						t.Error(err)
-					}
-
-					return
+		i, tc := i, tc
+		t.Run(tc.desc, func(t *testing.T) {
+			name := fmt.Sprintf("crd-validation-%d", i)
+			err := client.ManagedCertificate.Create(namespace, name, tc.domains)
+			if err == nil && !tc.success {
+				t.Fatalf("Created, want failure")
+			}
+			if err == nil && tc.success {
+				// Creation succeeded as expected, so now delete the managed certificate
+				if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
+					t.Error(err)
 				}
 
-				statusErr, ok := err.(*errors.StatusError)
-				if !ok {
-					t.Fatalf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
-				}
+				return
+			}
 
-				if statusErr.Status().Reason != "Invalid" {
-					t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
-				}
-			})
-		}(i, tc)
+			statusErr, ok := err.(*errors.StatusError)
+			if !ok {
+				t.Fatalf("Creation failed with error %T, want errors.StatusError. Error: %s", err, err.Error())
+			}
+
+			if statusErr.Status().Reason != "Invalid" {
+				t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
+			}
+		})
 	}
 }

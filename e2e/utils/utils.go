@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	maxRetries = 40
+	maxRetries = 50
 	timeout    = 30
 )
 
