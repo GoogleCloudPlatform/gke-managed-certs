@@ -21,13 +21,14 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 )
 
 // Clients are used to communicate with api server and GCLB
@@ -48,8 +49,8 @@ type Clients struct {
 	Ssl ssl.Ssl
 }
 
-func New(cloudConfig string) (*Clients, error) {
-	config, err := rest.InClusterConfig()
+func New() (*Clients, error) {
+	config, err := clientcmd.BuildConfigFromFlags(flags.F.APIServerHost, flags.F.KubeConfigFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
@@ -57,7 +58,7 @@ func New(cloudConfig string) (*Clients, error) {
 	clientset := versioned.NewForConfigOrDie(config)
 	factory := externalversions.NewSharedInformerFactory(clientset, 0)
 
-	ssl, err := ssl.New(cloudConfig)
+	ssl, err := ssl.New(flags.F.GCEConfigFilePath)
 	if err != nil {
 		return nil, err
 	}

@@ -50,13 +50,13 @@ type sslImpl struct {
 	projectID string
 }
 
-func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
-	if cloudConfig != "" {
+func getTokenSource(gceConfigFilePath string) (oauth2.TokenSource, error) {
+	if gceConfigFilePath != "" {
 		glog.V(1).Info("In a GKE cluster")
 
-		config, err := os.Open(cloudConfig)
+		config, err := os.Open(gceConfigFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %v", cloudConfig, err)
+			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %v", gceConfigFilePath, err)
 		}
 		defer config.Close()
 
@@ -75,8 +75,8 @@ func getTokenSource(cloudConfig string) (oauth2.TokenSource, error) {
 	}
 }
 
-func New(cloudConfig string) (Ssl, error) {
-	tokenSource, err := getTokenSource(cloudConfig)
+func New(gceConfigFilePath string) (Ssl, error) {
+	tokenSource, err := getTokenSource(gceConfigFilePath)
 	if err != nil {
 		return nil, err
 	}

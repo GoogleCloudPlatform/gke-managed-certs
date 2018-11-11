@@ -17,27 +17,30 @@ limitations under the License.
 package main
 
 import (
-	"flag"
+	"os"
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/version"
 )
 
-var cloudConfig = flag.String("cloud-config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-
 func main() {
-	flag.Parse()
+	flags.Register()
 
 	glog.V(1).Infof("managed-certificates-controller %s starting. Latest commit hash: %s", version.Version, version.GitCommit)
+	for i, a := range os.Args {
+		glog.V(0).Infof("argv[%d]: %q", i, a)
+	}
+	glog.V(1).Infof("Flags = %+v", flags.F)
 
 	//To handle SIGINT gracefully
 	stopChannel := server.SetupSignalHandler()
 
-	clients, err := client.New(*cloudConfig)
+	clients, err := client.New()
 	if err != nil {
 		glog.Fatal(err)
 	}

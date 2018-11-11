@@ -21,4 +21,4 @@ RUN clean-install ca-certificates
 ADD managed-certificate-controller /managed-certificate-controller
 ADD run.sh /run.sh
 
-CMD ./run.sh
+ENTRYPOINT ["./run.sh"]
