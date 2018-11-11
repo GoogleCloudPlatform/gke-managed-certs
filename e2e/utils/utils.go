@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 )
@@ -51,19 +50,19 @@ func Retry(action func() error) error {
 	return retryError
 }
 
-func Setup(t *testing.T) *client.Clients {
+func Setup(t *testing.T, namespace string) *client.Clients {
 	client, err := client.New()
 	if err != nil {
 		t.Fatalf("Could not create client: %s", err.Error())
 	}
 
-	TearDown(t, client)
+	TearDown(t, client, namespace)
 	return client
 }
 
-func TearDown(t *testing.T, client *client.Clients) {
+func TearDown(t *testing.T, client *client.Clients, namespace string) {
 	err := func() error {
-		if err := client.ManagedCertificate.DeleteAll(apiv1.NamespaceAll); err != nil {
+		if err := client.ManagedCertificate.DeleteAll(namespace); err != nil {
 			return err
 		}
 

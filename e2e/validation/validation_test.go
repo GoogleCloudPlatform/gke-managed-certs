@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_validation
 
 import (
 	"fmt"
@@ -23,6 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
+)
+
+const (
+	namespace = "default"
 )
 
 func TestCRDValidation(t *testing.T) {
@@ -41,8 +45,8 @@ func TestCRDValidation(t *testing.T) {
 		{[]string{"example.com"}, true, "Single non-wildcard domain <=63 characters allowed"},
 	}
 
-	client := utils.Setup(t)
-	defer utils.TearDown(t, client)
+	client := utils.Setup(t, namespace)
+	defer utils.TearDown(t, client, namespace)
 
 	for i, tc := range testCases {
 		i, tc := i, tc

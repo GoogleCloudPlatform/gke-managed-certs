@@ -54,13 +54,14 @@ docker-runner-builder:
 	docker build -t ${runner_image} runner
 
 e2e:
-	dest=/tmp/artifacts; \
+	- dest=/tmp/artifacts; \
 	rm -rf $${dest}/* && mkdir -p $${dest} && \
 	CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
 	PROJECT_ID=${PROJECT_ID} \
-	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} | go-junit-report > $${dest}/junit_01.xml
+	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt
+	dest=/tmp/artifacts; cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml
 
 # Formats go source code with gofmt
 gofmt:

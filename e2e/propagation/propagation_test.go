@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_propagation
 
 import (
 	"fmt"
@@ -24,6 +24,10 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+)
+
+const (
+	namespace = "default"
 )
 
 func ensurePropagated(t *testing.T, client *client.Clients, name string) error {
@@ -88,8 +92,8 @@ func TestPropagation(t *testing.T) {
 		},
 	}
 
-	client := utils.Setup(t)
-	defer utils.TearDown(t, client)
+	client := utils.Setup(t, namespace)
+	defer utils.TearDown(t, client, namespace)
 
 	for i, tc := range testCases {
 		i, tc := i, tc
