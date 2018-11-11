@@ -60,7 +60,7 @@ e2e:
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
 	PROJECT_ID=${PROJECT_ID} \
-	godep go test ./e2e/... -v -test.timeout=60m -alsologtostderr -log_dir $${dest} | go-junit-report > $${dest}/junit_01.xml
+	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} | go-junit-report > $${dest}/junit_01.xml
 
 # Formats go source code with gofmt
 gofmt:
