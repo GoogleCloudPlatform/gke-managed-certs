@@ -14,19 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_validation
+package e2e
 
 import (
 	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-)
-
-const (
-	namespace = "default"
 )
 
 func TestCRDValidation(t *testing.T) {
@@ -45,21 +39,18 @@ func TestCRDValidation(t *testing.T) {
 		{[]string{"example.com"}, true, "Single non-wildcard domain <=63 characters allowed"},
 	}
 
-	client := utils.Setup(t, namespace)
-	defer utils.TearDown(t, client, namespace)
-
 	for i, tc := range testCases {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
 			name := fmt.Sprintf("crd-validation-%d", i)
-			err := client.ManagedCertificate.Create(namespace, name, tc.domains)
+			err := clients.ManagedCertificate.Create(namespace, name, tc.domains)
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}
 			if err == nil && tc.success {
 				// Creation succeeded as expected, so now delete the managed certificate
-				if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
-					t.Error(err)
+				if err := clients.ManagedCertificate.Delete(namespace, name); err != nil {
+					t.Fatal(err)
 				}
 
 				return
@@ -71,7 +62,7 @@ func TestCRDValidation(t *testing.T) {
 			}
 
 			if statusErr.Status().Reason != "Invalid" {
-				t.Errorf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
+				t.Fatalf("Creation failed with reason %s, want Invalid, Error: %#v", statusErr.Status().Reason, err)
 			}
 		})
 	}

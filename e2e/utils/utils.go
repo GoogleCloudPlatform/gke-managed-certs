@@ -18,12 +18,9 @@ package utils
 
 import (
 	"errors"
-	"testing"
 	"time"
 
 	"github.com/golang/glog"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 )
 
 const (
@@ -48,32 +45,4 @@ func Retry(action func() error) error {
 
 	glog.Errorf("Failed because of exceeding the retry limit")
 	return retryError
-}
-
-func Setup(t *testing.T, namespace string) *client.Clients {
-	client, err := client.New()
-	if err != nil {
-		t.Fatalf("Could not create client: %s", err.Error())
-	}
-
-	TearDown(t, client, namespace)
-	return client
-}
-
-func TearDown(t *testing.T, client *client.Clients, namespace string) {
-	err := func() error {
-		if err := client.ManagedCertificate.DeleteAll(namespace); err != nil {
-			return err
-		}
-
-		if err := Retry(client.SslCertificate.DeleteOwn); err != nil {
-			return err
-		}
-
-		return nil
-	}()
-
-	if err != nil {
-		t.Errorf("Failed to tear down resources: %s", err.Error())
-	}
 }

@@ -14,25 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_propagation
+package e2e
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-const (
-	namespace = "default"
-)
-
-func ensurePropagated(t *testing.T, client *client.Clients, name string) error {
+func ensurePropagated(name string) error {
 	return utils.Retry(func() error {
-		mcrt, err := client.ManagedCertificate.Get(namespace, name)
+		mcrt, err := clients.ManagedCertificate.Get(namespace, name)
 		if err != nil {
 			return err
 		}
@@ -41,7 +36,7 @@ func ensurePropagated(t *testing.T, client *client.Clients, name string) error {
 			return fmt.Errorf("SslCertificate name empty in status of %s:%s", namespace, name)
 		}
 
-		sslCert, err := client.SslCertificate.Get(mcrt.Status.CertificateName)
+		sslCert, err := clients.SslCertificate.Get(mcrt.Status.CertificateName)
 		if err != nil {
 			return err
 		}
@@ -58,14 +53,14 @@ func TestPropagation(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
-		action func(client *client.Clients, mcrtName string) error
+		action func(mcrtName string) error
 		desc   string
 	}
 
 	testCases := []testCase{
 		{
-			func(client *client.Clients, mcrtName string) error {
-				mcrt, err := client.ManagedCertificate.Get(namespace, mcrtName)
+			func(mcrtName string) error {
+				mcrt, err := clients.ManagedCertificate.Get(namespace, mcrtName)
 				if err != nil {
 					return err
 				}
@@ -74,46 +69,43 @@ func TestPropagation(t *testing.T) {
 					return fmt.Errorf("SslCertificate name empty in status of %s:%s", namespace, mcrtName)
 				}
 
-				return client.SslCertificate.Delete(mcrt.Status.CertificateName)
+				return clients.SslCertificate.Delete(mcrt.Status.CertificateName)
 			},
 			"Deleted SslCertificate is recreated",
 		},
 		{
-			func(client *client.Clients, mcrtName string) error {
-				mcrt, err := client.ManagedCertificate.Get(namespace, mcrtName)
+			func(mcrtName string) error {
+				mcrt, err := clients.ManagedCertificate.Get(namespace, mcrtName)
 				if err != nil {
 					return err
 				}
 
 				mcrt.Spec.Domains = []string{"foo.com"}
-				return client.ManagedCertificate.Update(mcrt)
+				return clients.ManagedCertificate.Update(mcrt)
 			},
 			"Modifications in ManagedCertificate are propagated to SslCertificate",
 		},
 	}
-
-	client := utils.Setup(t, namespace)
-	defer utils.TearDown(t, client, namespace)
 
 	for i, tc := range testCases {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
 			name := fmt.Sprintf("propagation-%d", i)
 			domain := fmt.Sprintf("example-%d.com", i)
-			if err := client.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
+			if err := clients.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
 				t.Fatalf("Creation failed: %s", err.Error())
 			}
 
-			if err := ensurePropagated(t, client, name); err != nil {
+			if err := ensurePropagated(name); err != nil {
 				t.Fatalf("Propagation failed: %s", err.Error())
 			}
 
-			if err := tc.action(client, name); err != nil {
+			if err := tc.action(name); err != nil {
 				t.Fatalf("Action failed: %s", err.Error())
 			}
 
-			if err := ensurePropagated(t, client, name); err != nil {
-				t.Errorf("Propagation after action failed: %s", err.Error())
+			if err := ensurePropagated(name); err != nil {
+				t.Fatalf("Propagation after action failed: %s", err.Error())
 			}
 		})
 	}
@@ -121,25 +113,25 @@ func TestPropagation(t *testing.T) {
 	t.Run("Deleting ManagedCertificate deletes SslCertificate", func(t *testing.T) {
 		name := "propagation-to-be-deleted"
 		domain := "example-to-be-deleted.com"
-		if err := client.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
+		if err := clients.ManagedCertificate.Create(namespace, name, []string{domain}); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := ensurePropagated(t, client, name); err != nil {
+		if err := ensurePropagated(name); err != nil {
 			t.Fatal(err)
 		}
 
-		mcrt, err := client.ManagedCertificate.Get(namespace, name)
+		mcrt, err := clients.ManagedCertificate.Get(namespace, name)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := client.ManagedCertificate.Delete(namespace, name); err != nil {
+		if err := clients.ManagedCertificate.Delete(namespace, name); err != nil {
 			t.Fatal(err)
 		}
 
 		err = utils.Retry(func() error {
-			_, err := client.SslCertificate.Get(mcrt.Status.CertificateName)
+			_, err := clients.SslCertificate.Get(mcrt.Status.CertificateName)
 			if http.IsNotFound(err) {
 				return nil
 			}
@@ -147,7 +139,7 @@ func TestPropagation(t *testing.T) {
 			return fmt.Errorf("SslCertificate %s exists, want deleted", mcrt.Status.CertificateName)
 		})
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 	})
 }
