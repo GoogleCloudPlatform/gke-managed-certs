@@ -64,6 +64,7 @@ func getTokenSource(gceConfigFilePath string) (oauth2.TokenSource, error) {
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
 			return nil, fmt.Errorf("Could not read config %v", err)
 		}
+		glog.Infof("Using GCE provider config %+v", cfg)
 
 		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), nil
 	} else if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {

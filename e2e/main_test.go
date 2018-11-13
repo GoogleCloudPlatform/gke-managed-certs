@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 )
 
-
 const (
 	namespace = "default"
 )

@@ -34,6 +34,7 @@ var (
 	// SchemeBuilder points to a list of functions added to Scheme.
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
+	// AddToScheme applies all stored functions to Scheme.
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
