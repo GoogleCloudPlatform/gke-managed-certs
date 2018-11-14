@@ -35,7 +35,7 @@ var (
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	// AddToScheme applies all stored functions to Scheme.
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {

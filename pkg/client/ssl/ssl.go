@@ -50,44 +50,47 @@ type sslImpl struct {
 	projectID string
 }
 
-func getTokenSource(gceConfigFilePath string) (oauth2.TokenSource, error) {
+func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, string, error) {
 	if gceConfigFilePath != "" {
 		glog.V(1).Info("In a GKE cluster")
 
 		config, err := os.Open(gceConfigFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("Could not open cloud provider configuration %s: %v", gceConfigFilePath, err)
+			return nil, "", fmt.Errorf("Could not open cloud provider configuration %s: %v", gceConfigFilePath, err)
 		}
 		defer config.Close()
 
 		var cfg gce.ConfigFile
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
-			return nil, fmt.Errorf("Could not read config %v", err)
+			return nil, "", fmt.Errorf("Could not read config %v", err)
 		}
 		glog.Infof("Using GCE provider config %+v", cfg)
 
-		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), nil
-	} else if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
+		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), cfg.Global.ProjectID, nil
+	}
+
+	projectID, err := metadata.ProjectID()
+	if err != nil {
+		return nil, "", fmt.Errorf("Could not fetch project id: %v", err)
+	}
+
+	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
 		glog.V(1).Info("In a GCP cluster")
-		return google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
+		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
+		return tokenSource, projectID, err
 	} else {
 		glog.V(1).Info("Using default TokenSource")
-		return google.ComputeTokenSource(""), nil
+		return google.ComputeTokenSource(""), projectID, nil
 	}
 }
 
 func New(gceConfigFilePath string) (Ssl, error) {
-	tokenSource, err := getTokenSource(gceConfigFilePath)
+	tokenSource, projectID, err := getTokenSourceAndProjectID(gceConfigFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(1).Infof("TokenSource: %v", tokenSource)
-
-	projectID, err := metadata.ProjectID()
-	if err != nil {
-		return nil, fmt.Errorf("Could not fetch project id: %v", err)
-	}
+	glog.Infof("TokenSource: %#v, projectID: %s", tokenSource, projectID)
 
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
 	client.Timeout = httpTimeout
