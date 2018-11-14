@@ -36,7 +36,7 @@ type ManagedCertificateList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ManagedCertificate configures for what domains the client requests managed certificate and with which Ingress they should be associated. It also provides the current status of the certficate.
+// ManagedCertificate configures the domains for which client requests a managed certificate. It also provides the current status of the certficate.
 type ManagedCertificate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -53,7 +53,7 @@ type ManagedCertificate struct {
 	Status ManagedCertificateStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// ManagedCertificateSpec configures for what domains the client requests managed certificate and with which Ingress it should be associated.
+// ManagedCertificateSpec configures the domains for which client requests a managed certificate.
 type ManagedCertificateSpec struct {
 	// Specifies a list of domains populated by the user for which he requests a managed certificate.
 	Domains []string `json:"domains" protobuf:"bytes,2,rep,name=domains"`
