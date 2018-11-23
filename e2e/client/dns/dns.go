@@ -62,10 +62,10 @@ func (d dnsImpl) Create(randomNames []string, ip string) ([]string, error) {
 		domainName := fmt.Sprintf("%s.%s.%s", randomName, d.zone, topLevelZone)
 		domainNames = append(domainNames, domainName)
 		additions = append(additions, &dns.ResourceRecordSet{
-			Name: fmt.Sprintf("%s.", domainName),
+			Name:    fmt.Sprintf("%s.", domainName),
 			Rrdatas: []string{ip},
-			Ttl:  20,
-			Type: recordType,
+			Ttl:     20,
+			Type:    recordType,
 		})
 	}
 

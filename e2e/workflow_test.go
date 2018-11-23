@@ -111,7 +111,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 
 	glog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
-	additionalSslCertificateName := generateRandomNames(1)[0]
+	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
 	if err := clients.SslCertificate.Create(additionalSslCertificateName, []string{additionalSslCertificateDomain}); err != nil {
 		t.Fatal(err)
 	}
