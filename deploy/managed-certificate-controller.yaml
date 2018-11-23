@@ -22,8 +22,8 @@ roleRef:
   name: cluster-admin
 subjects:
   - kind: ServiceAccount
-   name: test-account
-   namespace: default
+    name: test-account
+    namespace: default
 ---
 apiVersion: v1
 kind: ServiceAccount

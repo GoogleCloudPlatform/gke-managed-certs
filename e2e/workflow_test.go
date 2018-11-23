@@ -32,7 +32,7 @@ const (
 	additionalSslCertificateDomain = "example.com"
 	annotation                     = "gke.googleapis.com/managed-certificates"
 	annotationSeparator            = ","
-	maxNameLength                  = 63
+	maxNameLength                  = 25
 	statusActive                   = "Active"
 	statusSuccess                  = 200
 )

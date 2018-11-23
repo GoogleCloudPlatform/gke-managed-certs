@@ -44,7 +44,8 @@ function init {
 
 function tear_down {
   kubectl delete -f ${SCRIPT_ROOT}/deploy/http-hello.yaml --ignore-not-found=true
-  if [ $PLATFORM -eq "GCP" ]
+  if [ $PLATFORM = "GCP" ]
+  then
     kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true
     kubectl delete -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml --ignore-not-found=true
   fi
@@ -53,7 +54,8 @@ function tear_down {
 function set_up {
   kubectl create -f ${SCRIPT_ROOT}/deploy/http-hello.yaml
 
-  if [ $PLATFORM -eq "GCP" ]
+  if [ $PLATFORM = "GCP" ]
+  then
     kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
     kubectl create -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml
   fi
@@ -75,6 +77,7 @@ while getopts "p:z:" opt; do
   case $opt in
     p)
       PLATFORM=$OPTARG
+      ;;
     z)
       DNS_ZONE=$OPTARG
       ;;
