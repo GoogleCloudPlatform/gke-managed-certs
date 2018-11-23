@@ -15,15 +15,11 @@ For that to work you need to run your cluster on a platform with [Google Cloud L
 
 To install Managed Certificates in your own cluster on GCP, you need to:
 
-1. Deploy the Cluster Role Binding and Service Account
-```console
-$ kubectl create -f deploy/rbac.yaml
-```
-2. Deploy the Managed Certficate CRD
+1. Deploy the Managed Certficate CRD
 ```console
 $ kubectl create -f deploy/managedcertificates-crd.yaml
 ```
-3. Deploy the managed-certificate-controller
+1. Deploy the managed-certificate-controller
 ```console
 $ kubectl create -f deploy/managed-certificate-controller.yaml
 ```
@@ -62,8 +58,4 @@ $ kubectl delete -f deploy/managed-certificate-controller.yaml
 * Tear down the Managed Certificate CRD  
 ```console
 $ kubectl delete -f deploy/managedcertificates-crd.yaml
-```
-* Tear down the Cluster Role Binding and Service Account
-```console
-$ kubectl delete -f deploy/rbac.yaml
 ```

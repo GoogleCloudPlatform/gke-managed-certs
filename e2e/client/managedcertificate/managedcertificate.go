@@ -14,16 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package managedcertificate
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-func (m managedCertificate) Create(namespace, name string, domains []string) error {
+type ManagedCertificate interface {
+	Create(namespace, name string, domains []string) error
+	DeleteAll(namespace string) error
+	Delete(namespace, name string) error
+	Get(namespace, name string) (*api.ManagedCertificate, error)
+	Update(mcrt *api.ManagedCertificate) error
+}
+
+type managedCertificateImpl struct {
+	// clientset manages ManagedCertificate custom resources
+	clientset versioned.Interface
+}
+
+func New(config *rest.Config) (ManagedCertificate, error) {
+	clientset, err := versioned.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return managedCertificateImpl{
+		clientset: clientset,
+	}, nil
+}
+
+func (m managedCertificateImpl) Create(namespace, name string, domains []string) error {
 	nsClient := m.clientset.GkeV1alpha1().ManagedCertificates(namespace)
 	mcrt := &api.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -40,7 +66,7 @@ func (m managedCertificate) Create(namespace, name string, domains []string) err
 	return err
 }
 
-func (m managedCertificate) DeleteAll(namespace string) error {
+func (m managedCertificateImpl) DeleteAll(namespace string) error {
 	mcrts, err := m.clientset.GkeV1alpha1().ManagedCertificates(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -55,15 +81,15 @@ func (m managedCertificate) DeleteAll(namespace string) error {
 	return nil
 }
 
-func (m managedCertificate) Delete(namespace, name string) error {
+func (m managedCertificateImpl) Delete(namespace, name string) error {
 	return http.IgnoreNotFound(m.clientset.GkeV1alpha1().ManagedCertificates(namespace).Delete(name, &metav1.DeleteOptions{}))
 }
 
-func (m managedCertificate) Get(namespace, name string) (*api.ManagedCertificate, error) {
+func (m managedCertificateImpl) Get(namespace, name string) (*api.ManagedCertificate, error) {
 	return m.clientset.GkeV1alpha1().ManagedCertificates(namespace).Get(name, metav1.GetOptions{})
 }
 
-func (m managedCertificate) Update(mcrt *api.ManagedCertificate) error {
+func (m managedCertificateImpl) Update(mcrt *api.ManagedCertificate) error {
 	_, err := m.clientset.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
 }

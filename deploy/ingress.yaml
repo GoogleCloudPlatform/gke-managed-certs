@@ -16,8 +16,6 @@ apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   name: test-ingress
-  annotations:
-    kubernetes.io/ingress.global-static-ip-name: test-ip-address
 spec:
   backend:
     serviceName: http-hello

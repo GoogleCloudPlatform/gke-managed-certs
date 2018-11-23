@@ -8,6 +8,7 @@ ARTIFACTS ?= /tmp/artifacts
 CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
 CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
 PROJECT_ID ?= $(shell gcloud config list --format="value(core.project)")
+DNS_ZONE ?= managedcertsgke
 
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
@@ -60,6 +61,7 @@ e2e:
 	KUBECONFIG=${KUBECONFIG} \
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
 	PROJECT_ID=${PROJECT_ID} \
+	DNS_ZONE=${DNS_ZONE} \
 	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt
 	dest=/tmp/artifacts; cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml
 

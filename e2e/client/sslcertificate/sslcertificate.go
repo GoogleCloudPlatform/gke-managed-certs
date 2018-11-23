@@ -14,20 +14,65 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package sslcertificate
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
-func (s sslCertificate) DeleteOwn() error {
+const (
+	typeManaged = "MANAGED"
+)
+
+type SslCertificate interface {
+	Create(name string, domains []string) error
+	DeleteOwn() error
+	Delete(name string) error
+	Get(name string) (*compute.SslCertificate, error)
+}
+
+type sslCertificateImpl struct {
+	// sslCertificates manages GCP SslCertificate resources
+	sslCertificates *compute.SslCertificatesService
+
+	// projectID is the id of the project in which e2e tests are run
+	projectID string
+}
+
+func New(oauthClient *http.Client, projectID string) (SslCertificate, error) {
+	computeClient, err := compute.New(oauthClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return sslCertificateImpl{
+		sslCertificates: computeClient.SslCertificates,
+		projectID:       projectID,
+	}, nil
+}
+
+func (s sslCertificateImpl) Create(name string, domains []string) error {
+	sslCertificate := &compute.SslCertificate{
+		Managed: &compute.SslCertificateManagedSslCertificate{
+			Domains: domains,
+		},
+		Name: name,
+		Type: typeManaged,
+	}
+
+	_, err := s.sslCertificates.Insert(s.projectID, sslCertificate).Do()
+	return err
+}
+
+func (s sslCertificateImpl) DeleteOwn() error {
 	names, err := s.getOwnNames()
 	if err != nil {
 		return err
@@ -57,20 +102,20 @@ func (s sslCertificate) DeleteOwn() error {
 	return nil
 }
 
-func (s sslCertificate) Delete(name string) error {
+func (s sslCertificateImpl) Delete(name string) error {
 	_, err := s.sslCertificates.Delete(s.projectID, name).Do()
-	if http.IsNotFound(err) {
+	if utilshttp.IsNotFound(err) {
 		return nil
 	}
 
 	return err
 }
 
-func (s sslCertificate) Get(name string) (*compute.SslCertificate, error) {
+func (s sslCertificateImpl) Get(name string) (*compute.SslCertificate, error) {
 	return s.sslCertificates.Get(s.projectID, name).Do()
 }
 
-func (s sslCertificate) getOwnNames() ([]string, error) {
+func (s sslCertificateImpl) getOwnNames() ([]string, error) {
 	sslCertificates, err := s.sslCertificates.List(s.projectID).Do()
 	if err != nil {
 		return nil, err

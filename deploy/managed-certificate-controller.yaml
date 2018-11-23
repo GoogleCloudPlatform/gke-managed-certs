@@ -12,43 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+   name: test-account
+   namespace: default
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-account
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: managed-certificate-controller
+  name: managed-certificate-controller
 spec:
-    replicas: 1
-    selector:
-        matchLabels:
-            app: managed-certificate-controller
-    template:
-        metadata:
-            labels:
-                app: managed-certificate-controller
-        spec:
-            serviceAccountName: test-account
-            containers:
-                - name: managed-certificate-controller
-                  image: eu.gcr.io/managed-certs-gke/managed-certificate-controller:ci_latest
-                  imagePullPolicy: Always
-                  volumeMounts:
-                      - name: ssl-certs
-                        mountPath: "/etc/ssl/certs"
-                        readOnly: true
-                      - name: usrsharecacerts
-                        mountPath: "/usr/share/ca-certificates"
-                        readOnly: true
-                      - name: logfile
-                        mountPath: "/var/log/managed_certificate_controller.log"
-                        readOnly: false
-            volumes:
-                - name: ssl-certs
-                  hostPath:
-                      path: "/etc/ssl/certs"
-                - name: usrsharecacerts
-                  hostPath:
-                      path: "/usr/share/ca-certificates"
-                - name: logfile
-                  hostPath:
-                      path: "/var/log/managed_certificate_controller.log"
-                      type: FileOrCreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: managed-certificate-controller
+  template:
+    metadata:
+      labels:
+        app: managed-certificate-controller
+    spec:
+      serviceAccountName: test-account
+      containers:
+        - name: managed-certificate-controller
+          image: eu.gcr.io/managed-certs-gke/managed-certificate-controller:ci_latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: "/etc/ssl/certs"
+              readOnly: true
+            - name: usrsharecacerts
+              mountPath: "/usr/share/ca-certificates"
+              readOnly: true
+            - name: logfile
+              mountPath: "/var/log/managed_certificate_controller.log"
+              readOnly: false
+      volumes:
+        - name: ssl-certs
+          hostPath:
+            path: "/etc/ssl/certs"
+        - name: usrsharecacerts
+          hostPath:
+            path: "/usr/share/ca-certificates"
+        - name: logfile
+          hostPath:
+            path: "/var/log/managed_certificate_controller.log"
+            type: FileOrCreate

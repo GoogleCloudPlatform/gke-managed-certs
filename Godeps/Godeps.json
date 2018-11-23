@@ -494,6 +494,10 @@
 			"Rev": "c51f30376ab7ec4f22b65de846a41593c8b70f07"
 		},
 		{
+			"ImportPath": "google.golang.org/api/dns/v2beta1",
+			"Rev": "c51f30376ab7ec4f22b65de846a41593c8b70f07"
+		},
+		{
 			"ImportPath": "google.golang.org/api/gensupport",
 			"Rev": "c51f30376ab7ec4f22b65de846a41593c8b70f07"
 		},

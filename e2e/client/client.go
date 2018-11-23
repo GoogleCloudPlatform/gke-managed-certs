@@ -18,51 +18,55 @@ package client
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
-	compute "google.golang.org/api/compute/v0.beta"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/dns"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/ingress"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/managedcertificate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/sslcertificate"
 )
 
 const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
+	dnsZoneEnv      = "DNS_ZONE"
 	projectIDEnv    = "PROJECT_ID"
 )
 
-type managedCertificate struct {
-	// clientset manages ManagedCertificate custom resources
-	clientset versioned.Interface
-}
-
-type sslCertificate struct {
-	// sslCertificates manages GCP SslCertificate resources
-	sslCertificates *compute.SslCertificatesService
-
-	// projectID is the id of the project in which e2e tests are run
-	projectID string
-}
-
 type Clients struct {
-	ManagedCertificate managedCertificate
-	SslCertificate     sslCertificate
+	Dns                dns.Dns
+	Ingress            ingress.Ingress
+	ManagedCertificate managedcertificate.ManagedCertificate
+	SslCertificate     sslcertificate.SslCertificate
 }
 
 func New() (*Clients, error) {
-	clientset, err := getMcrtClient()
+	config, err := getRestConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	computeClient, err := getComputeClient()
+	ingressClient, err := ingress.New(config)
+	if err != nil {
+		return nil, err
+	}
+
+	managedCertificateClient, err := managedcertificate.New(config)
+	if err != nil {
+		return nil, err
+	}
+
+	oauthClient, err := getOauthClient()
 	if err != nil {
 		return nil, err
 	}
@@ -70,18 +74,28 @@ func New() (*Clients, error) {
 	projectID := os.Getenv(projectIDEnv)
 	glog.Infof("projectID=%s", projectID)
 
+	dnsZone := os.Getenv(dnsZoneEnv)
+	glog.Infof("dnsZone=%s", dnsZone)
+
+	dnsClient, err := dns.New(oauthClient, dnsZone)
+	if err != nil {
+		return nil, err
+	}
+
+	sslCertificateClient, err := sslcertificate.New(oauthClient, projectID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Clients{
-		ManagedCertificate: managedCertificate{
-			clientset: clientset,
-		},
-		SslCertificate: sslCertificate{
-			sslCertificates: computeClient.SslCertificates,
-			projectID:       projectID,
-		},
+		Dns:                dnsClient,
+		Ingress:            ingressClient,
+		ManagedCertificate: managedCertificateClient,
+		SslCertificate:     sslCertificateClient,
 	}, nil
 }
 
-func getMcrtClient() (versioned.Interface, error) {
+func getRestConfig() (*rest.Config, error) {
 	kubeConfig := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 	c, err := clientcmd.LoadFromFile(kubeConfig)
 	if err != nil {
@@ -89,12 +103,7 @@ func getMcrtClient() (versioned.Interface, error) {
 	}
 
 	overrides := &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: defaultHost}}
-	config, err := clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return versioned.NewForConfig(config)
+	return clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
 }
 
 func gcloud(command ...string) (string, error) {
@@ -106,7 +115,7 @@ func gcloud(command ...string) (string, error) {
 	return strings.Replace(string(out), "\n", "", -1), nil
 }
 
-func getComputeClient() (*compute.Service, error) {
+func getOauthClient() (*http.Client, error) {
 	gcloudAuthList, err := gcloud("auth", "list")
 	if err != nil {
 		return nil, err
@@ -131,6 +140,5 @@ func getComputeClient() (*compute.Service, error) {
 	}
 
 	token := &oauth2.Token{AccessToken: accessToken}
-	oauthClient := oauth2.NewClient(oauth2.NoContext, oauth2.StaticTokenSource(token))
-	return compute.New(oauthClient)
+	return oauth2.NewClient(oauth2.NoContext, oauth2.StaticTokenSource(token)), nil
 }
