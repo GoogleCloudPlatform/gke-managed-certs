@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/golang/glog"
 	dns "google.golang.org/api/dns/v2beta1"
 )
 
 const (
 	projectID    = "certsbridge-dev"
-	recordType   = "A"
+	recordTypeA  = "A"
 	topLevelZone = "certsbridge.com"
 )
 
@@ -65,7 +66,7 @@ func (d dnsImpl) Create(randomNames []string, ip string) ([]string, error) {
 			Name:    fmt.Sprintf("%s.", domainName),
 			Rrdatas: []string{ip},
 			Ttl:     20,
-			Type:    recordType,
+			Type:    recordTypeA,
 		})
 	}
 
@@ -82,8 +83,24 @@ func (d dnsImpl) DeleteAll() error {
 		return err
 	}
 
+	var allNames []string
+	var allANames []string
+	var recordsA []*dns.ResourceRecordSet
+	for _, record := range resourceRecordsResponse.Rrsets {
+		allNames = append(allNames, record.Name)
+
+		if record.Type == recordTypeA {
+			recordsA = append(recordsA, record)
+			allANames = append(allANames, record.Name)
+		}
+	}
+
+	glog.Infof("Delete all DNS A records in %s.%s; all names: %v; all A names: %v", d.zone, topLevelZone, allNames, allANames)
+
 	_, err = d.service.Changes.Create(projectID, d.zone, &dns.Change{
-		Deletions: resourceRecordsResponse.Rrsets,
+		Deletions: recordsA,
 	}).Do()
+
+	glog.Infof("Successfully deleted DNS A records: %v", allANames)
 	return err
 }

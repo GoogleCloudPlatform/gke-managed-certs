@@ -37,7 +37,7 @@ var clients *client.Clients
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	if err := setup(); err != nil {
+	if err := setUp(); err != nil {
 		glog.Fatal(err)
 	}
 
@@ -50,16 +50,22 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func setup() error {
+func setUp() error {
+	glog.Infof("setting up")
+
 	var err error
 	if clients, err = client.New(); err != nil {
 		return fmt.Errorf("Could not create clients: %s", err.Error())
 	}
 
-	return tearDown()
+	err = tearDown()
+	glog.Infof("set up finished")
+	return err
 }
 
 func tearDown() error {
+	glog.Infof("tearing down")
+
 	err := func() error {
 		if err := clients.ManagedCertificate.DeleteAll(namespace); err != nil {
 			return err
@@ -71,10 +77,10 @@ func tearDown() error {
 
 		return nil
 	}()
-
 	if err != nil {
 		return fmt.Errorf("Error tearing down resources: %s", err.Error())
 	}
 
+	glog.Infof("tear down success")
 	return nil
 }

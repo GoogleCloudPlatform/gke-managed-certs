@@ -79,24 +79,25 @@ func TestProvisioningWorkflow(t *testing.T) {
 	if err := clients.Ingress.Delete(namespace, ingressName); err != nil {
 		t.Fatal(err)
 	}
+	glog.Infof("Deleted ingress %s:%s", namespace, ingressName)
+
 	if err := clients.Ingress.Create(namespace, ingressName); err != nil {
 		t.Fatal(err)
 	}
 	defer clients.Ingress.Delete(namespace, ingressName)
+	glog.Infof("Created ingress %s:%s", namespace, ingressName)
 
 	ip, err := getIngressIP(ingressName)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	glog.Infof("Ingress IP: %s", ip)
 
+	defer clients.Dns.DeleteAll()
 	domains, err := clients.Dns.Create(generateRandomNames(2), ip)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clients.Dns.DeleteAll()
-
 	glog.Infof("Generated random domains: %v", domains)
 
 	var mcrtNames []string
@@ -108,7 +109,6 @@ func TestProvisioningWorkflow(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
 	glog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
@@ -116,7 +116,6 @@ func TestProvisioningWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.SslCertificate.Delete(additionalSslCertificateName)
-
 	glog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
 
 	ing, err := clients.Ingress.Get(namespace, ingressName)
@@ -127,8 +126,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 	if err := clients.Ingress.Update(ing); err != nil {
 		t.Fatal(err)
 	}
-
-	glog.Infof("Annotated Ingress with annotation %s, value: %s", annotation, ing.Annotations[annotation])
+	glog.Infof("Annotated Ingress with %s=%s", annotation, ing.Annotations[annotation])
 
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
 		err := utils.Retry(func() error {
