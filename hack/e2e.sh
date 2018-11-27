@@ -20,6 +20,8 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
+
+CRD_VALIDATION_ENABLED=true
 DNS_ZONE="managedcertsgke"
 PLATFORM="GCP"
 
@@ -66,17 +68,21 @@ function main {
   tear_down
   set_up
 
-  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE && exitcode=$? || exitcode=$?
+  make -C ${SCRIPT_ROOT} run-e2e-in-docker \
+    CRD_VALIDATION_ENABLED=$CRD_VALIDATION_ENABLED DNS_ZONE=$DNS_ZONE && exitcode=$? || exitcode=$?
 
   tear_down
 
   exit $exitcode
 }
 
-while getopts "p:z:" opt; do
+while getopts "p:v:z:" opt; do
   case $opt in
     p)
       PLATFORM=$OPTARG
+      ;;
+    v)
+      CRD_VALIDATION_ENABLED=$OPTARG
       ;;
     z)
       DNS_ZONE=$OPTARG

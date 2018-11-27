@@ -62,6 +62,7 @@ e2e:
 	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
 	PROJECT_ID=${PROJECT_ID} \
 	DNS_ZONE=${DNS_ZONE} \
+	CRD_VALIDATION_ENABLED=${CRD_VALIDATION_ENABLED} \
 	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt
 	dest=/tmp/artifacts; cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml
 
@@ -84,7 +85,9 @@ run-e2e-in-docker: docker-runner-builder auth-configure-docker
 		-v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
 		-v ${KUBECONFIG}:/root/.kube/config \
 		-v ${ARTIFACTS}:/tmp/artifacts \
-		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e DNS_ZONE=${DNS_ZONE} CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} PROJECT_ID=${PROJECT_ID}'
+		${runner_image}:latest bash -c 'cd ${runner_path} && make e2e \
+		CRD_VALIDATION_ENABLED=${CRD_VALIDATION_ENABLED} DNS_ZONE=${DNS_ZONE} \
+		CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} PROJECT_ID=${PROJECT_ID}'
 
 run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make test'
