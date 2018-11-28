@@ -18,12 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Display executed shell commands
+set -x
+
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
 
-CRD_VALIDATION_ENABLED=true
-DNS_ZONE="managedcertsgke"
-PLATFORM="GCP"
+CRD_VALIDATION_ENABLED=${CRD_VALIDATION_ENABLED:-true}
+DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
+PLATFORM=${PLATFORM:-"GCP"}
 
 function init {
   if [ -f $SERVICE_ACCOUNT_KEY ]
@@ -78,15 +81,9 @@ function main {
 
 while getopts "p:v:z:" opt; do
   case $opt in
-    p)
-      PLATFORM=$OPTARG
-      ;;
-    v)
-      CRD_VALIDATION_ENABLED=$OPTARG
-      ;;
-    z)
-      DNS_ZONE=$OPTARG
-      ;;
+    p) PLATFORM=$OPTARG ;;
+    v) CRD_VALIDATION_ENABLED=$OPTARG ;;
+    z) DNS_ZONE=$OPTARG ;;
     :)
       echo "Option $OPTARG requires an argument." >&2
       exit 1
