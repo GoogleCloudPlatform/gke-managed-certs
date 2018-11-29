@@ -24,6 +24,7 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	cgo_testing "k8s.io/client-go/testing"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
@@ -42,15 +43,14 @@ func buildUpdateFunc(updateCalled *bool) cgo_testing.ReactionFunc {
 	})
 }
 
-var normalError = errors.New("normal error")
+var genericError = errors.New("generic error")
 var googleNotFound = &googleapi.Error{
 	Code: 404,
 }
-var k8sNotFound = &k8s_errors.StatusError{
-	metav1.Status{
-		Code: 404,
-	},
-}
+var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+	Group:    "test_group",
+	Resource: "test_resource",
+}, "test_name")
 
 var mcrt = &api.ManagedCertificate{
 	ObjectMeta: metav1.ObjectMeta{
@@ -71,11 +71,11 @@ var differentMcrt = &api.ManagedCertificate{
 	},
 }
 
-var listerFailsNormalErr = newLister(normalError, nil)
+var listerFailsGenericErr = newLister(genericError, nil)
 var listerFailsNotFound = newLister(k8sNotFound, nil)
 var listerSuccess = newLister(nil, mcrt)
 
-var randomFailsNormalErr = newRandom(normalError, "")
+var randomFailsGenericErr = newRandom(genericError, "")
 var randomSuccess = newRandom(nil, sslCertificateName)
 
 func empty() *fakeState {
@@ -106,18 +106,18 @@ var testCases = []struct {
 	{
 		"Lister fails with generic error, state is empty",
 		in{
-			lister: listerFailsNormalErr,
+			lister: listerFailsGenericErr,
 			random: randomSuccess,
 			state:  empty(),
-		}, false, false, normalError,
+		}, false, false, genericError,
 	},
 	{
 		"Lister fails with generic error, entry in state",
 		in{
-			lister: listerFailsNormalErr,
+			lister: listerFailsGenericErr,
 			random: randomSuccess,
 			state:  withEntry(),
-		}, true, false, normalError,
+		}, true, false, genericError,
 	},
 	{
 		"Lister fails with not found, state is empty",
@@ -150,8 +150,8 @@ var testCases = []struct {
 			lister:       listerFailsNotFound,
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslDeleteErr: []error{normalError},
-		}, true, false, normalError,
+			sslDeleteErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, state empty",
@@ -173,15 +173,15 @@ var testCases = []struct {
 		"Lister success, state empty, random fails",
 		in{
 			lister: listerSuccess,
-			random: randomFailsNormalErr,
+			random: randomFailsGenericErr,
 			state:  empty(),
-		}, false, false, normalError,
+		}, false, false, genericError,
 	},
 	{
 		"Lister success, entry in state, random fails",
 		in{
 			lister: listerSuccess,
-			random: randomFailsNormalErr,
+			random: randomFailsGenericErr,
 			state:  withEntry(),
 		}, true, true, nil,
 	},
@@ -191,8 +191,8 @@ var testCases = []struct {
 			lister:       listerSuccess,
 			random:       randomSuccess,
 			state:        empty(),
-			sslExistsErr: []error{normalError},
-		}, true, false, normalError,
+			sslExistsErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, ssl cert exists fails",
@@ -200,8 +200,8 @@ var testCases = []struct {
 			lister:       listerSuccess,
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslExistsErr: []error{normalError},
-		}, true, false, normalError,
+			sslExistsErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, state empty, ssl cert create fails",
@@ -209,8 +209,8 @@ var testCases = []struct {
 			lister:       listerSuccess,
 			random:       randomSuccess,
 			state:        empty(),
-			sslCreateErr: []error{normalError},
-		}, true, false, normalError,
+			sslCreateErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, ssl cert create fails",
@@ -218,8 +218,8 @@ var testCases = []struct {
 			lister:       listerSuccess,
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslCreateErr: []error{normalError},
-		}, true, false, normalError,
+			sslCreateErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, state empty, ssl cert get fails",
@@ -227,8 +227,8 @@ var testCases = []struct {
 			lister:    listerSuccess,
 			random:    randomSuccess,
 			state:     empty(),
-			sslGetErr: []error{normalError},
-		}, true, false, normalError,
+			sslGetErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, ssl cert get fails",
@@ -236,8 +236,8 @@ var testCases = []struct {
 			lister:    listerSuccess,
 			random:    randomSuccess,
 			state:     withEntry(),
-			sslGetErr: []error{normalError},
-		}, true, false, normalError,
+			sslGetErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, state empty, ssl cert get fails",
@@ -246,8 +246,8 @@ var testCases = []struct {
 			random:    randomSuccess,
 			state:     empty(),
 			mcrt:      mcrt,
-			sslGetErr: []error{normalError},
-		}, true, false, normalError,
+			sslGetErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, ssl cert get fails",
@@ -256,8 +256,8 @@ var testCases = []struct {
 			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      mcrt,
-			sslGetErr: []error{normalError},
-		}, true, false, normalError,
+			sslGetErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, certs mismatch",
@@ -285,8 +285,8 @@ var testCases = []struct {
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
-			sslDeleteErr: []error{normalError},
-		}, true, false, normalError,
+			sslDeleteErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert creation fails",
@@ -295,8 +295,8 @@ var testCases = []struct {
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
-			sslCreateErr: []error{normalError},
-		}, true, false, normalError,
+			sslCreateErr: []error{genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert creation fails",
@@ -305,9 +305,9 @@ var testCases = []struct {
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
-			sslCreateErr: []error{normalError},
+			sslCreateErr: []error{genericError},
 			sslDeleteErr: []error{googleNotFound},
-		}, true, false, normalError,
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert get fails",
@@ -316,8 +316,8 @@ var testCases = []struct {
 			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      differentMcrt,
-			sslGetErr: []error{nil, normalError},
-		}, true, false, normalError,
+			sslGetErr: []error{nil, genericError},
+		}, true, false, genericError,
 	},
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert get fails",
@@ -327,8 +327,8 @@ var testCases = []struct {
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{googleNotFound},
-			sslGetErr:    []error{nil, normalError},
-		}, true, false, normalError,
+			sslGetErr:    []error{nil, genericError},
+		}, true, false, genericError,
 	},
 }
 

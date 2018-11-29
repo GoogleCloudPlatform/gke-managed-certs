@@ -35,8 +35,7 @@ func IsNotFound(err error) bool {
 		return true
 	}
 
-	k8sErr, ok := err.(*errors.StatusError)
-	return ok && k8sErr.Status().Code == http.StatusNotFound
+	return errors.IsNotFound(err)
 }
 
 // IsQuotaExceeded checks if err is a googleapi error for exceeded quota.

@@ -22,8 +22,8 @@ import (
 
 	api "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	cgo_testing "k8s.io/client-go/testing"
 )
@@ -33,12 +33,11 @@ const (
 	resource  = "configmaps"
 )
 
-var normal = errors.New("normal error")
-var k8sNotFound = &k8s_errors.StatusError{
-	metav1.Status{
-		Code: 404,
-	},
-}
+var generic = errors.New("generic error")
+var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+	Group:    "test_group",
+	Resource: "test_resource",
+}, "test_name")
 
 func buildUpdateFunc(err error) cgo_testing.ReactionFunc {
 	return cgo_testing.ReactionFunc(func(action cgo_testing.Action) (bool, runtime.Object, error) {
@@ -60,7 +59,7 @@ func TestUpdateOrCreate(t *testing.T) {
 		returnedError error
 		description   string
 	}{
-		{normal, false, normal, "Failure to update a ConfigMap b/c of a generic error"},
+		{generic, false, generic, "Failure to update a ConfigMap b/c of a generic error"},
 		{k8sNotFound, true, nil, "Failure to update a ConfigMap b/c it does not exist"},
 		{nil, false, nil, "ConfigMap updated successfully"},
 	}

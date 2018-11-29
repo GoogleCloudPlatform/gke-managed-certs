@@ -18,15 +18,16 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"google.golang.org/api/googleapi"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var normal = errors.New("normal error")
-var googleNormal = &googleapi.Error{
+var generic = errors.New("generic error")
+var googleInternal = &googleapi.Error{
 	Code: 500,
 }
 var googleNotFound = &googleapi.Error{
@@ -40,16 +41,11 @@ var googleQuotaExceeded = &googleapi.Error{
 		},
 	},
 }
-var k8sNormal = &k8s_errors.StatusError{
-	metav1.Status{
-		Code: 500,
-	},
-}
-var k8sNotFound = &k8s_errors.StatusError{
-	metav1.Status{
-		Code: 404,
-	},
-}
+var k8sInternal = k8s_errors.NewInternalError(fmt.Errorf("test_internal_error"))
+var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+	Group:    "test_group",
+	Resource: "test_resource",
+}, "test_name")
 
 func TestIsNotFound(t *testing.T) {
 	testCases := []struct {
@@ -57,18 +53,18 @@ func TestIsNotFound(t *testing.T) {
 		out bool
 	}{
 		{nil, false},
-		{normal, false},
-		{googleNormal, false},
+		{generic, false},
+		{googleInternal, false},
 		{googleNotFound, true},
 		{googleQuotaExceeded, false},
-		{k8sNormal, false},
+		{k8sInternal, false},
 		{k8sNotFound, true},
 	}
 
 	for _, testCase := range testCases {
 		out := IsNotFound(testCase.in)
 		if out != testCase.out {
-			t.Errorf("IsNotFound(%v) = %t, want %t", testCase.in, out, testCase.out)
+			t.Errorf("IsNotFound(%#v) = %t, want %t", testCase.in, out, testCase.out)
 		}
 	}
 }
@@ -79,18 +75,18 @@ func TestIsQuotaExceeded(t *testing.T) {
 		out bool
 	}{
 		{nil, false},
-		{normal, false},
-		{googleNormal, false},
+		{generic, false},
+		{googleInternal, false},
 		{googleNotFound, false},
 		{googleQuotaExceeded, true},
-		{k8sNormal, false},
+		{k8sInternal, false},
 		{k8sNotFound, false},
 	}
 
 	for _, testCase := range testCases {
 		out := IsQuotaExceeded(testCase.in)
 		if out != testCase.out {
-			t.Errorf("IsQuotaExceeded(%v) = %t, want %t", testCase.in, out, testCase.out)
+			t.Errorf("IsQuotaExceeded(%#v) = %t, want %t", testCase.in, out, testCase.out)
 		}
 	}
 }
@@ -101,18 +97,18 @@ func TestIgnoreNotFound(t *testing.T) {
 		out error
 	}{
 		{nil, nil},
-		{normal, normal},
-		{googleNormal, googleNormal},
+		{generic, generic},
+		{googleInternal, googleInternal},
 		{googleNotFound, nil},
 		{googleQuotaExceeded, googleQuotaExceeded},
-		{k8sNormal, k8sNormal},
+		{k8sInternal, k8sInternal},
 		{k8sNotFound, nil},
 	}
 
 	for _, testCase := range testCases {
 		out := IgnoreNotFound(testCase.in)
 		if out != testCase.out {
-			t.Errorf("IgnoreNotFound(%v) = %v, want %v", testCase.in, out, testCase.out)
+			t.Errorf("IgnoreNotFound(%#v) = %v, want %v", testCase.in, out, testCase.out)
 		}
 	}
 }
