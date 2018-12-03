@@ -12,23 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: test-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: test-account
-    namespace: default
----
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: test-account
+  name: managed-certificate-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: managed-certificate-role
+rules:
+  - apiGroups: ["gke.googleapis.com"]
+    resources: ["managedcertificates"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["configmaps", "events"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: managed-certificate-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: managed-certificate-role
+subjects:
+  - kind: ServiceAccount
+    name: managed-certificate-account
+    namespace: default
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -44,7 +56,7 @@ spec:
       labels:
         app: managed-certificate-controller
     spec:
-      serviceAccountName: test-account
+      serviceAccountName: managed-certificate-account
       containers:
         - name: managed-certificate-controller
           image: eu.gcr.io/managed-certs-gke/managed-certificate-controller:ci_latest
