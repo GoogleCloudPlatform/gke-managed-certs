@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -35,21 +37,24 @@ import (
 )
 
 type Controller struct {
-	lister mcrtlister.ManagedCertificateLister
-	queue  workqueue.RateLimitingInterface
-	sync   sync.Sync
-	synced cache.InformerSynced
+	informerFactory externalversions.SharedInformerFactory
+	lister          mcrtlister.ManagedCertificateLister
+	queue           workqueue.RateLimitingInterface
+	sync            sync.Sync
+	synced          cache.InformerSynced
 }
 
 func New(clients *client.Clients) *Controller {
 	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
 	lister := informer.Lister()
+	ssl := sslcertificatemanager.New(clients.Event, clients.Ssl)
 
 	controller := &Controller{
-		lister: lister,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		sync:   sync.New(clients.Clientset, lister, random.New(), sslcertificatemanager.New(clients.Event, clients.Ssl), state.New(clients.ConfigMap)),
-		synced: informer.Informer().HasSynced,
+		informerFactory: clients.InformerFactory,
+		lister:          lister,
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
+		sync:            sync.New(clients.Clientset, lister, random.New(), ssl, state.New(clients.ConfigMap)),
+		synced:          informer.Informer().HasSynced,
 	}
 
 	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -67,27 +72,27 @@ func New(clients *client.Clients) *Controller {
 	return controller
 }
 
-func (c *Controller) Run(stopChannel <-chan struct{}) error {
+func (c *Controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	glog.Info("Controller.Run()")
 
+	go c.informerFactory.Start(ctx.Done())
+
 	glog.Info("Waiting for Managed Certificate cache sync")
-	if !cache.WaitForCacheSync(stopChannel, c.synced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.synced) {
 		return fmt.Errorf("Timed out waiting for Managed Certificate cache sync")
 	}
 	glog.Info("Managed Certificate cache synced")
 
-	go wait.Until(c.runWorker, time.Second, stopChannel)
-	go wait.Until(c.synchronizeAllMcrts, time.Minute, stopChannel)
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
+	go wait.Until(c.synchronizeAllMcrts, time.Minute, ctx.Done())
 
 	glog.Info("Controller waiting for stop signal or error")
 
-	<-stopChannel
-	glog.Info("Controller received stop signal")
-
-	glog.Info("Controller shutting down")
+	<-ctx.Done()
+	glog.Info("Controller received stop signal, shutting down")
 	return nil
 }
 

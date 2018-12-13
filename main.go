@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/golang/glog"
@@ -37,19 +38,21 @@ func main() {
 	}
 	glog.V(1).Infof("Flags = %+v", flags.F)
 
-	//To handle SIGINT gracefully
-	stopChannel := server.SetupSignalHandler()
-
 	clients, err := client.New()
 	if err != nil {
 		glog.Fatal(err)
 	}
-
 	controller := controller.New(clients)
 
-	go clients.InformerFactory.Start(stopChannel)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if err = controller.Run(stopChannel); err != nil {
-		glog.Fatal("Error running controller: %v", err)
+	go func() {
+		<-server.SetupSignalHandler()
+		cancel()
+	}()
+
+	if err = controller.Run(ctx); err != nil {
+		glog.Fatalf("Error running controller: %s", err)
 	}
 }
