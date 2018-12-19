@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 const (
@@ -34,10 +32,13 @@ type Random interface {
 }
 
 type randomImpl struct {
+	sslCertificateNamePrefix string
 }
 
-func New() Random {
-	return randomImpl{}
+func New(sslCertificateNamePrefix string) Random {
+	return randomImpl{
+		sslCertificateNamePrefix: sslCertificateNamePrefix,
+	}
 }
 
 // Name generates a random name for SslCertificate resource.
@@ -45,7 +46,7 @@ func (r randomImpl) Name() (string, error) {
 	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
 	} else {
-		generatedName := fmt.Sprintf("%s%s", config.SslCertificateNamePrefix, uid.String())
+		generatedName := fmt.Sprintf("%s%s", r.sslCertificateNamePrefix, uid.String())
 		maxLength := maxNameLength
 		if len(generatedName) < maxLength {
 			maxLength = len(generatedName)

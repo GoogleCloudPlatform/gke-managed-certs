@@ -54,8 +54,9 @@ var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
 
 var mcrt = &api.ManagedCertificate{
 	ObjectMeta: metav1.ObjectMeta{
-		Namespace: namespace,
-		Name:      name,
+		CreationTimestamp: metav1.Now().Rfc3339Copy(),
+		Namespace:         namespace,
+		Name:              name,
 	},
 	Spec: api.ManagedCertificateSpec{
 		Domains: []string{"example.com"},
@@ -63,8 +64,9 @@ var mcrt = &api.ManagedCertificate{
 }
 var differentMcrt = &api.ManagedCertificate{
 	ObjectMeta: metav1.ObjectMeta{
-		Namespace: namespace,
-		Name:      name,
+		CreationTimestamp: metav1.Now().Rfc3339Copy(),
+		Namespace:         namespace,
+		Name:              name,
 	},
 	Spec: api.ManagedCertificateSpec{
 		Domains: []string{"example2.com"},
@@ -79,14 +81,21 @@ var randomFailsGenericErr = newRandom(genericError, "")
 var randomSuccess = newRandom(nil, sslCertificateName)
 
 func empty() *fakeState {
-	return newState("", "", "")
+	return newEmptyState()
 }
 func withEntry() *fakeState {
 	return newState(namespace, name, sslCertificateName)
 }
+func withEntryAndNoMetric() *fakeState {
+	return newStateWithMetricOverride(namespace, name, sslCertificateName, false, false)
+}
+func withEntryAndMetricReported() *fakeState {
+	return newStateWithMetricOverride(namespace, name, sslCertificateName, true, true)
+}
 
 type in struct {
 	lister       fakeLister
+	metrics      *fakeMetrics
 	random       fakeRandom
 	state        *fakeState
 	mcrt         *api.ManagedCertificate
@@ -96,239 +105,428 @@ type in struct {
 	sslGetErr    []error
 }
 
+type out struct {
+	entryInState                bool
+	createLatencyMetricObserved bool
+	updateCalled                bool
+	err                         error
+}
+
 var testCases = []struct {
-	desc            string
-	in              in
-	outEntryInState bool
-	outUpdateCalled bool
-	outErr          error
+	desc string
+	in   in
+	out  out
 }{
 	{
 		"Lister fails with generic error, state is empty",
 		in{
-			lister: listerFailsGenericErr,
-			random: randomSuccess,
-			state:  empty(),
-		}, false, false, genericError,
+			lister:  listerFailsGenericErr,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   empty(),
+		},
+		out{
+			entryInState: false,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister fails with generic error, entry in state",
 		in{
-			lister: listerFailsGenericErr,
-			random: randomSuccess,
-			state:  withEntry(),
-		}, true, false, genericError,
+			lister:  listerFailsGenericErr,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   withEntry(),
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister fails with not found, state is empty",
 		in{
-			lister: listerFailsNotFound,
-			random: randomSuccess,
-			state:  empty(),
-		}, false, false, nil,
+			lister:  listerFailsNotFound,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   empty(),
+		},
+		out{
+			entryInState: false,
+			updateCalled: false,
+			err:          nil,
+		},
 	},
 	{
 		"Lister fails with not found, entry in state, success to delete ssl cert",
 		in{
-			lister: listerFailsNotFound,
-			random: randomSuccess,
-			state:  withEntry(),
-		}, false, false, nil,
+			lister:  listerFailsNotFound,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   withEntry(),
+		},
+		out{
+			entryInState: false,
+			updateCalled: false,
+			err:          nil,
+		},
 	},
 	{
 		"Lister fails with not found, entry in state, ssl cert already deleted",
 		in{
 			lister:       listerFailsNotFound,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			sslDeleteErr: []error{googleNotFound},
-		}, false, false, nil,
+		},
+		out{
+			entryInState: false,
+			updateCalled: false,
+			err:          nil,
+		},
 	},
 	{
 		"Lister fails with not found, entry in state, ssl cert fails to delete",
 		in{
 			lister:       listerFailsNotFound,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			sslDeleteErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, state empty",
 		in{
-			lister: listerSuccess,
-			random: randomSuccess,
-			state:  empty(),
-		}, true, true, nil,
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   empty(),
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                true,
+			err:                         nil,
+		},
 	},
 	{
 		"Lister success, entry in state",
 		in{
-			lister: listerSuccess,
-			random: randomSuccess,
-			state:  withEntry(),
-		}, true, true, nil,
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   withEntry(),
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                true,
+			err:                         nil,
+		},
 	},
 	{
 		"Lister success, state empty, random fails",
 		in{
-			lister: listerSuccess,
-			random: randomFailsGenericErr,
-			state:  empty(),
-		}, false, false, genericError,
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomFailsGenericErr,
+			state:   empty(),
+		},
+		out{
+			entryInState: false,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, random fails",
 		in{
-			lister: listerSuccess,
-			random: randomFailsGenericErr,
-			state:  withEntry(),
-		}, true, true, nil,
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomFailsGenericErr,
+			state:   withEntry(),
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                true,
+			err:                         nil,
+		},
 	},
 	{
 		"Lister success, state empty, ssl cert exists fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        empty(),
 			sslExistsErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, ssl cert exists fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			sslExistsErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, state empty, ssl cert create fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        empty(),
 			sslCreateErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, ssl cert create fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			sslCreateErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
-		"Lister success, state empty, ssl cert get fails",
+		"Lister success, entry in state, ssl cert create success, metric reported entry not found",
+		in{
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndNoMetric(),
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          errManagedCertificateNotFound,
+		},
+	},
+	{
+		"Lister success, entry in state, ssl cert create success, metric already reported",
+		in{
+			lister:  listerSuccess,
+			metrics: newMetricsAlreadyReported(),
+			random:  randomSuccess,
+			state:   withEntryAndMetricReported(),
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                true,
+			err:                         nil,
+		},
+	},
+	{
+		"Lister success, state empty, ssl cert not exists - get fails",
 		in{
 			lister:    listerSuccess,
+			metrics:   newMetrics(),
 			random:    randomSuccess,
 			state:     empty(),
 			sslGetErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                false,
+			err:                         genericError,
+		},
 	},
 	{
-		"Lister success, entry in state, ssl cert get fails",
+		"Lister success, entry in state, ssl cert not exists - get fails",
 		in{
 			lister:    listerSuccess,
+			metrics:   newMetrics(),
 			random:    randomSuccess,
 			state:     withEntry(),
 			sslGetErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: true,
+			updateCalled:                false,
+			err:                         genericError,
+		},
 	},
 	{
-		"Lister success, state empty, ssl cert get fails",
+		"Lister success, state empty, ssl cert exists - get fails",
 		in{
 			lister:    listerSuccess,
+			metrics:   newMetrics(),
 			random:    randomSuccess,
 			state:     empty(),
 			mcrt:      mcrt,
 			sslGetErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
-		"Lister success, entry in state, ssl cert get fails",
+		"Lister success, entry in state, ssl cert exists - get fails",
 		in{
 			lister:    listerSuccess,
+			metrics:   newMetrics(),
 			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      mcrt,
 			sslGetErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch",
 		in{
-			lister: listerSuccess,
-			random: randomSuccess,
-			state:  withEntry(),
-			mcrt:   differentMcrt,
-		}, true, true, nil,
+			lister:  listerSuccess,
+			metrics: newMetrics(),
+			random:  randomSuccess,
+			state:   withEntry(),
+			mcrt:    differentMcrt,
+		},
+		out{
+			entryInState: true,
+			updateCalled: true,
+			err:          nil,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{googleNotFound},
-		}, true, true, nil,
+		},
+		out{
+			entryInState: true,
+			updateCalled: true,
+			err:          nil,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch and deletion fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert creation fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslCreateErr: []error{genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert creation fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslCreateErr: []error{genericError},
 			sslDeleteErr: []error{googleNotFound},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch, ssl cert get fails",
 		in{
 			lister:    listerSuccess,
+			metrics:   newMetrics(),
 			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      differentMcrt,
 			sslGetErr: []error{nil, genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 	{
 		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert get fails",
 		in{
 			lister:       listerSuccess,
+			metrics:      newMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         differentMcrt,
 			sslDeleteErr: []error{googleNotFound},
 			sslGetErr:    []error{nil, genericError},
-		}, true, false, genericError,
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          genericError,
+		},
 	},
 }
 
@@ -339,22 +537,33 @@ func TestManagedCertificate(t *testing.T) {
 			updateCalled := false
 			clientset.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
 
-			ssl := newSsl(sslCertificateName, testCase.in.mcrt, testCase.in.sslCreateErr, testCase.in.sslDeleteErr, testCase.in.sslExistsErr, testCase.in.sslGetErr)
-
-			sut := New(clientset, testCase.in.lister, testCase.in.random, ssl, testCase.in.state)
+			ssl := newSsl(sslCertificateName, testCase.in.mcrt, testCase.in.sslCreateErr,
+				testCase.in.sslDeleteErr, testCase.in.sslExistsErr, testCase.in.sslGetErr)
+			sut := New(clientset, testCase.in.lister, testCase.in.metrics, testCase.in.random, ssl, testCase.in.state)
 
 			err := sut.ManagedCertificate(namespace, name)
 
-			if _, e := testCase.in.state.Get(namespace, name); e != testCase.outEntryInState {
-				t.Errorf("Entry in state %t, want %t", e, testCase.outEntryInState)
+			if _, e := testCase.in.state.GetSslCertificateName(namespace, name); e != testCase.out.entryInState {
+				t.Errorf("Entry in state %t, want %t", e, testCase.out.entryInState)
 			}
 
-			if testCase.outUpdateCalled != updateCalled {
-				t.Errorf("Update called %t, want %t", updateCalled, testCase.outUpdateCalled)
+			reported, _ := testCase.in.state.IsSslCertificateCreationReported(namespace, name)
+			entryExists := testCase.in.state.entryExists
+			if entryExists != testCase.out.entryInState || reported != testCase.out.createLatencyMetricObserved {
+				t.Errorf("Entry in state %t, want %t; CreateSslCertificateLatency metric observed %t, want %t",
+					entryExists, testCase.out.entryInState, reported, testCase.out.createLatencyMetricObserved)
+			}
+			if testCase.out.createLatencyMetricObserved && testCase.in.metrics.SslCertificateCreationLatencyObserved != 1 {
+				t.Errorf("CreateSslCertificateLatency metric observed %d times, want 1",
+					testCase.in.metrics.SslCertificateCreationLatencyObserved)
 			}
 
-			if err != testCase.outErr {
-				t.Errorf("Have error: %v, want: %v", err, testCase.outErr)
+			if testCase.out.updateCalled != updateCalled {
+				t.Errorf("Update called %t, want %t", updateCalled, testCase.out.updateCalled)
+			}
+
+			if err != testCase.out.err {
+				t.Errorf("Have error: %v, want: %v", err, testCase.out.err)
 			}
 		})
 	}

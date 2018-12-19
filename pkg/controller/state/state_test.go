@@ -17,121 +17,49 @@ limitations under the License.
 package state
 
 import (
-	"errors"
 	"testing"
 
-	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
 )
 
-type configMap interface {
-	configmap.ConfigMap
-	check(int)
-}
-
-// configMapMock counts the number of calls made to its methods.
-type configMapMock struct {
-	getCount    int
-	changeCount int
-	t           *testing.T
-}
-
-func (c *configMapMock) check(change int) {
-	if c.getCount != 1 {
-		c.t.Errorf("ConfigMap.Get() called %d times, want 1", c.getCount)
-	}
-	if c.changeCount != change {
-		c.t.Errorf("ConfigMap.UpdateOrCreate() called %d times, want %d", c.changeCount, change)
-	}
-}
-
-// failConfigMapMock fails Get and UpdateOrCreate with an error.
-type failConfigMapMock struct {
-	configMapMock
-}
-
-var _ configmap.ConfigMap = (*failConfigMapMock)(nil)
-
-func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return nil, errors.New("Fake error - failed to get a config map")
-}
-
-func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
-	return errors.New("Fake error - failed to update or create a config map")
-}
-
-func newFails(t *testing.T) *failConfigMapMock {
-	return &failConfigMapMock{
-		configMapMock{
-			t: t,
-		},
-	}
-}
-
-// emptyConfigMapMock represents a config map that is not initialized with any data.
-type emptyConfigMapMock struct {
-	configMapMock
-}
-
-var _ configmap.ConfigMap = (*emptyConfigMapMock)(nil)
-
-func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return &api.ConfigMap{Data: map[string]string{}}, nil
-}
-
-func (c *emptyConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
-	return nil
-}
-
-func newEmpty(t *testing.T) *emptyConfigMapMock {
-	return &emptyConfigMapMock{
-		configMapMock{
-			t: t,
-		},
-	}
-}
-
-// filledConfigMapMock represents a config map that is initialized with data.
-type filledConfigMapMock struct {
-	configMapMock
-}
-
-var _ configmap.ConfigMap = (*filledConfigMapMock)(nil)
-
-func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return &api.ConfigMap{Data: map[string]string{"1": "{\"Key\":\"default:cat\",\"Value\":\"1\"}"}}, nil
-}
-
-func (c *filledConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
-	return nil
-}
-
-func newFilled(t *testing.T) *filledConfigMapMock {
-	return &filledConfigMapMock{
-		configMapMock{
-			t: t,
-		},
-	}
-}
-
-func deleteAndCheck(state State, t tuple, configmap configMap, changeCount *int) {
+func deleteEntry(state State, t tuple, configmap configMap, changeCount *int) {
 	state.Delete(t.Namespace, t.Name)
 	(*changeCount)++
 	configmap.check(*changeCount)
 }
 
-func putAndCheck(state State, t tuple, configmap configMap, changeCount *int) {
-	state.Put(t.Namespace, t.Name, t.Value)
+func getSslCertificateName(t *testing.T, state State, tuple tuple, wantExists bool) {
+	t.Helper()
+	sslCertificateName, e := state.GetSslCertificateName(tuple.Namespace, tuple.Name)
+	if e != wantExists {
+		t.Fatalf("Expected %s:%s to exist in state to be %t", tuple.Namespace, tuple.Name, wantExists)
+	}
+
+	if e && sslCertificateName != tuple.SslCertificateName {
+		t.Fatalf("%s:%s mapped to %s, want %s", tuple.Namespace, tuple.Name, sslCertificateName, tuple.SslCertificateName)
+	}
+}
+
+func setSslCertificateCreationReported(state State, t tuple, configmap configMap, changeCount *int) {
+	state.SetSslCertificateCreationReported(t.Namespace, t.Name)
 	(*changeCount)++
 	configmap.check(*changeCount)
+}
+
+func setSslCertificateName(state State, t tuple, configmap configMap, changeCount *int) {
+	state.SetSslCertificateName(t.Namespace, t.Name, t.SslCertificateName)
+	(*changeCount)++
+	configmap.check(*changeCount)
+}
+
+func isSslCertificateCreationReported(t *testing.T, state State, tuple tuple, wantReported bool) {
+	t.Helper()
+	reported, e := state.IsSslCertificateCreationReported(tuple.Namespace, tuple.Name)
+	if !e {
+		t.Fatalf("Expected %s:%s to exist in state", tuple.Namespace, tuple.Name)
+	} else if reported != wantReported {
+		t.Fatalf("SslCertificate creation metric reported for %s:%s is %t, want %t", tuple.Namespace, tuple.Name, reported, wantReported)
+	}
 }
 
 func contains(expected []tuple, namespace, name string) bool {
@@ -145,43 +73,127 @@ func contains(expected []tuple, namespace, name string) bool {
 }
 
 type tuple struct {
-	Namespace string
-	Name      string
-	Value     string
+	Namespace          string
+	Name               string
+	SslCertificateName string
 }
 
 func (t tuple) empty() bool {
 	return t.Namespace == "" && t.Name == ""
 }
 
-var emptytp = tuple{"", "", ""}
-var defcat1 = tuple{"default", "cat", "1"}
-var defcate = tuple{"default", "cat", ""}
-var defdoge = tuple{"default", "dog", ""}
-var syscate = tuple{"system", "cat", ""}
-var deftea1 = tuple{"default", "tea", "1"}
+var tupleEmpty = tuple{"", "", ""}
+var tupleDefaultCat1 = tuple{"default", "cat", "1"}
+var tupleDefaultCatEmpty = tuple{"default", "cat", ""}
+var tupleDefaultDogEmpty = tuple{"default", "dog", ""}
+var tupleDefaultTea1 = tuple{"default", "tea", "1"}
+var tupleSystemCatEmpty = tuple{"system", "cat", ""}
 
 func TestState(t *testing.T) {
 	testCases := []struct {
+		desc      string
 		configmap configMap
 		init      tuple
 		test      tuple
 		exists    bool
 		expected  []tuple
-		desc      string
 	}{
-		{newFails(t), emptytp, defcate, false, nil, "Failing configmap - lookup argument in empty state"},
-		{newFails(t), defcat1, defcat1, true, []tuple{defcat1}, "Failing configmap - insert and lookup same argument, same namespaces"},
-		{newFails(t), defcat1, syscate, false, []tuple{defcat1}, "Failing configmap - insert and lookup same argument, different namespaces"},
-		{newFails(t), deftea1, defdoge, false, []tuple{deftea1}, "Failing configmap - insert and lookup different arguments, same namespace"},
-		{newEmpty(t), emptytp, defcate, false, nil, "Empty configmap - lookup argument in empty state"},
-		{newEmpty(t), defcat1, defcat1, true, []tuple{defcat1}, "Empty configmap - insert and lookup same argument, same namespaces"},
-		{newEmpty(t), defcat1, syscate, false, []tuple{defcat1}, "Empty configmap - insert and lookup same argument, different namespaces"},
-		{newEmpty(t), deftea1, defdoge, false, []tuple{deftea1}, "Empty configmap - insert and lookup different arguments, same namespace"},
-		{newFilled(t), emptytp, defcat1, true, []tuple{defcat1}, "Filled configmap - lookup argument in empty state"},
-		{newFilled(t), defcat1, defcat1, true, []tuple{defcat1}, "Filled configmap - insert and lookup same argument, same namespaces"},
-		{newFilled(t), defcat1, syscate, false, []tuple{defcat1}, "Filled configmap - insert and lookup same argument, different namespaces"},
-		{newFilled(t), deftea1, defdoge, false, []tuple{defcat1, deftea1}, "Filled configmap - insert and lookup different arguments, same namespace"},
+		{
+			"Failing configmap - lookup argument in empty state",
+			newFailing(t),
+			tupleEmpty,
+			tupleDefaultCatEmpty,
+			false,
+			nil,
+		},
+		{
+			"Failing configmap - insert and lookup same argument, same namespaces",
+			newFailing(t),
+			tupleDefaultCat1,
+			tupleDefaultCat1,
+			true,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Failing configmap - insert and lookup same argument, different namespaces",
+			newFailing(t),
+			tupleDefaultCat1,
+			tupleSystemCatEmpty,
+			false,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Failing configmap - insert and lookup different arguments, same namespace",
+			newFailing(t),
+			tupleDefaultTea1,
+			tupleDefaultDogEmpty,
+			false,
+			[]tuple{tupleDefaultTea1},
+		},
+		{
+			"Empty configmap - lookup argument in empty state",
+			newEmpty(t),
+			tupleEmpty,
+			tupleDefaultCatEmpty,
+			false,
+			nil,
+		},
+		{
+			"Empty configmap - insert and lookup same argument, same namespaces",
+			newEmpty(t),
+			tupleDefaultCat1,
+			tupleDefaultCat1,
+			true,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Empty configmap - insert and lookup same argument, different namespaces",
+			newEmpty(t),
+			tupleDefaultCat1,
+			tupleSystemCatEmpty,
+			false,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Empty configmap - insert and lookup different arguments, same namespace",
+			newEmpty(t),
+			tupleDefaultTea1,
+			tupleDefaultDogEmpty,
+			false,
+			[]tuple{tupleDefaultTea1},
+		},
+		{
+			"Filled configmap - lookup argument in empty state",
+			newFilled(t),
+			tupleEmpty,
+			tupleDefaultCat1,
+			true,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Filled configmap - insert and lookup same argument, same namespaces",
+			newFilled(t),
+			tupleDefaultCat1,
+			tupleDefaultCat1,
+			true,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Filled configmap - insert and lookup same argument, different namespaces",
+			newFilled(t),
+			tupleDefaultCat1,
+			tupleSystemCatEmpty,
+			false,
+			[]tuple{tupleDefaultCat1},
+		},
+		{
+			"Filled configmap - insert and lookup different arguments, same namespace",
+			newFilled(t),
+			tupleDefaultTea1,
+			tupleDefaultDogEmpty,
+			false,
+			[]tuple{tupleDefaultCat1, tupleDefaultTea1},
+		},
 	}
 
 	runtime.ErrorHandlers = nil
@@ -194,41 +206,57 @@ func TestState(t *testing.T) {
 			testCase.configmap.check(changeCount)
 
 			if !testCase.init.empty() {
-				putAndCheck(sut, testCase.init, testCase.configmap, &changeCount)
+				setSslCertificateName(sut, testCase.init, testCase.configmap, &changeCount)
 			}
 
-			if value, exists := sut.Get(testCase.test.Namespace, testCase.test.Name); exists != testCase.exists {
-				t.Errorf("Expected %s:%s to exist in state to be %t", testCase.test.Namespace, testCase.test.Name, testCase.exists)
-			} else if value != testCase.test.Value {
-				t.Errorf("%s:%s mapped to %s, want %s", testCase.test.Namespace, testCase.test.Name, value, testCase.test.Value)
-			}
+			getSslCertificateName(t, sut, testCase.test, testCase.exists)
 
-			deleteAndCheck(sut, tuple{"non existing namespace", "non existing name", ""}, testCase.configmap, &changeCount)
+			deleteEntry(sut, tuple{"non existing namespace", "non existing name", ""}, testCase.configmap, &changeCount)
 
 			foo := tuple{"custom", "foo", "2"}
-			putAndCheck(sut, foo, testCase.configmap, &changeCount)
+			setSslCertificateName(sut, foo, testCase.configmap, &changeCount)
+			isSslCertificateCreationReported(t, sut, foo, false)
+			setSslCertificateCreationReported(sut, foo, testCase.configmap, &changeCount)
+			isSslCertificateCreationReported(t, sut, foo, true)
 
 			bar := tuple{"custom", "bar", "3"}
-			putAndCheck(sut, bar, testCase.configmap, &changeCount)
+			setSslCertificateCreationReported(sut, bar, testCase.configmap, &changeCount)
+			getSslCertificateName(t, sut, tuple{"custom", "bar", ""}, true)
+			setSslCertificateName(sut, bar, testCase.configmap, &changeCount)
 
 			expected := append(testCase.expected, foo, bar)
 			allEntriesCounter := 0
 			sut.ForeachKey(func(namespace, name string) {
 				allEntriesCounter++
 				if !contains(expected, namespace, name) {
-					t.Errorf("{%s, %s} missing in %v", namespace, name, expected)
+					t.Fatalf("{%s, %s} missing in %v", namespace, name, expected)
 				}
 			})
 
 			if allEntriesCounter != len(expected) {
-				t.Errorf("Found %d entries, want %d", allEntriesCounter, len(expected))
+				t.Fatalf("Found %d entries, want %d", allEntriesCounter, len(expected))
 			}
 
-			deleteAndCheck(sut, testCase.init, testCase.configmap, &changeCount)
-
-			if value, exists := sut.Get(testCase.init.Namespace, testCase.init.Name); exists {
-				t.Errorf("%s:%s mapped to %s after delete, want key missing", testCase.init.Namespace, testCase.init.Name, value)
-			}
+			deleteEntry(sut, testCase.init, testCase.configmap, &changeCount)
+			getSslCertificateName(t, sut, testCase.init, false)
 		})
+	}
+}
+
+func TestMarshal(t *testing.T) {
+	m1 := map[string]entry{
+		"mcrt1": entry{SslCertificateName: "sslCert1", SslCertificateCreationReported: false},
+		"mcrt2": entry{SslCertificateName: "sslCert2", SslCertificateCreationReported: true},
+	}
+	m2 := unmarshal(marshal(m1))
+
+	v, e := m2["mcrt1"]
+	if !e || v.SslCertificateName != "sslCert1" || v.SslCertificateCreationReported != false {
+		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1["mcrt1"])
+	}
+
+	v, e = m2["mcrt2"]
+	if !e || v.SslCertificateName != "sslCert2" || v.SslCertificateCreationReported != true {
+		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1["mcrt2"])
 	}
 }

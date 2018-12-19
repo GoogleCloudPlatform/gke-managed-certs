@@ -18,16 +18,17 @@ limitations under the License.
 package state
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state/marshaller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 )
 
 const (
@@ -39,36 +40,46 @@ const (
 type State interface {
 	Delete(namespace, name string)
 	ForeachKey(f func(namespace, name string))
-	Get(namespace, name string) (string, bool)
-	Put(namespace, name, value string)
+	GetSslCertificateName(namespace, name string) (string, bool)
+	IsSslCertificateCreationReported(namespace, name string) (bool, bool)
+	SetSslCertificateCreationReported(namespace, name string)
+	SetSslCertificateName(namespace, name, sslCertificateName string)
+}
+
+type entry struct {
+	SslCertificateName             string
+	SslCertificateCreationReported bool
 }
 
 type stateImpl struct {
 	sync.RWMutex
 
-	// Maps Managed Certificate to SslCertificate name. Keys are built with buildKey() and decoded with splitKey().
-	mapping map[string]string
+	// Maps ManagedCertificate to SslCertificate. Keys are built with buildKey() and decoded with splitKey().
+	mapping map[string]entry
 
 	// Manages ConfigMap objects
 	configmap configmap.ConfigMap
 }
 
-// Transforms a namespace and name into a key in State mapping.
+// Transforms a ManagedCertificate namespace and name into a key in State mapping.
 func buildKey(namespace, name string) string {
 	return fmt.Sprintf("%s%s%s", namespace, keySeparator, name)
 }
 
-// Transforms a key in State mapping back into a namespace and name.
+// Transforms a key in State mapping back into a ManagedCertificate namespace and name.
 func splitKey(key string) (string, string) {
 	parts := strings.Split(key, keySeparator)
 	return parts[0], parts[1]
 }
 
 func New(configmap configmap.ConfigMap) State {
-	mapping := make(map[string]string)
+	mapping := make(map[string]entry)
 
-	if config, err := configmap.Get(configMapNamespace, configMapName); err == nil && len(config.Data) > 0 {
-		mapping = marshaller.Unmarshal(config.Data)
+	config, err := configmap.Get(configMapNamespace, configMapName)
+	if err != nil {
+		glog.Warning(err)
+	} else if len(config.Data) > 0 {
+		mapping = unmarshal(config.Data)
 	}
 
 	return stateImpl{
@@ -77,6 +88,7 @@ func New(configmap configmap.ConfigMap) State {
 	}
 }
 
+// Delete deletes entry associated with ManagedCertificate identified by namespace and name
 func (state stateImpl) Delete(namespace, name string) {
 	state.Lock()
 	defer state.Unlock()
@@ -84,6 +96,7 @@ func (state stateImpl) Delete(namespace, name string) {
 	state.persist()
 }
 
+// ForeachKey calls f on every key split into namespace and name
 func (state stateImpl) ForeachKey(f func(namespace, name string)) {
 	var keys []string
 
@@ -99,24 +112,59 @@ func (state stateImpl) ForeachKey(f func(namespace, name string)) {
 	}
 }
 
-func (state stateImpl) Get(namespace, name string) (string, bool) {
+// GetSslCertificateName returns the name of SslCertificate associated with ManagedCertificate identified by namespace and name
+func (state stateImpl) GetSslCertificateName(namespace, name string) (string, bool) {
 	state.RLock()
 	defer state.RUnlock()
-	value, exists := state.mapping[buildKey(namespace, name)]
-	return value, exists
+	entry, exists := state.mapping[buildKey(namespace, name)]
+	return entry.SslCertificateName, exists
 }
 
-func (state stateImpl) Put(namespace, name, value string) {
+// IsSslCertificateCreationReported returns true if SslCertificate creation metric has already been reported for ManagedCertificate identified by namespace and name
+func (state stateImpl) IsSslCertificateCreationReported(namespace, name string) (bool, bool) {
+	state.RLock()
+	defer state.RUnlock()
+	entry, exists := state.mapping[buildKey(namespace, name)]
+	return entry.SslCertificateCreationReported, exists
+}
+
+// SetSslCertificateCreationReported sets to true a flag indicating that SslCertificate creation metric has been already reported for ManagedCertificate identified by namespace and name
+func (state stateImpl) SetSslCertificateCreationReported(namespace, name string) {
 	state.Lock()
 	defer state.Unlock()
 
-	state.mapping[buildKey(namespace, name)] = value
+	key := buildKey(namespace, name)
+	v, exists := state.mapping[key]
+	if !exists {
+		v = entry{SslCertificateName: ""}
+	}
+
+	v.SslCertificateCreationReported = true
+
+	state.mapping[key] = v
+	state.persist()
+}
+
+// SetSslCertificateName sets the name of SslCertificate associated with ManagedCertificate identified by namespace and name
+func (state stateImpl) SetSslCertificateName(namespace, name, sslCertificateName string) {
+	state.Lock()
+	defer state.Unlock()
+
+	key := buildKey(namespace, name)
+	v, exists := state.mapping[key]
+	if !exists {
+		v = entry{SslCertificateCreationReported: false}
+	}
+
+	v.SslCertificateName = sslCertificateName
+
+	state.mapping[key] = v
 	state.persist()
 }
 
 func (state stateImpl) persist() {
 	config := &api.ConfigMap{
-		Data: marshaller.Marshal(state.mapping),
+		Data: marshal(state.mapping),
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configMapName,
 		},
@@ -124,4 +172,39 @@ func (state stateImpl) persist() {
 	if err := state.configmap.UpdateOrCreate(configMapNamespace, config); err != nil {
 		runtime.HandleError(err)
 	}
+}
+
+// jsonMapEntry stores an entry in a map being marshalled to JSON.
+type jsonMapEntry struct {
+	Key   string
+	Value entry
+}
+
+// Transforms input map m into a new map which can be stored in a ConfigMap. Values in new map encode entries of m.
+func marshal(m map[string]entry) map[string]string {
+	result := make(map[string]string)
+	i := 0
+	for k, v := range m {
+		i++
+		key := fmt.Sprintf("%d", i)
+		value, _ := json.Marshal(jsonMapEntry{
+			Key:   k,
+			Value: v,
+		})
+		result[key] = string(value)
+	}
+
+	return result
+}
+
+// Transforms an encoded map back into initial map.
+func unmarshal(m map[string]string) map[string]entry {
+	result := make(map[string]entry)
+	for _, v := range m {
+		var entry jsonMapEntry
+		_ = json.Unmarshal([]byte(v), &entry)
+		result[entry.Key] = entry.Value
+	}
+
+	return result
 }

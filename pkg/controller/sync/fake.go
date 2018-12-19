@@ -18,8 +18,7 @@ package sync
 
 import (
 	"errors"
-	"fmt"
-	"strings"
+	"time"
 
 	compute "google.golang.org/api/compute/v0.beta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,6 +31,10 @@ import (
 	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
 
 const (
@@ -45,6 +48,8 @@ type fakeLister struct {
 	managedCertificate *api.ManagedCertificate
 	err                error
 }
+
+var _ mcrtlister.ManagedCertificateLister = &fakeLister{}
 
 func newLister(err error, managedCertificate *api.ManagedCertificate) fakeLister {
 	return fakeLister{
@@ -69,6 +74,8 @@ type fakeNamespaceLister struct {
 	err                error
 }
 
+var _ mcrtlister.ManagedCertificateNamespaceLister = &fakeNamespaceLister{}
+
 func (f fakeNamespaceLister) List(selector labels.Selector) ([]*api.ManagedCertificate, error) {
 	return nil, errors.New("Not implemented")
 }
@@ -83,6 +90,8 @@ type fakeClientset struct {
 	discovery *fakediscovery.FakeDiscovery
 }
 
+var _ versioned.Interface = &fakeClientset{}
+
 func newClientset() fakeClientset {
 	f := fakeClientset{}
 	f.discovery = &fakediscovery.FakeDiscovery{Fake: &f.Fake}
@@ -93,8 +102,6 @@ func (f fakeClientset) Discovery() discovery.DiscoveryInterface {
 	return f.discovery
 }
 
-var _ versioned.Interface = &fakeClientset{}
-
 func (f fakeClientset) GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface {
 	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
 }
@@ -103,11 +110,36 @@ func (f fakeClientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
 	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
 }
 
+// Fake metrics
+type fakeMetrics struct {
+	SslCertificateCreationLatencyObserved int
+}
+
+var _ metrics.Metrics = &fakeMetrics{}
+
+func newMetrics() *fakeMetrics {
+	return &fakeMetrics{}
+}
+
+func newMetricsAlreadyReported() *fakeMetrics {
+	metrics := newMetrics()
+	metrics.SslCertificateCreationLatencyObserved++
+	return metrics
+}
+
+func (f *fakeMetrics) Start(address string) {}
+
+func (f *fakeMetrics) ObserveSslCertificateCreationLatency(creationTime time.Time) {
+	f.SslCertificateCreationLatencyObserved++
+}
+
 // Fake random
 type fakeRandom struct {
 	name string
 	err  error
 }
+
+var _ random.Random = &fakeRandom{}
 
 func newRandom(err error, name string) fakeRandom {
 	return fakeRandom{
@@ -120,52 +152,6 @@ func (f fakeRandom) Name() (string, error) {
 	return f.name, f.err
 }
 
-// Fake state
-type fakeState struct {
-	mapping map[string]string
-}
-
-func buildKey(namespace, name string) string {
-	return fmt.Sprintf("%s%s%s", namespace, keySeparator, name)
-}
-
-func splitKey(key string) (string, string) {
-	parts := strings.Split(key, keySeparator)
-	return parts[0], parts[1]
-}
-
-func newState(namespace, name, value string) *fakeState {
-	state := &fakeState{
-		mapping: make(map[string]string, 0),
-	}
-
-	if namespace != "" {
-		state.Put(namespace, name, value)
-	}
-
-	return state
-}
-
-func (f *fakeState) Delete(namespace, name string) {
-	delete(f.mapping, buildKey(namespace, name))
-}
-
-func (f *fakeState) ForeachKey(fun func(namespace, name string)) {
-	for k := range f.mapping {
-		namespace, name := splitKey(k)
-		fun(namespace, name)
-	}
-}
-
-func (f *fakeState) Get(namespace, name string) (string, bool) {
-	v, e := f.mapping[buildKey(namespace, name)]
-	return v, e
-}
-
-func (f *fakeState) Put(namespace, name, value string) {
-	f.mapping[buildKey(namespace, name)] = value
-}
-
 // Fake ssl manager
 type fakeSsl struct {
 	mapping   map[string]*compute.SslCertificate
@@ -174,6 +160,8 @@ type fakeSsl struct {
 	existsErr <-chan error
 	getErr    <-chan error
 }
+
+var _ sslcertificatemanager.SslCertificateManager = &fakeSsl{}
 
 func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, existsErr, getErr []error) *fakeSsl {
 	ssl := &fakeSsl{
@@ -235,4 +223,71 @@ func (f *fakeSsl) Exists(sslCertificateName string, mcrt *api.ManagedCertificate
 func (f *fakeSsl) Get(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
 	sslCert := f.mapping[sslCertificateName]
 	return sslCert, errOrNil(f.getErr)
+}
+
+// Fake state
+type fakeMetricState struct {
+	exists bool
+}
+type fakeState struct {
+	namespace                            string
+	name                                 string
+	sslCertificateName                   string
+	entryExists                          bool
+	sslCertificateCreationReported       bool
+	sslCertificateCreationMetricOverride *fakeMetricState
+}
+
+var _ state.State = &fakeState{}
+
+func newEmptyState() *fakeState {
+	return &fakeState{}
+}
+
+func newState(namespace, name, sslCertificateName string) *fakeState {
+	return &fakeState{
+		namespace:          namespace,
+		name:               name,
+		sslCertificateName: sslCertificateName,
+		entryExists:        true,
+	}
+}
+
+func newStateWithMetricOverride(namespace, name, sslCertificateName string,
+	sslCertificateCreationReported, sslCertificateCreationMetricExists bool) *fakeState {
+	state := newState(namespace, name, sslCertificateName)
+	state.sslCertificateCreationReported = sslCertificateCreationReported
+	state.sslCertificateCreationMetricOverride = &fakeMetricState{
+		exists: sslCertificateCreationMetricExists,
+	}
+	return state
+}
+
+func (f *fakeState) Delete(namespace, name string) {
+	f.entryExists = false
+}
+
+func (f *fakeState) ForeachKey(fun func(namespace, name string)) {
+	fun(f.namespace, f.name)
+}
+
+func (f *fakeState) GetSslCertificateName(namespace, name string) (string, bool) {
+	return f.sslCertificateName, f.entryExists
+}
+
+func (f *fakeState) IsSslCertificateCreationReported(namespace, name string) (bool, bool) {
+	if f.sslCertificateCreationMetricOverride != nil {
+		return f.sslCertificateCreationReported, f.sslCertificateCreationMetricOverride.exists
+	}
+	return f.sslCertificateCreationReported, f.entryExists
+}
+
+func (f *fakeState) SetSslCertificateCreationReported(namespace, name string) {
+	f.sslCertificateCreationReported = true
+	f.entryExists = true
+}
+
+func (f *fakeState) SetSslCertificateName(namespace, name, sslCertificateName string) {
+	f.sslCertificateName = sslCertificateName
+	f.entryExists = true
 }

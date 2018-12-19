@@ -23,7 +23,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/server"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/version"
@@ -38,11 +39,17 @@ func main() {
 	}
 	glog.V(1).Infof("Flags = %+v", flags.F)
 
-	clients, err := client.New()
+	config, err := config.New(flags.F.GCEConfigFilePath)
 	if err != nil {
 		glog.Fatal(err)
 	}
-	controller := controller.New(clients)
+
+	clients, err := clients.New(config)
+	if err != nil {
+		glog.Fatal(err)
+	}
+
+	controller := controller.New(config, clients)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

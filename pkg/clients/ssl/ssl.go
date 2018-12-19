@@ -18,23 +18,14 @@ limitations under the License.
 package ssl
 
 import (
-	"fmt"
-	"os"
-	"time"
-
-	"cloud.google.com/go/compute/metadata"
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
-	gcfg "gopkg.in/gcfg.v1"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
-	httpTimeout = 30 * time.Second
 	typeManaged = "MANAGED"
 )
 
@@ -46,54 +37,13 @@ type Ssl interface {
 }
 
 type sslImpl struct {
-	service   *compute.Service
+	service   *compute.SslCertificatesService
 	projectID string
 }
 
-func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, string, error) {
-	if gceConfigFilePath != "" {
-		glog.V(1).Info("In a GKE cluster")
-
-		config, err := os.Open(gceConfigFilePath)
-		if err != nil {
-			return nil, "", fmt.Errorf("Could not open cloud provider configuration %s: %v", gceConfigFilePath, err)
-		}
-		defer config.Close()
-
-		var cfg gce.ConfigFile
-		if err := gcfg.ReadInto(&cfg, config); err != nil {
-			return nil, "", fmt.Errorf("Could not read config %v", err)
-		}
-		glog.Infof("Using GCE provider config %+v", cfg)
-
-		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), cfg.Global.ProjectID, nil
-	}
-
-	projectID, err := metadata.ProjectID()
-	if err != nil {
-		return nil, "", fmt.Errorf("Could not fetch project id: %v", err)
-	}
-
-	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
-		glog.V(1).Info("In a GCP cluster")
-		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
-		return tokenSource, projectID, err
-	} else {
-		glog.V(1).Info("Using default TokenSource")
-		return google.ComputeTokenSource(""), projectID, nil
-	}
-}
-
-func New(gceConfigFilePath string) (Ssl, error) {
-	tokenSource, projectID, err := getTokenSourceAndProjectID(gceConfigFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	glog.Infof("TokenSource: %#v, projectID: %s", tokenSource, projectID)
-
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	client.Timeout = httpTimeout
+func New(config *config.Config) (Ssl, error) {
+	client := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
+	client.Timeout = config.Compute.Timeout
 
 	service, err := compute.New(client)
 	if err != nil {
@@ -101,8 +51,8 @@ func New(gceConfigFilePath string) (Ssl, error) {
 	}
 
 	return &sslImpl{
-		service:   service,
-		projectID: projectID,
+		service:   service.SslCertificates,
+		projectID: config.Compute.ProjectID,
 	}, nil
 }
 
@@ -116,13 +66,13 @@ func (s sslImpl) Create(name string, domains []string) error {
 		Type: typeManaged,
 	}
 
-	_, err := s.service.SslCertificates.Insert(s.projectID, sslCertificate).Do()
+	_, err := s.service.Insert(s.projectID, sslCertificate).Do()
 	return err
 }
 
 // Delete deletes an SslCertificate resource.
 func (s sslImpl) Delete(name string) error {
-	_, err := s.service.SslCertificates.Delete(s.projectID, name).Do()
+	_, err := s.service.Delete(s.projectID, name).Do()
 	return err
 }
 
@@ -142,5 +92,5 @@ func (s sslImpl) Exists(name string) (bool, error) {
 
 // Get fetches an SslCertificate resource.
 func (s sslImpl) Get(name string) (*compute.SslCertificate, error) {
-	return s.service.SslCertificates.Get(s.projectID, name).Do()
+	return s.service.Get(s.projectID, name).Do()
 }

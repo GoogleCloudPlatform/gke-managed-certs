@@ -24,8 +24,8 @@ import (
 	compute "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/googleapi"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 )
 
 type fakeSsl struct {

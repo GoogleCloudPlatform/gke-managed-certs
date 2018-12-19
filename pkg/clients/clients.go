@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package client provides clients which are used to communicate with api server and GCLB.
-package client
+// Package clients provides clients which are used to communicate with api server and GCLB.
+package clients
 
 import (
 	"fmt"
@@ -23,11 +23,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/configmap"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/event"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 )
 
@@ -49,28 +50,28 @@ type Clients struct {
 	Ssl ssl.Ssl
 }
 
-func New() (*Clients, error) {
-	config, err := clientcmd.BuildConfigFromFlags(flags.F.APIServerHost, flags.F.KubeConfigFilePath)
+func New(config *config.Config) (*Clients, error) {
+	clusterConfig, err := clientcmd.BuildConfigFromFlags(flags.F.APIServerHost, flags.F.KubeConfigFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
 
-	clientset := versioned.NewForConfigOrDie(config)
+	clientset := versioned.NewForConfigOrDie(clusterConfig)
 	factory := externalversions.NewSharedInformerFactory(clientset, 0)
 
-	ssl, err := ssl.New(flags.F.GCEConfigFilePath)
+	ssl, err := ssl.New(config)
 	if err != nil {
 		return nil, err
 	}
 
-	event, err := event.New(kubernetes.NewForConfigOrDie(config))
+	event, err := event.New(kubernetes.NewForConfigOrDie(clusterConfig))
 	if err != nil {
 		return nil, err
 	}
 
 	return &Clients{
 		Clientset:       clientset,
-		ConfigMap:       configmap.New(config),
+		ConfigMap:       configmap.New(clusterConfig),
 		Event:           event,
 		InformerFactory: factory,
 		Ssl:             ssl,

@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/gke-managed-certs",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
@@ -312,6 +312,11 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
+			"Comment": "v0.8.0-83-ge7e9030",
+			"Rev": "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus/promhttp",
 			"Comment": "v0.8.0-83-ge7e9030",
 			"Rev": "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
 		},
@@ -2289,6 +2294,11 @@
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/capabilities",
+			"Comment": "v1.12.2-beta.0-11-g989fd1cb36",
+			"Rev": "989fd1cb36102920c7dc55d08b24711c88283971"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/client/metrics/prometheus",
 			"Comment": "v1.12.2-beta.0-11-g989fd1cb36",
 			"Rev": "989fd1cb36102920c7dc55d08b24711c88283971"
 		},

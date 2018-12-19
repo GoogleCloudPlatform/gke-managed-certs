@@ -18,6 +18,9 @@ limitations under the License.
 package sync
 
 import (
+	"errors"
+	"time"
+
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -26,10 +29,15 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
+)
+
+var (
+	errManagedCertificateNotFound = errors.New("ManagedCertificate not found in state")
 )
 
 type Sync interface {
@@ -40,15 +48,18 @@ type Sync interface {
 type syncImpl struct {
 	clientset versioned.Interface
 	lister    mcrtlister.ManagedCertificateLister
+	metrics   metrics.Metrics
 	random    random.Random
 	ssl       sslcertificatemanager.SslCertificateManager
 	state     state.State
 }
 
-func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateLister, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
+func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateLister, metrics metrics.Metrics,
+	random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
 	return syncImpl{
 		clientset: clientset,
 		lister:    lister,
+		metrics:   metrics,
 		random:    random,
 		ssl:       ssl,
 		state:     state,
@@ -56,7 +67,7 @@ func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateList
 }
 
 func (s syncImpl) ensureSslCertificateName(mcrt *api.ManagedCertificate) (string, error) {
-	sslCertificateName, exists := s.state.Get(mcrt.Namespace, mcrt.Name)
+	sslCertificateName, exists := s.state.GetSslCertificateName(mcrt.Namespace, mcrt.Name)
 
 	if exists {
 		return sslCertificateName, nil
@@ -68,8 +79,27 @@ func (s syncImpl) ensureSslCertificateName(mcrt *api.ManagedCertificate) (string
 	}
 
 	glog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
-	s.state.Put(mcrt.Namespace, mcrt.Name, sslCertificateName)
+	s.state.SetSslCertificateName(mcrt.Namespace, mcrt.Name, sslCertificateName)
 	return sslCertificateName, nil
+}
+
+func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string, mcrt api.ManagedCertificate) error {
+	reported, exists := s.state.IsSslCertificateCreationReported(mcrt.Namespace, mcrt.Name)
+	if !exists {
+		return errManagedCertificateNotFound
+	}
+	if reported {
+		return nil
+	}
+
+	creationTime, err := time.Parse(time.RFC3339, mcrt.CreationTimestamp.Format(time.RFC3339))
+	if err != nil {
+		return err
+	}
+
+	s.metrics.ObserveSslCertificateCreationLatency(creationTime)
+	s.state.SetSslCertificateCreationReported(mcrt.Namespace, mcrt.Name)
+	return nil
 }
 
 func (s syncImpl) ensureSslCertificate(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
@@ -80,6 +110,10 @@ func (s syncImpl) ensureSslCertificate(sslCertificateName string, mcrt *api.Mana
 
 	if !exists {
 		if err := s.ssl.Create(sslCertificateName, *mcrt); err != nil {
+			return nil, err
+		}
+
+		if err := s.observeSslCertificateCreationLatencyIfNeeded(sslCertificateName, *mcrt); err != nil {
 			return nil, err
 		}
 	}
@@ -111,8 +145,9 @@ func (s syncImpl) ensureSslCertificate(sslCertificateName string, mcrt *api.Mana
 func (s syncImpl) ManagedCertificate(namespace, name string) error {
 	mcrt, err := s.lister.ManagedCertificates(namespace).Get(name)
 	if http.IsNotFound(err) {
-		if sslCertificateName, exists := s.state.Get(namespace, name); exists {
-			glog.Infof("Delete SslCertificate %s, because ManagedCertificate %s:%s already deleted", sslCertificateName, namespace, name)
+		if sslCertificateName, exists := s.state.GetSslCertificateName(namespace, name); exists {
+			glog.Infof("Delete SslCertificate %s, because ManagedCertificate %s:%s already deleted",
+				sslCertificateName, namespace, name)
 			err := http.IgnoreNotFound(s.ssl.Delete(sslCertificateName, nil))
 			if err != nil {
 				return err

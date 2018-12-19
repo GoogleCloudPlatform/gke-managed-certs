@@ -27,33 +27,41 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
 
 type Controller struct {
 	informerFactory externalversions.SharedInformerFactory
 	lister          mcrtlister.ManagedCertificateLister
+	metrics         metrics.Metrics
 	queue           workqueue.RateLimitingInterface
 	sync            sync.Sync
 	synced          cache.InformerSynced
 }
 
-func New(clients *client.Clients) *Controller {
+func New(config *config.Config, clients *clients.Clients) *Controller {
 	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
 	lister := informer.Lister()
 	ssl := sslcertificatemanager.New(clients.Event, clients.Ssl)
+	metrics := metrics.New()
+	random := random.New(config.SslCertificateNamePrefix)
+	sync := sync.New(clients.Clientset, lister, metrics, random, ssl, state.New(clients.ConfigMap))
 
 	controller := &Controller{
 		informerFactory: clients.InformerFactory,
 		lister:          lister,
+		metrics:         metrics,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		sync:            sync.New(clients.Clientset, lister, random.New(), ssl, state.New(clients.ConfigMap)),
+		sync:            sync,
 		synced:          informer.Informer().HasSynced,
 	}
 
@@ -78,21 +86,24 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	glog.Info("Controller.Run()")
 
+	glog.Info("Start reporting metrics")
+	go c.metrics.Start(flags.F.PrometheusAddress)
+
 	go c.informerFactory.Start(ctx.Done())
 
-	glog.Info("Waiting for Managed Certificate cache sync")
+	glog.Info("Waiting for ManagedCertificate cache sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.synced) {
-		return fmt.Errorf("Timed out waiting for Managed Certificate cache sync")
+		return fmt.Errorf("Timed out waiting for ManagedCertificate cache sync")
 	}
-	glog.Info("Managed Certificate cache synced")
+	glog.Info("ManagedCertificate cache synced")
 
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 	go wait.Until(c.synchronizeAllMcrts, time.Minute, ctx.Done())
 
-	glog.Info("Controller waiting for stop signal or error")
+	glog.Info("Waiting for stop signal or error")
 
 	<-ctx.Done()
-	glog.Info("Controller received stop signal, shutting down")
+	glog.Info("Received stop signal, shutting down")
 	return nil
 }
 
