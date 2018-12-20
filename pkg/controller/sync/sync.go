@@ -23,11 +23,11 @@ import (
 
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
-	"k8s.io/apimachinery/pkg/util/runtime"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
@@ -42,11 +42,11 @@ var (
 
 type Sync interface {
 	ManagedCertificate(namespace, name string) error
-	State()
 }
 
 type syncImpl struct {
 	clientset versioned.Interface
+	config    *config.Config
 	lister    mcrtlister.ManagedCertificateLister
 	metrics   metrics.Metrics
 	random    random.Random
@@ -54,10 +54,11 @@ type syncImpl struct {
 	state     state.State
 }
 
-func New(clientset versioned.Interface, lister mcrtlister.ManagedCertificateLister, metrics metrics.Metrics,
-	random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
+func New(clientset versioned.Interface, config *config.Config, lister mcrtlister.ManagedCertificateLister,
+	metrics metrics.Metrics, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
 	return syncImpl{
 		clientset: clientset,
+		config:    config,
 		lister:    lister,
 		metrics:   metrics,
 		random:    random,
@@ -174,18 +175,10 @@ func (s syncImpl) ManagedCertificate(namespace, name string) error {
 		return err
 	}
 
-	if err := certificates.CopyStatus(*sslCert, mcrt); err != nil {
+	if err := certificates.CopyStatus(*sslCert, mcrt, s.config); err != nil {
 		return err
 	}
 
 	_, err = s.clientset.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
-}
-
-func (s syncImpl) State() {
-	s.state.ForeachKey(func(namespace, name string) {
-		if err := s.ManagedCertificate(namespace, name); err != nil {
-			runtime.HandleError(err)
-		}
-	})
 }

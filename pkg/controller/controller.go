@@ -39,29 +39,30 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
 
-type Controller struct {
+type controller struct {
 	informerFactory externalversions.SharedInformerFactory
 	lister          mcrtlister.ManagedCertificateLister
 	metrics         metrics.Metrics
 	queue           workqueue.RateLimitingInterface
+	state           state.State
 	sync            sync.Sync
 	synced          cache.InformerSynced
 }
 
-func New(config *config.Config, clients *clients.Clients) *Controller {
+func New(config *config.Config, clients *clients.Clients) *controller {
 	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
 	lister := informer.Lister()
 	ssl := sslcertificatemanager.New(clients.Event, clients.Ssl)
-	metrics := metrics.New()
+	metrics := metrics.New(config)
 	random := random.New(config.SslCertificateNamePrefix)
-	sync := sync.New(clients.Clientset, lister, metrics, random, ssl, state.New(clients.ConfigMap))
-
-	controller := &Controller{
+	state := state.New(clients.ConfigMap)
+	controller := &controller{
 		informerFactory: clients.InformerFactory,
 		lister:          lister,
 		metrics:         metrics,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		sync:            sync,
+		state:           state,
+		sync:            sync.New(clients.Clientset, config, lister, metrics, random, ssl, state),
 		synced:          informer.Informer().HasSynced,
 	}
 
@@ -80,7 +81,7 @@ func New(config *config.Config, clients *clients.Clients) *Controller {
 	return controller
 }
 
-func (c *Controller) Run(ctx context.Context) error {
+func (c *controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -98,7 +99,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	glog.Info("ManagedCertificate cache synced")
 
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
-	go wait.Until(c.synchronizeAllMcrts, time.Minute, ctx.Done())
+	go wait.Until(c.synchronizeAllManagedCertificates, time.Minute, ctx.Done())
 
 	glog.Info("Waiting for stop signal or error")
 
@@ -107,12 +108,16 @@ func (c *Controller) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) runWorker() {
+func (c *controller) runWorker() {
 	for c.processNext() {
 	}
 }
 
-func (c *Controller) synchronizeAllMcrts() {
-	c.sync.State()
+func (c *controller) synchronizeAllManagedCertificates() {
+	c.state.ForeachKey(func(namespace, name string) {
+		if err := c.sync.ManagedCertificate(namespace, name); err != nil {
+			runtime.HandleError(err)
+		}
+	})
 	c.enqueueAll()
 }

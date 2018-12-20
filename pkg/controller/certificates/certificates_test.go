@@ -23,6 +23,7 @@ import (
 	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 const (
@@ -54,10 +55,10 @@ func mcrt(status string, domains []api.DomainStatus) *api.ManagedCertificate {
 
 func TestCopyStatus(t *testing.T) {
 	testCases := []struct {
-		sslCertIn compute.SslCertificate
-		success   bool // translation should succeed
-		mcrtOut   *api.ManagedCertificate
-		desc      string
+		sslCertIn   compute.SslCertificate
+		wantSuccess bool // translation should succeed
+		mcrtOut     *api.ManagedCertificate
+		desc        string
 	}{
 		{sslCert("bad_status", nil), false, nil, "Wrong certificate status"},
 		{sslCert("ACTIVE", map[string]string{"example.com": "bad_status"}), false, nil, "Wrong domain status"},
@@ -68,10 +69,10 @@ func TestCopyStatus(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			var mcrt api.ManagedCertificate
-			err := CopyStatus(testCase.sslCertIn, &mcrt)
+			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFakeCertificateStatusConfig())
 
-			if (err == nil) != testCase.success {
-				t.Errorf("Translation err: %s, want success: %t", err.Error(), testCase.success)
+			if (err == nil) != testCase.wantSuccess {
+				t.Errorf("Translation err: %s, want success: %t", err.Error(), testCase.wantSuccess)
 			}
 
 			if err != nil {

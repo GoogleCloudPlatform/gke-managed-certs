@@ -32,7 +32,30 @@ import (
 )
 
 const (
+	managedActive                        = "Active"
+	managedEmpty                         = ""
+	managedFailedCaaChecking             = "FailedCaaChecking"
+	managedFailedCaaForbidden            = "FailedCaaForbidden"
+	managedFailedNotVisible              = "FailedNotVisible"
+	managedFailedRateLimited             = "FailedRateLimited"
+	managedProvisioning                  = "Provisioning"
+	managedProvisioningFailed            = "ProvisioningFailed"
+	managedProvisioningFailedPermanently = "ProvisioningFailedPermanently"
+	managedRenewalFailed                 = "RenewalFailed"
+
 	SslCertificateNamePrefix = "mcrt-"
+
+	sslActive                              = "ACTIVE"
+	sslEmpty                               = ""
+	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
+	sslFailedCaaForbidden                  = "FAILED_CAA_FORBIDDEN"
+	sslFailedNotVisible                    = "FAILED_NOT_VISIBLE"
+	sslFailedRateLimited                   = "FAILED_RATE_LIMITED"
+	sslManagedCertificateStatusUnspecified = "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED"
+	sslProvisioning                        = "PROVISIONING"
+	sslProvisioningFailed                  = "PROVISIONING_FAILED"
+	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
+	sslRenewalFailed                       = "RENEWAL_FAILED"
 )
 
 type computeConfig struct {
@@ -41,8 +64,19 @@ type computeConfig struct {
 	Timeout     time.Duration
 }
 
+type certificateStatusConfig struct {
+	// Certificate is a mapping from SslCertificate status to ManagedCertificate status
+	Certificate map[string]string
+	// Domain is a mapping from SslCertificate domain status to ManagedCertificate domain status
+	Domain map[string]string
+}
+
 type Config struct {
-	Compute                  computeConfig
+	// CertificateStatus holds mappings of SslCertificate statuses to ManagedCertificate statuses
+	CertificateStatus certificateStatusConfig
+	// Compute is GCP-specific configuration
+	Compute computeConfig
+	// SslCertificateNamePrefix is a prefix prepended to SslCertificate resources created by the controller
 	SslCertificateNamePrefix string
 }
 
@@ -54,7 +88,28 @@ func New(gceConfigFilePath string) (*Config, error) {
 
 	glog.Infof("TokenSource: %#v, projectID: %s", tokenSource, projectID)
 
+	domainStatuses := make(map[string]string, 0)
+	domainStatuses[sslActive] = managedActive
+	domainStatuses[sslFailedCaaChecking] = managedFailedCaaChecking
+	domainStatuses[sslFailedCaaForbidden] = managedFailedCaaForbidden
+	domainStatuses[sslFailedNotVisible] = managedFailedNotVisible
+	domainStatuses[sslFailedRateLimited] = managedFailedRateLimited
+	domainStatuses[sslProvisioning] = managedProvisioning
+
+	certificateStatuses := make(map[string]string, 0)
+	certificateStatuses[sslActive] = managedActive
+	certificateStatuses[sslEmpty] = managedEmpty
+	certificateStatuses[sslManagedCertificateStatusUnspecified] = managedEmpty
+	certificateStatuses[sslProvisioning] = managedProvisioning
+	certificateStatuses[sslProvisioningFailed] = managedProvisioningFailed
+	certificateStatuses[sslProvisioningFailedPermanently] = managedProvisioningFailedPermanently
+	certificateStatuses[sslRenewalFailed] = managedRenewalFailed
+
 	return &Config{
+		CertificateStatus: certificateStatusConfig{
+			Certificate: certificateStatuses,
+			Domain:      domainStatuses,
+		},
 		Compute: computeConfig{
 			TokenSource: tokenSource,
 			ProjectID:   projectID,

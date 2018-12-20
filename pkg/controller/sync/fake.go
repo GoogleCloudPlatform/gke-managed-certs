@@ -17,11 +17,7 @@ limitations under the License.
 package sync
 
 import (
-	"errors"
-	"time"
-
 	compute "google.golang.org/api/compute/v0.beta"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	cgo_testing "k8s.io/client-go/testing"
@@ -30,8 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
@@ -42,47 +36,6 @@ const (
 	keySeparator  = ":"
 	typeManaged   = "MANAGED"
 )
-
-// Fake lister
-type fakeLister struct {
-	managedCertificate *api.ManagedCertificate
-	err                error
-}
-
-var _ mcrtlister.ManagedCertificateLister = &fakeLister{}
-
-func newLister(err error, managedCertificate *api.ManagedCertificate) fakeLister {
-	return fakeLister{
-		managedCertificate: managedCertificate,
-		err:                err,
-	}
-}
-
-func (f fakeLister) List(selector labels.Selector) ([]*api.ManagedCertificate, error) {
-	return nil, errors.New("Not implemented")
-}
-
-func (f fakeLister) ManagedCertificates(namespace string) mcrtlister.ManagedCertificateNamespaceLister {
-	return fakeNamespaceLister{
-		managedCertificate: f.managedCertificate,
-		err:                f.err,
-	}
-}
-
-type fakeNamespaceLister struct {
-	managedCertificate *api.ManagedCertificate
-	err                error
-}
-
-var _ mcrtlister.ManagedCertificateNamespaceLister = &fakeNamespaceLister{}
-
-func (f fakeNamespaceLister) List(selector labels.Selector) ([]*api.ManagedCertificate, error) {
-	return nil, errors.New("Not implemented")
-}
-
-func (f fakeNamespaceLister) Get(name string) (*api.ManagedCertificate, error) {
-	return f.managedCertificate, f.err
-}
 
 // Fake ManagedCertificate clientset
 type fakeClientset struct {
@@ -108,29 +61,6 @@ func (f fakeClientset) GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface {
 
 func (f fakeClientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
 	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
-}
-
-// Fake metrics
-type fakeMetrics struct {
-	SslCertificateCreationLatencyObserved int
-}
-
-var _ metrics.Metrics = &fakeMetrics{}
-
-func newMetrics() *fakeMetrics {
-	return &fakeMetrics{}
-}
-
-func newMetricsAlreadyReported() *fakeMetrics {
-	metrics := newMetrics()
-	metrics.SslCertificateCreationLatencyObserved++
-	return metrics
-}
-
-func (f *fakeMetrics) Start(address string) {}
-
-func (f *fakeMetrics) ObserveSslCertificateCreationLatency(creationTime time.Time) {
-	f.SslCertificateCreationLatencyObserved++
 }
 
 // Fake random

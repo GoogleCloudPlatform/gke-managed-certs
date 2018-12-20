@@ -25,40 +25,28 @@ import (
 	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-)
-
-const (
-	sslActive                              = "ACTIVE"
-	sslFailedNotVisible                    = "FAILED_NOT_VISIBLE"
-	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
-	sslFailedCaaForbidden                  = "FAILED_CAA_FORBIDDEN"
-	sslFailedRateLimited                   = "FAILED_RATE_LIMITED"
-	sslManagedCertificateStatusUnspecified = "MANAGED_CERTIFICATE_STATUS_UNSPECIFIED"
-	sslProvisioning                        = "PROVISIONING"
-	sslProvisioningFailed                  = "PROVISIONING_FAILED"
-	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
-	sslRenewalFailed                       = "RENEWAL_FAILED"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 // CopyStatus sets ManagedCertificate status based on SslCertificate object.
-func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate) error {
-	status, err := status(sslCert.Managed.Status)
+func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate, config *config.Config) error {
+	certificateStatus, err := translateStatus(config.CertificateStatus.Certificate, sslCert.Managed.Status)
 	if err != nil {
 		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
 	}
-	mcrt.Status.CertificateStatus = status
+	mcrt.Status.CertificateStatus = certificateStatus
 
 	// Initialize with non-nil value to avoid ManagedCertificate CRD validation warnings
 	domainStatuses := make([]api.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
-		translatedStatus, err := domainStatus(status)
+		domainStatus, err := translateStatus(config.CertificateStatus.Domain, status)
 		if err != nil {
 			return err
 		}
 
 		domainStatuses = append(domainStatuses, api.DomainStatus{
 			Domain: domain,
-			Status: translatedStatus,
+			Status: domainStatus,
 		})
 	}
 	mcrt.Status.DomainStatus = domainStatuses
@@ -82,42 +70,12 @@ func Equal(mcrt api.ManagedCertificate, sslCert compute.SslCertificate) bool {
 	return reflect.DeepEqual(mcrtDomains, sslCertDomains)
 }
 
-// domainStatus translates an SslCertificate domain status to ManagedCertificate domain status.
-func domainStatus(status string) (string, error) {
-	switch status {
-	case sslProvisioning:
-		return "Provisioning", nil
-	case sslFailedNotVisible:
-		return "FailedNotVisible", nil
-	case sslFailedCaaChecking:
-		return "FailedCaaChecking", nil
-	case sslFailedCaaForbidden:
-		return "FailedCaaForbidden", nil
-	case sslFailedRateLimited:
-		return "FailedRateLimited", nil
-	case sslActive:
-		return "Active", nil
-	default:
+// translateStatus translates status based on statuses mappings.
+func translateStatus(statuses map[string]string, status string) (string, error) {
+	v, e := statuses[status]
+	if !e {
 		return "", fmt.Errorf("Unexpected status %s", status)
 	}
-}
 
-// status translates an SslCertificate status to ManagedCertificate status.
-func status(status string) (string, error) {
-	switch status {
-	case sslActive:
-		return "Active", nil
-	case sslManagedCertificateStatusUnspecified, "":
-		return "", nil
-	case sslProvisioning:
-		return "Provisioning", nil
-	case sslProvisioningFailed:
-		return "ProvisioningFailed", nil
-	case sslProvisioningFailedPermanently:
-		return "ProvisioningFailedPermanently", nil
-	case sslRenewalFailed:
-		return "RenewalFailed", nil
-	default:
-		return "", fmt.Errorf("Unexpected status %s", status)
-	}
+	return v, nil
 }

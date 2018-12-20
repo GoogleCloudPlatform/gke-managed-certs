@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *Controller) enqueue(obj interface{}) {
+func (c *controller) enqueue(obj interface{}) {
 	key, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		runtime.HandleError(err)
@@ -35,7 +35,7 @@ func (c *Controller) enqueue(obj interface{}) {
 	c.queue.AddRateLimited(key)
 }
 
-func (c *Controller) enqueueAll() {
+func (c *controller) enqueueAll() {
 	mcrts, err := c.lister.List(labels.Everything())
 	if err != nil {
 		runtime.HandleError(err)
@@ -48,17 +48,21 @@ func (c *Controller) enqueueAll() {
 	}
 
 	var names []string
+	statuses := make(map[string]int, 0)
 	for _, mcrt := range mcrts {
 		names = append(names, mcrt.Name)
+		statuses[mcrt.Status.CertificateStatus]++
 	}
 
 	glog.Infof("Enqueuing ManagedCertificates found in cluster: %+v", names)
 	for _, mcrt := range mcrts {
 		c.enqueue(mcrt)
 	}
+
+	c.metrics.ObserveManagedCertificatesStatuses(statuses)
 }
 
-func (c *Controller) handle(key string) error {
+func (c *controller) handle(key string) error {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -71,7 +75,7 @@ func (c *Controller) handle(key string) error {
 	return err
 }
 
-func (c *Controller) processNext() bool {
+func (c *controller) processNext() bool {
 	obj, shutdown := c.queue.Get()
 
 	if shutdown {
