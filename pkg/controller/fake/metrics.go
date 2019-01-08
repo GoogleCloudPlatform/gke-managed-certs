@@ -24,6 +24,8 @@ import (
 
 type FakeMetrics struct {
 	ManagedCertificatesStatuses           map[string]int
+	SslCertificateBackendErrorObserved    int
+	SslCertificateQuotaErrorObserved      int
 	SslCertificateCreationLatencyObserved int
 }
 
@@ -43,6 +45,14 @@ func (f *FakeMetrics) Start(address string) {}
 
 func (f *FakeMetrics) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 	f.ManagedCertificatesStatuses = statuses
+}
+
+func (f *FakeMetrics) ObserveSslCertificateBackendError() {
+	f.SslCertificateBackendErrorObserved++
+}
+
+func (f *FakeMetrics) ObserveSslCertificateQuotaError() {
+	f.SslCertificateQuotaErrorObserved++
 }
 
 func (f *FakeMetrics) ObserveSslCertificateCreationLatency(creationTime time.Time) {

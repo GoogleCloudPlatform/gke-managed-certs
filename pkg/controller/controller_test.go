@@ -105,7 +105,7 @@ func (f *fakeQueue) NumRequeues(item interface{}) int { return 0 }
 
 func TestSynchronizeAllManagedCertificates(t *testing.T) {
 	testCases := []struct {
-		desc string
+		desc      string
 		listerErr error
 		// Collection of namespace, name pairs
 		managedCertificatesLister []pair

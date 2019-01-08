@@ -64,12 +64,8 @@ func TestCRDValidation(t *testing.T) {
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}
-			if err == nil && tc.success {
-				// Creation succeeded as expected, so now delete the managed certificate
-				if err := clients.ManagedCertificate.Delete(namespace, name); err != nil {
-					t.Fatal(err)
-				}
 
+			if err == nil {
 				return
 			}
 

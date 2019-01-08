@@ -52,8 +52,8 @@ type controller struct {
 func New(config *config.Config, clients *clients.Clients) *controller {
 	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
 	lister := informer.Lister()
-	ssl := sslcertificatemanager.New(clients.Event, clients.Ssl)
 	metrics := metrics.New(config)
+	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl)
 	random := random.New(config.SslCertificateNamePrefix)
 	state := state.New(clients.ConfigMap)
 	controller := &controller{
@@ -98,7 +98,7 @@ func (c *controller) Run(ctx context.Context) error {
 	}
 	glog.Info("ManagedCertificate cache synced")
 
-	go wait.Until(c.runWorker, time.Second, ctx.Done())
+	go wait.Until(func() { c.processNext() }, time.Second, ctx.Done())
 	go wait.Until(c.synchronizeAllManagedCertificates, time.Minute, ctx.Done())
 
 	glog.Info("Waiting for stop signal or error")
@@ -106,11 +106,6 @@ func (c *controller) Run(ctx context.Context) error {
 	<-ctx.Done()
 	glog.Info("Received stop signal, shutting down")
 	return nil
-}
-
-func (c *controller) runWorker() {
-	for c.processNext() {
-	}
 }
 
 func (c *controller) synchronizeAllManagedCertificates() {

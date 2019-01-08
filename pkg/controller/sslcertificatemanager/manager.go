@@ -24,6 +24,7 @@ import (
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
@@ -35,14 +36,16 @@ type SslCertificateManager interface {
 }
 
 type sslCertificateManagerImpl struct {
-	event event.Event
-	ssl   ssl.Ssl
+	event   event.Event
+	metrics metrics.Metrics
+	ssl     ssl.Ssl
 }
 
-func New(event event.Event, ssl ssl.Ssl) SslCertificateManager {
+func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl) SslCertificateManager {
 	return sslCertificateManagerImpl{
-		event: event,
-		ssl:   ssl,
+		event:   event,
+		metrics: metrics,
+		ssl:     ssl,
 	}
 }
 
@@ -54,10 +57,12 @@ func (s sslCertificateManagerImpl) Create(sslCertificateName string, mcrt api.Ma
 	if err := s.ssl.Create(sslCertificateName, mcrt.Spec.Domains); err != nil {
 		if http.IsQuotaExceeded(err) {
 			s.event.TooManyCertificates(mcrt, err)
+			s.metrics.ObserveSslCertificateQuotaError()
 			return err
 		}
 
 		s.event.BackendError(mcrt, err)
+		s.metrics.ObserveSslCertificateBackendError()
 		return err
 	}
 
@@ -81,6 +86,7 @@ func (s sslCertificateManagerImpl) Delete(sslCertificateName string, mcrt *api.M
 	if http.IgnoreNotFound(err) != nil {
 		if mcrt != nil {
 			s.event.BackendError(*mcrt, err)
+			s.metrics.ObserveSslCertificateBackendError()
 		}
 
 		return err
@@ -97,6 +103,7 @@ func (s sslCertificateManagerImpl) Exists(sslCertificateName string, mcrt *api.M
 	if err != nil {
 		if mcrt != nil {
 			s.event.BackendError(*mcrt, err)
+			s.metrics.ObserveSslCertificateBackendError()
 		}
 		return false, err
 	}
@@ -110,6 +117,7 @@ func (s sslCertificateManagerImpl) Get(sslCertificateName string, mcrt *api.Mana
 	if err != nil {
 		if mcrt != nil {
 			s.event.BackendError(*mcrt, err)
+			s.metrics.ObserveSslCertificateBackendError()
 		}
 		return nil, err
 	}

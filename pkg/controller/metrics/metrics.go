@@ -39,13 +39,17 @@ const (
 type Metrics interface {
 	Start(address string)
 	ObserveManagedCertificatesStatuses(statuses map[string]int)
+	ObserveSslCertificateBackendError()
+	ObserveSslCertificateQuotaError()
 	ObserveSslCertificateCreationLatency(creationTime time.Time)
 }
 
 type metricsImpl struct {
-	config                        *config.Config
-	managedCertificateStatus      *prometheus.GaugeVec
-	sslCertificateCreationLatency prometheus.Histogram
+	config                          *config.Config
+	managedCertificateStatus        *prometheus.GaugeVec
+	sslCertificateBackendErrorCount prometheus.Counter
+	sslCertificateQuotaErrorCount   prometheus.Counter
+	sslCertificateCreationLatency   prometheus.Histogram
 }
 
 func New(config *config.Config) Metrics {
@@ -58,6 +62,22 @@ func New(config *config.Config) Metrics {
 				Help:      `The number of ManagedCertificate resources partitioned by their statuses`,
 			},
 			[]string{labelStatus},
+		),
+		sslCertificateBackendErrorCount: promauto.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "managedcertificate_backenderror_count",
+				Help: `The number of generic errors occurred
+				when performing actions on SslCertificate resources`,
+			},
+		),
+		sslCertificateQuotaErrorCount: promauto.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "managedcertificate_quotaerror_count",
+				Help: `The number of out-of-quota errors occurred
+				when performing actions on SslCertificate resources`,
+			},
 		),
 		sslCertificateCreationLatency: promauto.NewHistogram(
 			prometheus.HistogramOpts{
@@ -90,6 +110,16 @@ func (m metricsImpl) ObserveManagedCertificatesStatuses(statuses map[string]int)
 
 		m.managedCertificateStatus.With(prometheus.Labels{labelStatus: label}).Set(float64(occurences))
 	}
+}
+
+// ObserveSslCertificateBackendError observes an error when performing action on SslCertificate resource.
+func (m metricsImpl) ObserveSslCertificateBackendError() {
+	m.sslCertificateBackendErrorCount.Inc()
+}
+
+// ObserveSslCertificateQuotaError observes an out-of-quota error when performing action on SslCertificate resource.
+func (m metricsImpl) ObserveSslCertificateQuotaError() {
+	m.sslCertificateQuotaErrorCount.Inc()
 }
 
 // ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid ManagedCertficate resource was created.
