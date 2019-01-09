@@ -66,7 +66,7 @@ func New(config *config.Config) Metrics {
 		sslCertificateBackendErrorCount: promauto.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "managedcertificate_backenderror_count",
+				Name:      "sslcertificate_backenderror_total",
 				Help: `The number of generic errors occurred
 				when performing actions on SslCertificate resources`,
 			},
@@ -74,7 +74,7 @@ func New(config *config.Config) Metrics {
 		sslCertificateQuotaErrorCount: promauto.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "managedcertificate_quotaerror_count",
+				Name:      "sslcertificate_quotaerror_total",
 				Help: `The number of out-of-quota errors occurred
 				when performing actions on SslCertificate resources`,
 			},
@@ -85,6 +85,7 @@ func New(config *config.Config) Metrics {
 				Name:      "sslcertificate_creation_latency_seconds",
 				Help: `Time elapsed from creating a valid ManagedCertificate resource
 				to creating a first corresponding SslCertificate resource`,
+				Buckets: prometheus.ExponentialBuckets(1.0, 1.3, 10),
 			},
 		),
 	}
