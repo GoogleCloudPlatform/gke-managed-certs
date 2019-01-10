@@ -47,8 +47,8 @@ type Metrics interface {
 type metricsImpl struct {
 	config                          *config.Config
 	managedCertificateStatus        *prometheus.GaugeVec
-	sslCertificateBackendErrorCount prometheus.Counter
-	sslCertificateQuotaErrorCount   prometheus.Counter
+	sslCertificateBackendErrorTotal prometheus.Counter
+	sslCertificateQuotaErrorTotal   prometheus.Counter
 	sslCertificateCreationLatency   prometheus.Histogram
 }
 
@@ -63,18 +63,18 @@ func New(config *config.Config) Metrics {
 			},
 			[]string{labelStatus},
 		),
-		sslCertificateBackendErrorCount: promauto.NewCounter(
+		sslCertificateBackendErrorTotal: promauto.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "sslcertificate_backenderror_total",
+				Name:      "sslcertificate_backend_error_total",
 				Help: `The number of generic errors occurred
 				when performing actions on SslCertificate resources`,
 			},
 		),
-		sslCertificateQuotaErrorCount: promauto.NewCounter(
+		sslCertificateQuotaErrorTotal: promauto.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "sslcertificate_quotaerror_total",
+				Name:      "sslcertificate_quota_error_total",
 				Help: `The number of out-of-quota errors occurred
 				when performing actions on SslCertificate resources`,
 			},
@@ -115,12 +115,12 @@ func (m metricsImpl) ObserveManagedCertificatesStatuses(statuses map[string]int)
 
 // ObserveSslCertificateBackendError observes an error when performing action on SslCertificate resource.
 func (m metricsImpl) ObserveSslCertificateBackendError() {
-	m.sslCertificateBackendErrorCount.Inc()
+	m.sslCertificateBackendErrorTotal.Inc()
 }
 
 // ObserveSslCertificateQuotaError observes an out-of-quota error when performing action on SslCertificate resource.
 func (m metricsImpl) ObserveSslCertificateQuotaError() {
-	m.sslCertificateQuotaErrorCount.Inc()
+	m.sslCertificateQuotaErrorTotal.Inc()
 }
 
 // ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid ManagedCertficate resource was created.
