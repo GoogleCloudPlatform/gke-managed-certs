@@ -19,22 +19,22 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
+	v1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeGkeV1alpha1 struct {
+type FakeNetworkingV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeGkeV1alpha1) ManagedCertificates(namespace string) v1alpha1.ManagedCertificateInterface {
+func (c *FakeNetworkingV1beta1) ManagedCertificates(namespace string) v1beta1.ManagedCertificateInterface {
 	return &FakeManagedCertificates{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeGkeV1alpha1) RESTClient() rest.Interface {
+func (c *FakeNetworkingV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	v1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,29 +30,29 @@ import (
 
 // FakeManagedCertificates implements ManagedCertificateInterface
 type FakeManagedCertificates struct {
-	Fake *FakeGkeV1alpha1
+	Fake *FakeNetworkingV1beta1
 	ns   string
 }
 
-var managedcertificatesResource = schema.GroupVersionResource{Group: "gke.googleapis.com", Version: "v1alpha1", Resource: "managedcertificates"}
+var managedcertificatesResource = schema.GroupVersionResource{Group: "networking.gke.io", Version: "v1beta1", Resource: "managedcertificates"}
 
-var managedcertificatesKind = schema.GroupVersionKind{Group: "gke.googleapis.com", Version: "v1alpha1", Kind: "ManagedCertificate"}
+var managedcertificatesKind = schema.GroupVersionKind{Group: "networking.gke.io", Version: "v1beta1", Kind: "ManagedCertificate"}
 
 // Get takes name of the managedCertificate, and returns the corresponding managedCertificate object, and an error if there is any.
-func (c *FakeManagedCertificates) Get(name string, options v1.GetOptions) (result *v1alpha1.ManagedCertificate, err error) {
+func (c *FakeManagedCertificates) Get(name string, options v1.GetOptions) (result *v1beta1.ManagedCertificate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(managedcertificatesResource, c.ns, name), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewGetAction(managedcertificatesResource, c.ns, name), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ManagedCertificate), err
+	return obj.(*v1beta1.ManagedCertificate), err
 }
 
 // List takes label and field selectors, and returns the list of ManagedCertificates that match those selectors.
-func (c *FakeManagedCertificates) List(opts v1.ListOptions) (result *v1alpha1.ManagedCertificateList, err error) {
+func (c *FakeManagedCertificates) List(opts v1.ListOptions) (result *v1beta1.ManagedCertificateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(managedcertificatesResource, managedcertificatesKind, c.ns, opts), &v1alpha1.ManagedCertificateList{})
+		Invokes(testing.NewListAction(managedcertificatesResource, managedcertificatesKind, c.ns, opts), &v1beta1.ManagedCertificateList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeManagedCertificates) List(opts v1.ListOptions) (result *v1alpha1.Ma
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.ManagedCertificateList{ListMeta: obj.(*v1alpha1.ManagedCertificateList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ManagedCertificateList).Items {
+	list := &v1beta1.ManagedCertificateList{ListMeta: obj.(*v1beta1.ManagedCertificateList).ListMeta}
+	for _, item := range obj.(*v1beta1.ManagedCertificateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeManagedCertificates) Watch(opts v1.ListOptions) (watch.Interface, e
 }
 
 // Create takes the representation of a managedCertificate and creates it.  Returns the server's representation of the managedCertificate, and an error, if there is any.
-func (c *FakeManagedCertificates) Create(managedCertificate *v1alpha1.ManagedCertificate) (result *v1alpha1.ManagedCertificate, err error) {
+func (c *FakeManagedCertificates) Create(managedCertificate *v1beta1.ManagedCertificate) (result *v1beta1.ManagedCertificate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(managedcertificatesResource, c.ns, managedCertificate), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewCreateAction(managedcertificatesResource, c.ns, managedCertificate), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ManagedCertificate), err
+	return obj.(*v1beta1.ManagedCertificate), err
 }
 
 // Update takes the representation of a managedCertificate and updates it. Returns the server's representation of the managedCertificate, and an error, if there is any.
-func (c *FakeManagedCertificates) Update(managedCertificate *v1alpha1.ManagedCertificate) (result *v1alpha1.ManagedCertificate, err error) {
+func (c *FakeManagedCertificates) Update(managedCertificate *v1beta1.ManagedCertificate) (result *v1beta1.ManagedCertificate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(managedcertificatesResource, c.ns, managedCertificate), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewUpdateAction(managedcertificatesResource, c.ns, managedCertificate), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ManagedCertificate), err
+	return obj.(*v1beta1.ManagedCertificate), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeManagedCertificates) UpdateStatus(managedCertificate *v1alpha1.ManagedCertificate) (*v1alpha1.ManagedCertificate, error) {
+func (c *FakeManagedCertificates) UpdateStatus(managedCertificate *v1beta1.ManagedCertificate) (*v1beta1.ManagedCertificate, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(managedcertificatesResource, "status", c.ns, managedCertificate), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewUpdateSubresourceAction(managedcertificatesResource, "status", c.ns, managedCertificate), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ManagedCertificate), err
+	return obj.(*v1beta1.ManagedCertificate), err
 }
 
 // Delete takes name of the managedCertificate and deletes it. Returns an error if one occurs.
 func (c *FakeManagedCertificates) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(managedcertificatesResource, c.ns, name), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewDeleteAction(managedcertificatesResource, c.ns, name), &v1beta1.ManagedCertificate{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeManagedCertificates) Delete(name string, options *v1.DeleteOptions)
 func (c *FakeManagedCertificates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(managedcertificatesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.ManagedCertificateList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.ManagedCertificateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched managedCertificate.
-func (c *FakeManagedCertificates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ManagedCertificate, err error) {
+func (c *FakeManagedCertificates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ManagedCertificate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(managedcertificatesResource, c.ns, name, data, subresources...), &v1alpha1.ManagedCertificate{})
+		Invokes(testing.NewPatchSubresourceAction(managedcertificatesResource, c.ns, name, data, subresources...), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ManagedCertificate), err
+	return obj.(*v1beta1.ManagedCertificate), err
 }

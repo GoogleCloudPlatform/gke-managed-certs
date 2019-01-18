@@ -22,7 +22,7 @@ kind: ClusterRole
 metadata:
   name: managed-certificate-role
 rules:
-  - apiGroups: ["gke.googleapis.com"]
+  - apiGroups: ["networking.gke.io"]
     resources: ["managedcertificates"]
     verbs: ["*"]
   - apiGroups: ["", "extensions"]

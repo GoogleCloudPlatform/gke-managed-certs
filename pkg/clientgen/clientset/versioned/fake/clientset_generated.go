@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
-	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
+	networkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
+	fakenetworkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -71,12 +71,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// GkeV1alpha1 retrieves the GkeV1alpha1Client
-func (c *Clientset) GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface {
-	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &c.Fake}
+// NetworkingV1beta1 retrieves the NetworkingV1beta1Client
+func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
+	return &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &c.Fake}
 }
 
-// Gke retrieves the GkeV1alpha1Client
-func (c *Clientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
-	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &c.Fake}
+// Networking retrieves the NetworkingV1beta1Client
+func (c *Clientset) Networking() networkingv1beta1.NetworkingV1beta1Interface {
+	return &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &c.Fake}
 }

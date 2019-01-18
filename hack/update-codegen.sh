@@ -22,9 +22,12 @@ SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
 go get -d k8s.io/code-generator/...
 
+# Checkout code-generator to compatible version
+(cd $GOPATH/src/k8s.io/code-generator && git checkout 3dcf91f64f638563e5106f21f50c31fa361c918d)
+
 REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
 $GOPATH/src/k8s.io/code-generator/generate-groups.sh all \
-  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis gke.googleapis.com:v1alpha1 \
+  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1 \
   --go-header-file $SCRIPT_ROOT/hack/header.go.txt
 
 # This hack is required as the autogens don't work for upper case letters in package names.

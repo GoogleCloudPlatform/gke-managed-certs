@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cgo_testing "k8s.io/client-go/testing"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	fakenetworkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1/fake"
+	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	cnt_errors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
@@ -542,7 +542,7 @@ var testCases = []struct {
 func TestManagedCertificate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			client := &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &cgo_testing.Fake{}}
+			client := &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &cgo_testing.Fake{}}
 			updateCalled := false
 			client.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
 

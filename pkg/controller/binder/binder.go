@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	annotationManagedCertificatesKey = "gke.googleapis.com/managed-certificates"
+	annotationManagedCertificatesKey = "networking.gke.io/managed-certificates"
 	annotationPreSharedCertKey       = "ingress.gcp.kubernetes.io/pre-shared-cert"
 	separator                        = ","
 )

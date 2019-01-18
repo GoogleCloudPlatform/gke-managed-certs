@@ -23,9 +23,9 @@ import (
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	networkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
+	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
@@ -42,7 +42,7 @@ type Sync interface {
 }
 
 type syncImpl struct {
-	client  gkev1alpha1.GkeV1alpha1Interface
+	client  networkingv1beta1.NetworkingV1beta1Interface
 	config  *config.Config
 	lister  mcrtlister.ManagedCertificateLister
 	metrics metrics.Metrics
@@ -51,7 +51,7 @@ type syncImpl struct {
 	state   state.State
 }
 
-func New(client gkev1alpha1.GkeV1alpha1Interface, config *config.Config, lister mcrtlister.ManagedCertificateLister,
+func New(client networkingv1beta1.NetworkingV1beta1Interface, config *config.Config, lister mcrtlister.ManagedCertificateLister,
 	metrics metrics.Metrics, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
 	return syncImpl{
 		client:  client,

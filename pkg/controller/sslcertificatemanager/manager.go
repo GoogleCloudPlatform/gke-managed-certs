@@ -21,7 +21,7 @@ import (
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"

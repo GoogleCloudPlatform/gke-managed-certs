@@ -30,7 +30,7 @@ import (
 
 const (
 	additionalSslCertificateDomain = "example.com"
-	annotation                     = "gke.googleapis.com/managed-certificates"
+	annotation                     = "networking.gke.io/managed-certificates"
 	annotationSeparator            = ","
 	maxNameLength                  = 15
 	statusActive                   = "Active"

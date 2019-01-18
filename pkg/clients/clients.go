@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
+	networkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
@@ -51,7 +51,7 @@ type Clients struct {
 	IngressInformerFactory informers.SharedInformerFactory
 
 	// ManagedCertificateClient manages ManagedCertificate custom resources
-	ManagedCertificateClient gkev1alpha1.GkeV1alpha1Interface
+	ManagedCertificateClient networkingv1beta1.NetworkingV1beta1Interface
 
 	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
 	ManagedCertificateInformerFactory externalversions.SharedInformerFactory
@@ -89,7 +89,7 @@ func New(config *config.Config) (*Clients, error) {
 		Event:                             event,
 		IngressClient:                     ingressClient,
 		IngressInformerFactory:            ingressFactory,
-		ManagedCertificateClient:          managedCertificateClient.GkeV1alpha1(),
+		ManagedCertificateClient:          managedCertificateClient.NetworkingV1beta1(),
 		ManagedCertificateInformerFactory: managedCertificateFactory,
 		Ssl:                               ssl,
 	}, nil

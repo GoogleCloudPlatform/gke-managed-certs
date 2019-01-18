@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
@@ -50,7 +50,7 @@ func New(config *rest.Config) (ManagedCertificate, error) {
 }
 
 func (m managedCertificateImpl) Create(namespace, name string, domains []string) error {
-	nsClient := m.clientset.GkeV1alpha1().ManagedCertificates(namespace)
+	nsClient := m.clientset.NetworkingV1beta1().ManagedCertificates(namespace)
 	mcrt := &api.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -67,7 +67,7 @@ func (m managedCertificateImpl) Create(namespace, name string, domains []string)
 }
 
 func (m managedCertificateImpl) DeleteAll(namespace string) error {
-	mcrts, err := m.clientset.GkeV1alpha1().ManagedCertificates(namespace).List(metav1.ListOptions{})
+	mcrts, err := m.clientset.NetworkingV1beta1().ManagedCertificates(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -82,14 +82,14 @@ func (m managedCertificateImpl) DeleteAll(namespace string) error {
 }
 
 func (m managedCertificateImpl) Delete(namespace, name string) error {
-	return http.IgnoreNotFound(m.clientset.GkeV1alpha1().ManagedCertificates(namespace).Delete(name, &metav1.DeleteOptions{}))
+	return http.IgnoreNotFound(m.clientset.NetworkingV1beta1().ManagedCertificates(namespace).Delete(name, &metav1.DeleteOptions{}))
 }
 
 func (m managedCertificateImpl) Get(namespace, name string) (*api.ManagedCertificate, error) {
-	return m.clientset.GkeV1alpha1().ManagedCertificates(namespace).Get(name, metav1.GetOptions{})
+	return m.clientset.NetworkingV1beta1().ManagedCertificates(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (m managedCertificateImpl) Update(mcrt *api.ManagedCertificate) error {
-	_, err := m.clientset.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
+	_, err := m.clientset.NetworkingV1beta1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
 }

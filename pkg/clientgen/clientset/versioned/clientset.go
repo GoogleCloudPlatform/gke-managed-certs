@@ -19,7 +19,7 @@ limitations under the License.
 package versioned
 
 import (
-	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
+	networkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -27,27 +27,27 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface
+	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Gke() gkev1alpha1.GkeV1alpha1Interface
+	Networking() networkingv1beta1.NetworkingV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	gkeV1alpha1 *gkev1alpha1.GkeV1alpha1Client
+	networkingV1beta1 *networkingv1beta1.NetworkingV1beta1Client
 }
 
-// GkeV1alpha1 retrieves the GkeV1alpha1Client
-func (c *Clientset) GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface {
-	return c.gkeV1alpha1
+// NetworkingV1beta1 retrieves the NetworkingV1beta1Client
+func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
+	return c.networkingV1beta1
 }
 
-// Deprecated: Gke retrieves the default version of GkeClient.
+// Deprecated: Networking retrieves the default version of NetworkingClient.
 // Please explicitly pick a version.
-func (c *Clientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
-	return c.gkeV1alpha1
+func (c *Clientset) Networking() networkingv1beta1.NetworkingV1beta1Interface {
+	return c.networkingV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -66,7 +66,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.gkeV1alpha1, err = gkev1alpha1.NewForConfig(&configShallowCopy)
+	cs.networkingV1beta1, err = networkingv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.gkeV1alpha1 = gkev1alpha1.NewForConfigOrDie(c)
+	cs.networkingV1beta1 = networkingv1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -91,7 +91,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.gkeV1alpha1 = gkev1alpha1.New(c)
+	cs.networkingV1beta1 = networkingv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

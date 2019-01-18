@@ -15,10 +15,10 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: managedcertificates.gke.googleapis.com
+  name: managedcertificates.networking.gke.io
 spec:
-  group: gke.googleapis.com
-  version: v1alpha1
+  group: networking.gke.io
+  version: v1beta1
   scope: Namespaced
   names:
     plural: managedcertificates

@@ -24,8 +24,8 @@ import (
 	time "time"
 
 	versioned "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	gkegoogleapiscom "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions/gke.googleapis.com"
 	internalinterfaces "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions/internalinterfaces"
+	networkinggkeio "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions/networking.gke.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Gke() gkegoogleapiscom.Interface
+	Networking() networkinggkeio.Interface
 }
 
-func (f *sharedInformerFactory) Gke() gkegoogleapiscom.Interface {
-	return gkegoogleapiscom.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Networking() networkinggkeio.Interface {
+	return networkinggkeio.New(f, f.namespace, f.tweakListOptions)
 }
