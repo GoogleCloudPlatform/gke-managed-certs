@@ -26,9 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 const (
@@ -85,15 +87,15 @@ func (f fakeRandom) Name() (string, error) {
 // Fake ssl manager
 type fakeSsl struct {
 	mapping   map[string]*compute.SslCertificate
-	createErr <-chan error
-	deleteErr <-chan error
-	existsErr <-chan error
-	getErr    <-chan error
+	createErr error
+	deleteErr error
+	existsErr error
+	getErr    error
 }
 
 var _ sslcertificatemanager.SslCertificateManager = &fakeSsl{}
 
-func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, existsErr, getErr []error) *fakeSsl {
+func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, existsErr, getErr error) *fakeSsl {
 	ssl := &fakeSsl{
 		mapping: make(map[string]*compute.SslCertificate, 0),
 	}
@@ -102,30 +104,12 @@ func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, exis
 		ssl.Create(key, *mcrt)
 	}
 
-	ssl.createErr = toChannel(createErr)
-	ssl.deleteErr = toChannel(deleteErr)
-	ssl.existsErr = toChannel(existsErr)
-	ssl.getErr = toChannel(getErr)
+	ssl.createErr = createErr
+	ssl.deleteErr = deleteErr
+	ssl.existsErr = existsErr
+	ssl.getErr = getErr
 
 	return ssl
-}
-
-func toChannel(err []error) <-chan error {
-	ch := make(chan error, channelBuffer)
-	for _, e := range err {
-		ch <- e
-	}
-
-	return ch
-}
-
-func errOrNil(ch <-chan error) error {
-	select {
-	case e := <-ch:
-		return e
-	default:
-		return nil
-	}
 }
 
 func (f *fakeSsl) Create(sslCertificateName string, mcrt api.ManagedCertificate) error {
@@ -137,35 +121,36 @@ func (f *fakeSsl) Create(sslCertificateName string, mcrt api.ManagedCertificate)
 		Type: typeManaged,
 	}
 
-	return errOrNil(f.createErr)
+	return f.createErr
 }
 
 func (f *fakeSsl) Delete(sslCertificateName string, mcrt *api.ManagedCertificate) error {
 	delete(f.mapping, sslCertificateName)
-	return errOrNil(f.deleteErr)
+	return f.deleteErr
 }
 
 func (f *fakeSsl) Exists(sslCertificateName string, mcrt *api.ManagedCertificate) (bool, error) {
 	_, exists := f.mapping[sslCertificateName]
-	return exists, errOrNil(f.existsErr)
+	return exists, f.existsErr
 }
 
 func (f *fakeSsl) Get(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
 	sslCert := f.mapping[sslCertificateName]
-	return sslCert, errOrNil(f.getErr)
+	return sslCert, f.getErr
 }
 
 // Fake state
-type fakeMetricState struct {
-	exists bool
+type fakeMetricsState struct {
+	softDeletedErr            error
+	sslCertificateCreationErr error
 }
 type fakeState struct {
-	namespace                            string
-	name                                 string
-	sslCertificateName                   string
-	entryExists                          bool
-	sslCertificateCreationReported       bool
-	sslCertificateCreationMetricOverride *fakeMetricState
+	entryExists                    bool
+	id                             types.CertId
+	sslCertificateName             string
+	softDeleted                    bool
+	sslCertificateCreationReported bool
+	errOverride                    *fakeMetricsState
 }
 
 var _ state.State = &fakeState{}
@@ -174,50 +159,94 @@ func newEmptyState() *fakeState {
 	return &fakeState{}
 }
 
-func newState(namespace, name, sslCertificateName string) *fakeState {
+func newState(id types.CertId, sslCertificateName string) *fakeState {
 	return &fakeState{
-		namespace:          namespace,
-		name:               name,
+		id:                 id,
 		sslCertificateName: sslCertificateName,
 		entryExists:        true,
 	}
 }
 
-func newStateWithMetricOverride(namespace, name, sslCertificateName string,
-	sslCertificateCreationReported, sslCertificateCreationMetricExists bool) *fakeState {
-	state := newState(namespace, name, sslCertificateName)
+func newStateWithOverride(id types.CertId, sslCertificateName string, sslCertificateCreationReported bool, sslCertificateCreationErr error,
+	softDeleted bool, softDeletedErr error) *fakeState {
+
+	state := newState(id, sslCertificateName)
 	state.sslCertificateCreationReported = sslCertificateCreationReported
-	state.sslCertificateCreationMetricOverride = &fakeMetricState{
-		exists: sslCertificateCreationMetricExists,
+	state.softDeleted = softDeleted
+	state.errOverride = &fakeMetricsState{
+		softDeletedErr:            softDeletedErr,
+		sslCertificateCreationErr: sslCertificateCreationErr,
 	}
 	return state
 }
 
-func (f *fakeState) Delete(namespace, name string) {
+func (f *fakeState) Delete(id types.CertId) {
 	f.entryExists = false
 }
 
-func (f *fakeState) ForeachKey(fun func(namespace, name string)) {
-	fun(f.namespace, f.name)
+func (f *fakeState) ForeachKey(fun func(id types.CertId)) {
+	fun(f.id)
 }
 
-func (f *fakeState) GetSslCertificateName(namespace, name string) (string, bool) {
-	return f.sslCertificateName, f.entryExists
-}
-
-func (f *fakeState) IsSslCertificateCreationReported(namespace, name string) (bool, bool) {
-	if f.sslCertificateCreationMetricOverride != nil {
-		return f.sslCertificateCreationReported, f.sslCertificateCreationMetricOverride.exists
+func (f *fakeState) GetSslCertificateName(id types.CertId) (string, error) {
+	if !f.entryExists {
+		return "", errors.ErrManagedCertificateNotFound
 	}
-	return f.sslCertificateCreationReported, f.entryExists
+
+	return f.sslCertificateName, nil
 }
 
-func (f *fakeState) SetSslCertificateCreationReported(namespace, name string) {
+func (f *fakeState) IsSoftDeleted(id types.CertId) (bool, error) {
+	if f.errOverride != nil && f.errOverride.softDeletedErr != nil {
+		return false, f.errOverride.softDeletedErr
+	}
+
+	if !f.entryExists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return f.softDeleted, nil
+}
+
+func (f *fakeState) IsSslCertificateCreationReported(id types.CertId) (bool, error) {
+	if f.errOverride != nil && f.errOverride.sslCertificateCreationErr != nil {
+		return false, f.errOverride.sslCertificateCreationErr
+	}
+
+	if !f.entryExists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return f.sslCertificateCreationReported, nil
+}
+
+func (f *fakeState) SetSoftDeleted(id types.CertId) error {
+	if f.errOverride != nil && f.errOverride.softDeletedErr != nil {
+		return f.errOverride.softDeletedErr
+	}
+
+	if !f.entryExists {
+		return errors.ErrManagedCertificateNotFound
+	}
+	f.softDeleted = true
+
+	return nil
+}
+
+func (f *fakeState) SetSslCertificateCreationReported(id types.CertId) error {
+	if f.errOverride != nil && f.errOverride.sslCertificateCreationErr != nil {
+		return f.errOverride.sslCertificateCreationErr
+	}
+
+	if !f.entryExists {
+		return errors.ErrManagedCertificateNotFound
+	}
 	f.sslCertificateCreationReported = true
-	f.entryExists = true
+
+	return nil
 }
 
-func (f *fakeState) SetSslCertificateName(namespace, name, sslCertificateName string) {
+func (f *fakeState) SetSslCertificateName(id types.CertId, sslCertificateName string) {
 	f.sslCertificateName = sslCertificateName
 	f.entryExists = true
 }

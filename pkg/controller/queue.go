@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 func (c *controller) enqueue(obj interface{}) {
@@ -68,7 +70,7 @@ func (c *controller) handle(key string) error {
 		return err
 	}
 
-	if err := c.sync.ManagedCertificate(namespace, name); err != nil {
+	if err := c.sync.ManagedCertificate(types.NewCertId(namespace, name)); err != nil {
 		return err
 	}
 

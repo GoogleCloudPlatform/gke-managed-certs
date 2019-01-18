@@ -29,57 +29,37 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
-
-type pair struct {
-	first  string
-	second string
-}
 
 // Fake state
 type fakeState struct {
-	// Collection of namespace, name pairs
-	managedCertificates []pair
+	// Collection of ManagedCertificate ids
+	ids []types.CertId
 }
 
-var _ state.State = &fakeState{}
+var _ state.StateIterator = &fakeState{}
 
-func newFakeState(managedCertificates []pair) *fakeState {
-	return &fakeState{
-		managedCertificates: managedCertificates,
+func newFakeState(ids []types.CertId) *fakeState {
+	return &fakeState{ids: ids}
+}
+
+func (f *fakeState) ForeachKey(fun func(id types.CertId)) {
+	for _, id := range f.ids {
+		fun(id)
 	}
 }
-
-func (f *fakeState) Delete(namespace, name string) {}
-
-func (f *fakeState) ForeachKey(fun func(namespace, name string)) {
-	for _, m := range f.managedCertificates {
-		fun(m.first, m.second)
-	}
-}
-
-func (f *fakeState) GetSslCertificateName(namespace, name string) (string, bool) {
-	return "", false
-}
-
-func (f *fakeState) IsSslCertificateCreationReported(namespace, name string) (bool, bool) {
-	return false, false
-}
-
-func (f *fakeState) SetSslCertificateCreationReported(namespace, name string) {}
-
-func (f *fakeState) SetSslCertificateName(namespace, name, sslCertificateName string) {}
 
 // Fake sync
 type fakeSync struct {
-	// Collection of namespace, name pairs
-	managedCertificates []pair
+	// Collection of ManagedCertificate ids
+	ids []types.CertId
 }
 
 var _ sync.Sync = &fakeSync{}
 
-func (f *fakeSync) ManagedCertificate(namespace, name string) error {
-	f.managedCertificates = append(f.managedCertificates, pair{first: namespace, second: name})
+func (f *fakeSync) ManagedCertificate(id types.CertId) error {
+	f.ids = append(f.ids, id)
 	return nil
 }
 
@@ -105,13 +85,12 @@ func (f *fakeQueue) NumRequeues(item interface{}) int { return 0 }
 
 func TestSynchronizeAllManagedCertificates(t *testing.T) {
 	testCases := []struct {
-		desc      string
-		listerErr error
-		// Collection of namespace, name pairs
-		managedCertificatesLister []pair
-		managedCertificatesState  []pair
-		wantQueue                 []string
-		wantMetrics               map[string]int
+		desc        string
+		listerErr   error
+		listerIds   []types.CertId
+		stateIds    []types.CertId
+		wantQueue   []string
+		wantMetrics map[string]int
 	}{
 		{
 			"State and lister empty",
@@ -124,16 +103,16 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 		{
 			"State two elements, lister one element",
 			nil,
-			[]pair{pair{"default", "foo"}, pair{"default", "bar"}},
-			[]pair{pair{"default", "baz"}},
+			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
+			[]types.CertId{types.NewCertId("default", "baz")},
 			[]string{"default/foo", "default/bar"},
 			map[string]int{"Active": 2},
 		},
 		{
 			"State two elements, lister one element and fails",
 			errors.New("test error"),
-			[]pair{pair{"default", "foo"}, pair{"default", "bar"}},
-			[]pair{pair{"default", "baz"}},
+			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
+			[]types.CertId{types.NewCertId("default", "baz")},
 			nil,
 			nil,
 		},
@@ -142,12 +121,12 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
 			var mcrts []*api.ManagedCertificate
-			for _, mcrt := range testCase.managedCertificatesLister {
+			for _, id := range testCase.listerIds {
 				mcrts = append(mcrts, &api.ManagedCertificate{
 					ObjectMeta: metav1.ObjectMeta{
 						CreationTimestamp: metav1.Now().Rfc3339Copy(),
-						Namespace:         mcrt.first,
-						Name:              mcrt.second,
+						Namespace:         id.Namespace,
+						Name:              id.Name,
 					},
 					Spec: api.ManagedCertificateSpec{
 						Domains: []string{"example.com"},
@@ -166,14 +145,14 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 				lister:  fake.NewLister(testCase.listerErr, mcrts),
 				metrics: metrics,
 				queue:   queue,
-				state:   newFakeState(testCase.managedCertificatesState),
+				state:   newFakeState(testCase.stateIds),
 				sync:    sync,
 			}
 
 			sut.synchronizeAllManagedCertificates()
 
-			if !reflect.DeepEqual(testCase.managedCertificatesState, sync.managedCertificates) {
-				t.Fatalf("Synced %v, want %v", sync.managedCertificates, testCase.managedCertificatesState)
+			if !reflect.DeepEqual(testCase.stateIds, sync.ids) {
+				t.Fatalf("Synced %v, want %v", sync.ids, testCase.stateIds)
 			}
 
 			if !reflect.DeepEqual(testCase.wantQueue, queue.items) {

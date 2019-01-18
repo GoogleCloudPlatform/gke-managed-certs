@@ -30,15 +30,19 @@ import (
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
+	cnt_errors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 const (
 	domainBar          = "bar.com"
 	domainFoo          = "foo.com"
-	namespace          = "foo"
-	name               = "bar"
 	sslCertificateName = "baz"
+)
+
+var (
+	mcrtId = types.NewCertId("foo", "bar")
 )
 
 func buildUpdateFunc(updateCalled *bool) cgo_testing.ReactionFunc {
@@ -61,8 +65,8 @@ func mockMcrt(domain string) *api.ManagedCertificate {
 	return &api.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.Now().Rfc3339Copy(),
-			Namespace:         namespace,
-			Name:              name,
+			Namespace:         mcrtId.Namespace,
+			Name:              mcrtId.Name,
 		},
 		Spec: api.ManagedCertificateSpec{
 			Domains: []string{domain},
@@ -81,13 +85,19 @@ func empty() *fakeState {
 	return newEmptyState()
 }
 func withEntry() *fakeState {
-	return newState(namespace, name, sslCertificateName)
+	return newState(mcrtId, sslCertificateName)
 }
-func withEntryAndNoMetric() *fakeState {
-	return newStateWithMetricOverride(namespace, name, sslCertificateName, false, false)
+func withEntryAndSslCertificateCreationFails() *fakeState {
+	return newStateWithOverride(mcrtId, sslCertificateName, false, cnt_errors.ErrManagedCertificateNotFound, false, nil)
 }
-func withEntryAndMetricReported() *fakeState {
-	return newStateWithMetricOverride(namespace, name, sslCertificateName, true, true)
+func withEntryAndSslCertificateCreationReported() *fakeState {
+	return newStateWithOverride(mcrtId, sslCertificateName, true, nil, false, nil)
+}
+func withEntryAndSoftDeletedFails() *fakeState {
+	return newStateWithOverride(mcrtId, sslCertificateName, false, nil, false, cnt_errors.ErrManagedCertificateNotFound)
+}
+func withEntryAndSoftDeleted() *fakeState {
+	return newStateWithOverride(mcrtId, sslCertificateName, false, nil, true, nil)
 }
 
 type in struct {
@@ -96,15 +106,16 @@ type in struct {
 	random       fakeRandom
 	state        *fakeState
 	mcrt         *api.ManagedCertificate
-	sslCreateErr []error
-	sslDeleteErr []error
-	sslExistsErr []error
-	sslGetErr    []error
+	sslCreateErr error
+	sslDeleteErr error
+	sslExistsErr error
+	sslGetErr    error
 }
 
 type out struct {
 	entryInState                bool
 	createLatencyMetricObserved bool
+	wantSoftDeleted             bool
 	updateCalled                bool
 	err                         error
 }
@@ -157,7 +168,36 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister fails with not found, entry in state, success to delete ssl cert",
+		"Lister fails with not found, entry in state, soft deleted in state, success to delete SslCertificate",
+		in{
+			lister:  listerFailsNotFound,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndSoftDeleted(),
+		},
+		out{
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             nil,
+		},
+	},
+	{
+		"Lister fails with not found, entry in state, setting soft deleted fails",
+		in{
+			lister:  listerFailsNotFound,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndSoftDeletedFails(),
+		},
+		out{
+			entryInState: true,
+			updateCalled: false,
+			err:          cnt_errors.ErrManagedCertificateNotFound,
+		},
+	},
+	{
+		"Lister fails with not found, entry in state, success to delete SslCertificate",
 		in{
 			lister:  listerFailsNotFound,
 			metrics: fake.NewMetrics(),
@@ -165,39 +205,42 @@ var testCases = []struct {
 			state:   withEntry(),
 		},
 		out{
-			entryInState: false,
-			updateCalled: false,
-			err:          nil,
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             nil,
 		},
 	},
 	{
-		"Lister fails with not found, entry in state, ssl cert already deleted",
+		"Lister fails with not found, entry in state, SslCertificate already deleted",
 		in{
 			lister:       listerFailsNotFound,
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslDeleteErr: []error{googleNotFound},
+			sslDeleteErr: googleNotFound,
 		},
 		out{
-			entryInState: false,
-			updateCalled: false,
-			err:          nil,
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             nil,
 		},
 	},
 	{
-		"Lister fails with not found, entry in state, ssl cert fails to delete",
+		"Lister fails with not found, entry in state, fail to delete SslCertificate",
 		in{
 			lister:       listerFailsNotFound,
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslDeleteErr: []error{genericError},
+			sslDeleteErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:    true,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             genericError,
 		},
 	},
 	{
@@ -266,7 +309,7 @@ var testCases = []struct {
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        empty(),
-			sslExistsErr: []error{genericError},
+			sslExistsErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -281,7 +324,7 @@ var testCases = []struct {
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslExistsErr: []error{genericError},
+			sslExistsErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -296,7 +339,7 @@ var testCases = []struct {
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        empty(),
-			sslCreateErr: []error{genericError},
+			sslCreateErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -305,13 +348,13 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert create fails",
+		"Lister success, entry in state, SslCertificate creation fails",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
-			sslCreateErr: []error{genericError},
+			sslCreateErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -320,26 +363,26 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert create success, metric reported entry not found",
+		"Lister success, entry in state, SslCertificate creation succeeds, metric reported entry not found",
 		in{
 			lister:  listerSuccess,
 			metrics: fake.NewMetrics(),
 			random:  randomSuccess,
-			state:   withEntryAndNoMetric(),
+			state:   withEntryAndSslCertificateCreationFails(),
 		},
 		out{
 			entryInState: true,
 			updateCalled: false,
-			err:          errManagedCertificateNotFound,
+			err:          cnt_errors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert create success, metric already reported",
+		"Lister success, entry in state, SslCertificate creation succeeds, metric already reported",
 		in{
 			lister:  listerSuccess,
 			metrics: fake.NewMetricsSslCertificateCreationAlreadyReported(),
 			random:  randomSuccess,
-			state:   withEntryAndMetricReported(),
+			state:   withEntryAndSslCertificateCreationReported(),
 		},
 		out{
 			entryInState:                true,
@@ -349,13 +392,13 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, state empty, ssl cert not exists - get fails",
+		"Lister success, state empty, SslCertificate does not exists - get fails",
 		in{
 			lister:    listerSuccess,
 			metrics:   fake.NewMetrics(),
 			random:    randomSuccess,
 			state:     empty(),
-			sslGetErr: []error{genericError},
+			sslGetErr: genericError,
 		},
 		out{
 			entryInState:                true,
@@ -365,13 +408,13 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert not exists - get fails",
+		"Lister success, entry in state, SslCertificate does not exists - get fails",
 		in{
 			lister:    listerSuccess,
 			metrics:   fake.NewMetrics(),
 			random:    randomSuccess,
 			state:     withEntry(),
-			sslGetErr: []error{genericError},
+			sslGetErr: genericError,
 		},
 		out{
 			entryInState:                true,
@@ -381,14 +424,14 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, state empty, ssl cert exists - get fails",
+		"Lister success, state empty, SslCertificate exists - get fails",
 		in{
 			lister:    listerSuccess,
 			metrics:   fake.NewMetrics(),
 			random:    randomSuccess,
 			state:     empty(),
 			mcrt:      mockMcrt(domainFoo),
-			sslGetErr: []error{genericError},
+			sslGetErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -397,14 +440,14 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert exists - get fails",
+		"Lister success, entry in state, SslCertificate exists - get fails",
 		in{
 			lister:    listerSuccess,
 			metrics:   fake.NewMetrics(),
 			random:    randomSuccess,
 			state:     withEntry(),
 			mcrt:      mockMcrt(domainFoo),
-			sslGetErr: []error{genericError},
+			sslGetErr: genericError,
 		},
 		out{
 			entryInState: true,
@@ -422,147 +465,118 @@ var testCases = []struct {
 			mcrt:    mockMcrt(domainBar),
 		},
 		out{
-			entryInState: true,
-			updateCalled: true,
-			err:          nil,
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
-		"Lister success, entry in state, certs mismatch but ssl cert already deleted",
+		"Lister success, entry in state, certs mismatch - SslCertificate already deleted",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         mockMcrt(domainBar),
-			sslDeleteErr: []error{googleNotFound},
+			sslDeleteErr: googleNotFound,
 		},
 		out{
-			entryInState: true,
-			updateCalled: true,
-			err:          nil,
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
-		"Lister success, entry in state, certs mismatch and deletion fails",
+		"Lister success, entry in state, certs mismatch - SslCertificate deletion fails",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
 			random:       randomSuccess,
 			state:        withEntry(),
 			mcrt:         mockMcrt(domainBar),
-			sslDeleteErr: []error{genericError},
+			sslDeleteErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:    true,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             genericError,
 		},
 	},
 	{
-		"Lister success, entry in state, certs mismatch, ssl cert creation fails",
+		"Lister success, entry in state, certs mismatch, soft deleted in state",
 		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			mcrt:         mockMcrt(domainBar),
-			sslCreateErr: []error{genericError},
+			lister:  listerSuccess,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndSoftDeleted(),
+			mcrt:    mockMcrt(domainBar),
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:    false,
+			wantSoftDeleted: true,
+			updateCalled:    false,
+			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
-		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert creation fails",
+		"Lister success, entry in state, certs mismatch, setting soft deleted fails",
 		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			mcrt:         mockMcrt(domainBar),
-			sslCreateErr: []error{genericError},
-			sslDeleteErr: []error{googleNotFound},
+			lister:  listerSuccess,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndSoftDeletedFails(),
+			mcrt:    mockMcrt(domainBar),
 		},
 		out{
 			entryInState: true,
 			updateCalled: false,
-			err:          genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch, ssl cert get fails",
-		in{
-			lister:    listerSuccess,
-			metrics:   fake.NewMetrics(),
-			random:    randomSuccess,
-			state:     withEntry(),
-			mcrt:      mockMcrt(domainBar),
-			sslGetErr: []error{nil, genericError},
-		},
-		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch but ssl cert already deleted, ssl cert get fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			mcrt:         mockMcrt(domainBar),
-			sslDeleteErr: []error{googleNotFound},
-			sslGetErr:    []error{nil, genericError},
-		},
-		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			err:          cnt_errors.ErrManagedCertificateNotFound,
 		},
 	},
 }
 
 func TestManagedCertificate(t *testing.T) {
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
 			clientset := newClientset()
 			updateCalled := false
 			clientset.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
 
 			config := config.NewFakeCertificateStatusConfig()
-			ssl := newSsl(sslCertificateName, testCase.in.mcrt, testCase.in.sslCreateErr,
-				testCase.in.sslDeleteErr, testCase.in.sslExistsErr, testCase.in.sslGetErr)
-			sut := New(clientset, config, testCase.in.lister, testCase.in.metrics, testCase.in.random, ssl,
-				testCase.in.state)
+			ssl := newSsl(sslCertificateName, tc.in.mcrt, tc.in.sslCreateErr, tc.in.sslDeleteErr,
+				tc.in.sslExistsErr, tc.in.sslGetErr)
+			sut := New(clientset, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
 
-			err := sut.ManagedCertificate(namespace, name)
+			err := sut.ManagedCertificate(mcrtId)
 
-			if _, e := testCase.in.state.GetSslCertificateName(namespace, name); e != testCase.out.entryInState {
-				t.Errorf("Entry in state %t, want %t", e, testCase.out.entryInState)
+			if _, err := tc.in.state.GetSslCertificateName(mcrtId); (err == nil) != tc.out.entryInState {
+				t.Errorf("Entry in state %t, want %t, err: %v", err == nil, tc.out.entryInState, err)
 			}
 
-			reported, _ := testCase.in.state.IsSslCertificateCreationReported(namespace, name)
-			entryExists := testCase.in.state.entryExists
-			if entryExists != testCase.out.entryInState || reported != testCase.out.createLatencyMetricObserved {
+			if tc.out.wantSoftDeleted != tc.in.state.softDeleted {
+				t.Errorf("Soft deleted: %t, want: %t", tc.in.state.softDeleted, tc.out.wantSoftDeleted)
+			}
+
+			reported, _ := tc.in.state.IsSslCertificateCreationReported(mcrtId)
+			entryExists := tc.in.state.entryExists
+			if entryExists != tc.out.entryInState || reported != tc.out.createLatencyMetricObserved {
 				t.Errorf("Entry in state %t, want %t; CreateSslCertificateLatency metric observed %t, want %t",
-					entryExists, testCase.out.entryInState, reported, testCase.out.createLatencyMetricObserved)
+					entryExists, tc.out.entryInState, reported, tc.out.createLatencyMetricObserved)
 			}
-			if testCase.out.createLatencyMetricObserved && testCase.in.metrics.SslCertificateCreationLatencyObserved != 1 {
+			if tc.out.createLatencyMetricObserved && tc.in.metrics.SslCertificateCreationLatencyObserved != 1 {
 				t.Errorf("CreateSslCertificateLatency metric observed %d times, want 1",
-					testCase.in.metrics.SslCertificateCreationLatencyObserved)
+					tc.in.metrics.SslCertificateCreationLatencyObserved)
 			}
 
-			if testCase.out.updateCalled != updateCalled {
-				t.Errorf("Update called %t, want %t", updateCalled, testCase.out.updateCalled)
+			if tc.out.updateCalled != updateCalled {
+				t.Errorf("Update called %t, want %t", updateCalled, tc.out.updateCalled)
 			}
 
-			if err != testCase.out.err {
-				t.Errorf("Have error: %v, want: %v", err, testCase.out.err)
+			if err != tc.out.err {
+				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
 			}
 		})
 	}

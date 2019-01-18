@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 const (
@@ -37,16 +39,24 @@ const (
 	keySeparator       = ":"
 )
 
+type StateIterator interface {
+	ForeachKey(f func(id types.CertId))
+}
+
 type State interface {
-	Delete(namespace, name string)
-	ForeachKey(f func(namespace, name string))
-	GetSslCertificateName(namespace, name string) (string, bool)
-	IsSslCertificateCreationReported(namespace, name string) (bool, bool)
-	SetSslCertificateCreationReported(namespace, name string)
-	SetSslCertificateName(namespace, name, sslCertificateName string)
+	StateIterator
+
+	Delete(id types.CertId)
+	GetSslCertificateName(id types.CertId) (string, error)
+	IsSoftDeleted(id types.CertId) (bool, error)
+	IsSslCertificateCreationReported(id types.CertId) (bool, error)
+	SetSoftDeleted(id types.CertId) error
+	SetSslCertificateCreationReported(id types.CertId) error
+	SetSslCertificateName(id types.CertId, sslCertificateName string)
 }
 
 type entry struct {
+	SoftDeleted                    bool
 	SslCertificateName             string
 	SslCertificateCreationReported bool
 }
@@ -54,22 +64,22 @@ type entry struct {
 type stateImpl struct {
 	sync.RWMutex
 
-	// Maps ManagedCertificate to SslCertificate. Keys are built with buildKey() and decoded with splitKey().
+	// Maps ManagedCertificate to SslCertificate. Keys are built with idToKey() and decoded with keyToId().
 	mapping map[string]entry
 
 	// Manages ConfigMap objects
 	configmap configmap.ConfigMap
 }
 
-// Transforms a ManagedCertificate namespace and name into a key in State mapping.
-func buildKey(namespace, name string) string {
-	return fmt.Sprintf("%s%s%s", namespace, keySeparator, name)
+// Transforms a ManagedCertificate id into a key in State mapping.
+func idToKey(id types.CertId) string {
+	return fmt.Sprintf("%s%s%s", id.Namespace, keySeparator, id.Name)
 }
 
-// Transforms a key in State mapping back into a ManagedCertificate namespace and name.
-func splitKey(key string) (string, string) {
+// Transforms a key in State mapping back into a ManagedCertificate id.
+func keyToId(key string) types.CertId {
 	parts := strings.Split(key, keySeparator)
-	return parts[0], parts[1]
+	return types.NewCertId(parts[0], parts[1])
 }
 
 func New(configmap configmap.ConfigMap) State {
@@ -88,72 +98,115 @@ func New(configmap configmap.ConfigMap) State {
 	}
 }
 
-// Delete deletes entry associated with ManagedCertificate identified by namespace and name
-func (state stateImpl) Delete(namespace, name string) {
+// Delete deletes entry associated with ManagedCertificate id
+func (state stateImpl) Delete(id types.CertId) {
 	state.Lock()
 	defer state.Unlock()
-	delete(state.mapping, buildKey(namespace, name))
+	delete(state.mapping, idToKey(id))
 	state.persist()
 }
 
-// ForeachKey calls f on every key split into namespace and name
-func (state stateImpl) ForeachKey(f func(namespace, name string)) {
+// ForeachKey calls f on every key translated into id
+func (state stateImpl) ForeachKey(f func(id types.CertId)) {
 	var keys []string
 
 	state.RLock()
-	for k := range state.mapping {
-		keys = append(keys, k)
+	for key := range state.mapping {
+		keys = append(keys, key)
 	}
 	state.RUnlock()
 
-	for _, k := range keys {
-		namespace, name := splitKey(k)
-		f(namespace, name)
+	for _, key := range keys {
+		f(keyToId(key))
 	}
 }
 
-// GetSslCertificateName returns the name of SslCertificate associated with ManagedCertificate identified by namespace and name
-func (state stateImpl) GetSslCertificateName(namespace, name string) (string, bool) {
+// GetSslCertificateName returns the name of SslCertificate associated with ManagedCertificate id
+func (state stateImpl) GetSslCertificateName(id types.CertId) (string, error) {
 	state.RLock()
 	defer state.RUnlock()
-	entry, exists := state.mapping[buildKey(namespace, name)]
-	return entry.SslCertificateName, exists
+	entry, exists := state.mapping[idToKey(id)]
+
+	if !exists {
+		return "", errors.ErrManagedCertificateNotFound
+	}
+
+	return entry.SslCertificateName, nil
 }
 
-// IsSslCertificateCreationReported returns true if SslCertificate creation metric has already been reported for ManagedCertificate identified by namespace and name
-func (state stateImpl) IsSslCertificateCreationReported(namespace, name string) (bool, bool) {
+// IsSoftDeleted returns true if entry associated with given ManagedCertificate id is marked as soft deleted.
+func (state stateImpl) IsSoftDeleted(id types.CertId) (bool, error) {
 	state.RLock()
 	defer state.RUnlock()
-	entry, exists := state.mapping[buildKey(namespace, name)]
-	return entry.SslCertificateCreationReported, exists
+	entry, exists := state.mapping[idToKey(id)]
+
+	if !exists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return entry.SoftDeleted, nil
 }
 
-// SetSslCertificateCreationReported sets to true a flag indicating that SslCertificate creation metric has been already reported for ManagedCertificate identified by namespace and name
-func (state stateImpl) SetSslCertificateCreationReported(namespace, name string) {
+// IsSslCertificateCreationReported returns true if SslCertificate creation metric has already been reported for ManagedCertificate id
+func (state stateImpl) IsSslCertificateCreationReported(id types.CertId) (bool, error) {
+	state.RLock()
+	defer state.RUnlock()
+	entry, exists := state.mapping[idToKey(id)]
+
+	if !exists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return entry.SslCertificateCreationReported, nil
+}
+
+// SetSoftDeleted sets to true a flag indicating that entry associated with given ManagedCertificate id has been deleted.
+func (state stateImpl) SetSoftDeleted(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
 
-	key := buildKey(namespace, name)
+	key := idToKey(id)
 	v, exists := state.mapping[key]
 	if !exists {
-		v = entry{SslCertificateName: ""}
+		return errors.ErrManagedCertificateNotFound
+	}
+
+	v.SoftDeleted = true
+
+	state.mapping[key] = v
+	state.persist()
+
+	return nil
+}
+
+// SetSslCertificateCreationReported sets to true a flag indicating that SslCertificate creation metric has been already reported for ManagedCertificate id
+func (state stateImpl) SetSslCertificateCreationReported(id types.CertId) error {
+	state.Lock()
+	defer state.Unlock()
+
+	key := idToKey(id)
+	v, exists := state.mapping[key]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
 	}
 
 	v.SslCertificateCreationReported = true
 
 	state.mapping[key] = v
 	state.persist()
+
+	return nil
 }
 
-// SetSslCertificateName sets the name of SslCertificate associated with ManagedCertificate identified by namespace and name
-func (state stateImpl) SetSslCertificateName(namespace, name, sslCertificateName string) {
+// SetSslCertificateName sets the name of SslCertificate associated with ManagedCertificate id
+func (state stateImpl) SetSslCertificateName(id types.CertId, sslCertificateName string) {
 	state.Lock()
 	defer state.Unlock()
 
-	key := buildKey(namespace, name)
+	key := idToKey(id)
 	v, exists := state.mapping[key]
 	if !exists {
-		v = entry{SslCertificateCreationReported: false}
+		v = entry{}
 	}
 
 	v.SslCertificateName = sslCertificateName

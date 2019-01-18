@@ -38,6 +38,8 @@ type configMapMock struct {
 }
 
 func (c *configMapMock) check(change int) {
+	c.t.Helper()
+
 	if c.getCount != 1 {
 		c.t.Fatalf("ConfigMap.Get() called %d times, want 1", c.getCount)
 	}

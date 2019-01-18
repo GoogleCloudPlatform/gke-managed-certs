@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type controller struct {
@@ -44,7 +45,7 @@ type controller struct {
 	lister          mcrtlister.ManagedCertificateLister
 	metrics         metrics.Metrics
 	queue           workqueue.RateLimitingInterface
-	state           state.State
+	state           state.StateIterator
 	sync            sync.Sync
 	synced          cache.InformerSynced
 }
@@ -109,8 +110,8 @@ func (c *controller) Run(ctx context.Context) error {
 }
 
 func (c *controller) synchronizeAllManagedCertificates() {
-	c.state.ForeachKey(func(namespace, name string) {
-		if err := c.sync.ManagedCertificate(namespace, name); err != nil {
+	c.state.ForeachKey(func(id types.CertId) {
+		if err := c.sync.ManagedCertificate(id); err != nil {
 			runtime.HandleError(err)
 		}
 	})
