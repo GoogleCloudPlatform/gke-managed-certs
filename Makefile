@@ -1,6 +1,6 @@
-all: gofmt build-binary-in-docker run-test-in-docker clean cross
+all: gofmt vet build-binary-in-docker run-test-in-docker clean cross
 
-TAG ?= dev
+TAG ?= ${USER}-dev
 REGISTRY ?= eu.gcr.io/managed-certs-gke
 KUBECONFIG ?= ${HOME}/.kube/config
 KUBERNETES_PROVIDER ?= gke
@@ -95,4 +95,7 @@ run-test-in-docker: docker-runner-builder
 test:
 	godep go test ./pkg/... -cover
 
-.PHONY: all auth-configure-docker build-binary build-binary-in-docker build-dev clean cross deps docker docker-runner-builder e2e release release-ci run-e2e-in-docker run-test-in-docker test
+vet:
+	godep go vet ./...
+
+.PHONY: all auth-configure-docker build-binary build-binary-in-docker build-dev clean cross deps docker docker-runner-builder e2e release release-ci run-e2e-in-docker run-test-in-docker test vet

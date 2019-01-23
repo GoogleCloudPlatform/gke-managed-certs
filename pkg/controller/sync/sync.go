@@ -24,7 +24,7 @@ import (
 	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
+	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
@@ -42,25 +42,25 @@ type Sync interface {
 }
 
 type syncImpl struct {
-	clientset versioned.Interface
-	config    *config.Config
-	lister    mcrtlister.ManagedCertificateLister
-	metrics   metrics.Metrics
-	random    random.Random
-	ssl       sslcertificatemanager.SslCertificateManager
-	state     state.State
+	client  gkev1alpha1.GkeV1alpha1Interface
+	config  *config.Config
+	lister  mcrtlister.ManagedCertificateLister
+	metrics metrics.Metrics
+	random  random.Random
+	ssl     sslcertificatemanager.SslCertificateManager
+	state   state.State
 }
 
-func New(clientset versioned.Interface, config *config.Config, lister mcrtlister.ManagedCertificateLister,
+func New(client gkev1alpha1.GkeV1alpha1Interface, config *config.Config, lister mcrtlister.ManagedCertificateLister,
 	metrics metrics.Metrics, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
 	return syncImpl{
-		clientset: clientset,
-		config:    config,
-		lister:    lister,
-		metrics:   metrics,
-		random:    random,
-		ssl:       ssl,
-		state:     state,
+		client:  client,
+		config:  config,
+		lister:  lister,
+		metrics: metrics,
+		random:  random,
+		ssl:     ssl,
+		state:   state,
 	}
 }
 
@@ -184,6 +184,6 @@ func (s syncImpl) ManagedCertificate(id types.CertId) error {
 		return err
 	}
 
-	_, err = s.clientset.GkeV1alpha1().ManagedCertificates(mcrt.Namespace).Update(mcrt)
+	_, err = s.client.ManagedCertificates(mcrt.Namespace).Update(mcrt)
 	return err
 }

@@ -27,10 +27,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/binder"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -41,33 +41,36 @@ import (
 )
 
 type controller struct {
-	informerFactory externalversions.SharedInformerFactory
-	lister          mcrtlister.ManagedCertificateLister
-	metrics         metrics.Metrics
-	queue           workqueue.RateLimitingInterface
-	state           state.StateIterator
-	sync            sync.Sync
-	synced          cache.InformerSynced
+	binder  binder.Binder
+	clients *clients.Clients
+	lister  v1alpha1.ManagedCertificateLister
+	metrics metrics.Metrics
+	queue   workqueue.RateLimitingInterface
+	state   state.StateIterator
+	sync    sync.Sync
+	synced  cache.InformerSynced
 }
 
 func New(config *config.Config, clients *clients.Clients) *controller {
-	informer := clients.InformerFactory.Gke().V1alpha1().ManagedCertificates()
-	lister := informer.Lister()
+	ingressLister := clients.IngressInformerFactory.Extensions().V1beta1().Ingresses().Lister()
+	managedCertificateInformer := clients.ManagedCertificateInformerFactory.Gke().V1alpha1().ManagedCertificates()
+	mcrtLister := managedCertificateInformer.Lister()
 	metrics := metrics.New(config)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl)
 	random := random.New(config.SslCertificateNamePrefix)
 	state := state.New(clients.ConfigMap)
 	controller := &controller{
-		informerFactory: clients.InformerFactory,
-		lister:          lister,
-		metrics:         metrics,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		state:           state,
-		sync:            sync.New(clients.Clientset, config, lister, metrics, random, ssl, state),
-		synced:          informer.Informer().HasSynced,
+		binder:  binder.New(clients.IngressClient, ingressLister, state),
+		clients: clients,
+		lister:  mcrtLister,
+		metrics: metrics,
+		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
+		state:   state,
+		sync:    sync.New(clients.ManagedCertificateClient, config, mcrtLister, metrics, random, ssl, state),
+		synced:  managedCertificateInformer.Informer().HasSynced,
 	}
 
-	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	managedCertificateInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			controller.enqueue(obj)
 		},
@@ -91,7 +94,7 @@ func (c *controller) Run(ctx context.Context) error {
 	glog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
-	go c.informerFactory.Start(ctx.Done())
+	c.clients.Run(ctx)
 
 	glog.Info("Waiting for ManagedCertificate cache sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.synced) {
@@ -99,8 +102,9 @@ func (c *controller) Run(ctx context.Context) error {
 	}
 	glog.Info("ManagedCertificate cache synced")
 
-	go wait.Until(func() { c.processNext() }, time.Second, ctx.Done())
+	go wait.Until(c.processNextManagedCertificate, time.Second, ctx.Done())
 	go wait.Until(c.synchronizeAllManagedCertificates, time.Minute, ctx.Done())
+	go wait.Until(c.binder.BindCertificates, time.Second, ctx.Done())
 
 	glog.Info("Waiting for stop signal or error")
 

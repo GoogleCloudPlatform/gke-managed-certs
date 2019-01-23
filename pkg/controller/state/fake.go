@@ -109,7 +109,7 @@ func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error
 	c.getCount++
 	return &api.ConfigMap{
 		Data: map[string]string{
-			"1": "{\"Key\":\"default:cat\",\"Value\":{\"SslCertificateName\":\"1\",\"SslCertificateCreationReported\":false}}",
+			"1": "{\"Key\":{\"Namespace\":\"default\",\"Name\":\"cat\"},\"Value\":{\"SslCertificateName\":\"1\",\"SslCertificateCreationReported\":false}}",
 		},
 	}, nil
 }

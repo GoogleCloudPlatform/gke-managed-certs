@@ -18,14 +18,8 @@ package sync
 
 import (
 	compute "google.golang.org/api/compute/v0.beta"
-	"k8s.io/client-go/discovery"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	cgo_testing "k8s.io/client-go/testing"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
-	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -38,32 +32,6 @@ const (
 	keySeparator  = ":"
 	typeManaged   = "MANAGED"
 )
-
-// Fake ManagedCertificate clientset
-type fakeClientset struct {
-	cgo_testing.Fake
-	discovery *fakediscovery.FakeDiscovery
-}
-
-var _ versioned.Interface = &fakeClientset{}
-
-func newClientset() fakeClientset {
-	f := fakeClientset{}
-	f.discovery = &fakediscovery.FakeDiscovery{Fake: &f.Fake}
-	return f
-}
-
-func (f fakeClientset) Discovery() discovery.DiscoveryInterface {
-	return f.discovery
-}
-
-func (f fakeClientset) GkeV1alpha1() gkev1alpha1.GkeV1alpha1Interface {
-	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
-}
-
-func (f fakeClientset) Gke() gkev1alpha1.GkeV1alpha1Interface {
-	return &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &f.Fake}
-}
 
 // Fake random
 type fakeRandom struct {

@@ -34,6 +34,7 @@ func (c *controller) enqueue(obj interface{}) {
 		return
 	}
 
+	glog.Infof("Enqueuing ManagedCertificate: %+v", obj)
 	c.queue.AddRateLimited(key)
 }
 
@@ -56,7 +57,6 @@ func (c *controller) enqueueAll() {
 		statuses[mcrt.Status.CertificateStatus]++
 	}
 
-	glog.Infof("Enqueuing ManagedCertificates found in cluster: %+v", names)
 	for _, mcrt := range mcrts {
 		c.enqueue(mcrt)
 	}
@@ -77,11 +77,11 @@ func (c *controller) handle(key string) error {
 	return err
 }
 
-func (c *controller) processNext() bool {
+func (c *controller) processNextManagedCertificate() {
 	obj, shutdown := c.queue.Get()
 
 	if shutdown {
-		return false
+		return
 	}
 
 	defer c.queue.Done(obj)
@@ -90,16 +90,15 @@ func (c *controller) processNext() bool {
 	if !ok {
 		c.queue.Forget(obj)
 		runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
-		return true
+		return
 	}
 
 	err := c.handle(key)
 	if err == nil {
 		c.queue.Forget(obj)
-		return true
+		return
 	}
 
 	c.queue.AddRateLimited(obj)
 	runtime.HandleError(err)
-	return true
 }

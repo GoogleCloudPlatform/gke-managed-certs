@@ -28,6 +28,7 @@ import (
 	cgo_testing "k8s.io/client-go/testing"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/gke.googleapis.com/v1alpha1"
+	fakegkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1/fake"
 	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	cnt_errors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
@@ -541,14 +542,14 @@ var testCases = []struct {
 func TestManagedCertificate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			clientset := newClientset()
+			client := &fakegkev1alpha1.FakeGkeV1alpha1{Fake: &cgo_testing.Fake{}}
 			updateCalled := false
-			clientset.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
+			client.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
 
 			config := config.NewFakeCertificateStatusConfig()
 			ssl := newSsl(sslCertificateName, tc.in.mcrt, tc.in.sslCreateErr, tc.in.sslDeleteErr,
 				tc.in.sslExistsErr, tc.in.sslGetErr)
-			sut := New(clientset, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
+			sut := New(client, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
 
 			err := sut.ManagedCertificate(mcrtId)
 

@@ -280,13 +280,16 @@ func TestState(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
-	m1 := map[string]entry{
-		"mcrt1": entry{
+	mcrt1 := types.NewCertId("default", "mcrt1")
+	mcrt2 := types.NewCertId("system", "mcrt2")
+
+	m1 := map[types.CertId]entry{
+		mcrt1: entry{
 			SoftDeleted:                    false,
 			SslCertificateName:             "sslCert1",
 			SslCertificateCreationReported: false,
 		},
-		"mcrt2": entry{
+		mcrt2: entry{
 			SoftDeleted:                    true,
 			SslCertificateName:             "sslCert2",
 			SslCertificateCreationReported: true,
@@ -294,13 +297,13 @@ func TestMarshal(t *testing.T) {
 	}
 	m2 := unmarshal(marshal(m1))
 
-	v, e := m2["mcrt1"]
+	v, e := m2[mcrt1]
 	if !e || v.SoftDeleted != false || v.SslCertificateName != "sslCert1" || v.SslCertificateCreationReported != false {
-		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1["mcrt1"])
+		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1[mcrt1])
 	}
 
-	v, e = m2["mcrt2"]
+	v, e = m2[mcrt2]
 	if !e || v.SoftDeleted != true || v.SslCertificateName != "sslCert2" || v.SslCertificateCreationReported != true {
-		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1["mcrt2"])
+		t.Fatalf("Marshalling and unmarshalling mangles data: e is %t, want true; v: %#v, want %#v", e, v, m1[mcrt2])
 	}
 }

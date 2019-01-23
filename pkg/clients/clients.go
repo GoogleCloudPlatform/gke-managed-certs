@@ -18,12 +18,16 @@ limitations under the License.
 package clients
 
 import (
+	"context"
 	"fmt"
 
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
+	gkev1alpha1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/gke.googleapis.com/v1alpha1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
@@ -34,17 +38,23 @@ import (
 
 // Clients are used to communicate with api server and GCLB
 type Clients struct {
-	// Clientset manages ManagedCertificate custom resources
-	Clientset versioned.Interface
-
 	// ConfigMap manages ConfigMap objects
 	ConfigMap configmap.ConfigMap
 
 	// Event manages Event objects
 	Event event.Event
 
-	// InfomerFactory produces informers and listers which handle ManagedCertificate custom resources
-	InformerFactory externalversions.SharedInformerFactory
+	// IngressClient manages Ingress objects
+	IngressClient v1beta1.IngressesGetter
+
+	// IngressInformerFactory produces informers and listers which handle Ingress objects
+	IngressInformerFactory informers.SharedInformerFactory
+
+	// ManagedCertificateClient manages ManagedCertificate custom resources
+	ManagedCertificateClient gkev1alpha1.GkeV1alpha1Interface
+
+	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
+	ManagedCertificateInformerFactory externalversions.SharedInformerFactory
 
 	// Ssl manages SslCertificate GCP resources
 	Ssl ssl.Ssl
@@ -56,24 +66,36 @@ func New(config *config.Config) (*Clients, error) {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
 
-	clientset := versioned.NewForConfigOrDie(clusterConfig)
-	factory := externalversions.NewSharedInformerFactory(clientset, 0)
+	ingressClient := v1beta1.NewForConfigOrDie(clusterConfig)
+
+	kubernetesClient := kubernetes.NewForConfigOrDie(clusterConfig)
+	ingressFactory := informers.NewSharedInformerFactory(kubernetesClient, 0)
+
+	managedCertificateClient := versioned.NewForConfigOrDie(clusterConfig)
+	managedCertificateFactory := externalversions.NewSharedInformerFactory(managedCertificateClient, 0)
 
 	ssl, err := ssl.New(config)
 	if err != nil {
 		return nil, err
 	}
 
-	event, err := event.New(kubernetes.NewForConfigOrDie(clusterConfig))
+	event, err := event.New(kubernetesClient)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Clients{
-		Clientset:       clientset,
-		ConfigMap:       configmap.New(clusterConfig),
-		Event:           event,
-		InformerFactory: factory,
-		Ssl:             ssl,
+		ConfigMap:                         configmap.New(clusterConfig),
+		Event:                             event,
+		IngressClient:                     ingressClient,
+		IngressInformerFactory:            ingressFactory,
+		ManagedCertificateClient:          managedCertificateClient.GkeV1alpha1(),
+		ManagedCertificateInformerFactory: managedCertificateFactory,
+		Ssl:                               ssl,
 	}, nil
+}
+
+func (c *Clients) Run(ctx context.Context) {
+	go c.IngressInformerFactory.Start(ctx.Done())
+	go c.ManagedCertificateInformerFactory.Start(ctx.Done())
 }
