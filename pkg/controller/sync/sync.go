@@ -80,6 +80,15 @@ func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
 }
 
 func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string, id types.CertId, mcrt api.ManagedCertificate) error {
+	excludedFromSLO, err := s.state.IsExcludedFromSLO(id)
+	if err != nil {
+		return err
+	}
+	if excludedFromSLO {
+		glog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
+		return nil
+	}
+
 	reported, err := s.state.IsSslCertificateCreationReported(id)
 	if err != nil {
 		return err

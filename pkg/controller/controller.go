@@ -56,11 +56,11 @@ func New(config *config.Config, clients *clients.Clients) *controller {
 	managedCertificateInformer := clients.ManagedCertificateInformerFactory.Networking().V1beta1().ManagedCertificates()
 	mcrtLister := managedCertificateInformer.Lister()
 	metrics := metrics.New(config)
-	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl)
-	random := random.New(config.SslCertificateNamePrefix)
 	state := state.New(clients.ConfigMap)
+	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
+	random := random.New(config.SslCertificateNamePrefix)
 	controller := &controller{
-		binder:  binder.New(clients.IngressClient, ingressLister, state),
+		binder:  binder.New(clients.IngressClient, ingressLister, mcrtLister, metrics, state),
 		clients: clients,
 		lister:  mcrtLister,
 		metrics: metrics,

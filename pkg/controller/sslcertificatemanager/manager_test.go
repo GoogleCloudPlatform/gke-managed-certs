@@ -125,8 +125,10 @@ var cert = &compute.SslCertificate{}
 func TestCreate(t *testing.T) {
 	testCases := []struct {
 		ssl                   ssl.Ssl
+		excludedFromSLOErr    error
 		wantErr               error
 		wantTooManyCertsEvent bool
+		wantExcludedFromSLO   bool
 		wantBackendErrorEvent bool
 		wantCreateEvent       bool
 	}{
@@ -137,6 +139,13 @@ func TestCreate(t *testing.T) {
 		{
 			ssl:                   withErr(quotaExceededErr),
 			wantErr:               quotaExceededErr,
+			wantTooManyCertsEvent: true,
+			wantExcludedFromSLO:   true,
+		},
+		{
+			ssl:                   withErr(quotaExceededErr),
+			excludedFromSLOErr:    genericErr,
+			wantErr:               genericErr,
 			wantTooManyCertsEvent: true,
 		},
 		{
@@ -149,7 +158,10 @@ func TestCreate(t *testing.T) {
 	for _, tc := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl)
+		state := fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+			certId: fake.StateEntry{SslCertificateName: "", ExcludedFromSLOErr: tc.excludedFromSLOErr},
+		})
+		sut := New(event, metrics, tc.ssl, state)
 
 		err := sut.Create("", *fake.NewManagedCertificate(certId, domain))
 
@@ -165,6 +177,12 @@ func TestCreate(t *testing.T) {
 		oneSslCertificateQuotaErrorObserved := metrics.SslCertificateQuotaErrorObserved == 1
 		if tc.wantTooManyCertsEvent != oneSslCertificateQuotaErrorObserved {
 			t.Fatalf("Metric SslCertificateQuotaError observed %d times", metrics.SslCertificateQuotaErrorObserved)
+		}
+
+		excluded, err := state.IsExcludedFromSLO(certId)
+		if tc.excludedFromSLOErr != err || excluded != tc.wantExcludedFromSLO {
+			t.Fatalf("Excluded from SLO is %t, err %v; want %t, err %v", excluded, err,
+				tc.wantExcludedFromSLO, tc.excludedFromSLOErr)
 		}
 
 		oneBackendErrorEvent := event.backendErrorCnt == 1
@@ -222,7 +240,7 @@ func TestDelete(t *testing.T) {
 	for _, tc := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl)
+		sut := New(event, metrics, tc.ssl, fake.NewState())
 
 		err := sut.Delete("", tc.mcrt)
 
@@ -296,7 +314,7 @@ func TestExists(t *testing.T) {
 	for _, tc := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl)
+		sut := New(event, metrics, tc.ssl, fake.NewState())
 
 		exists, err := sut.Exists("", tc.mcrt)
 
@@ -367,7 +385,7 @@ func TestGet(t *testing.T) {
 	for _, tc := range testCases {
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl)
+		sut := New(event, metrics, tc.ssl, fake.NewState())
 
 		sslCert, err := sut.Get("", tc.mcrt)
 

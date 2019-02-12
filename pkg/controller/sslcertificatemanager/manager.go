@@ -25,7 +25,9 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type SslCertificateManager interface {
@@ -39,13 +41,15 @@ type sslCertificateManagerImpl struct {
 	event   event.Event
 	metrics metrics.Metrics
 	ssl     ssl.Ssl
+	state   state.State
 }
 
-func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl) SslCertificateManager {
+func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl, state state.State) SslCertificateManager {
 	return sslCertificateManagerImpl{
 		event:   event,
 		metrics: metrics,
 		ssl:     ssl,
+		state:   state,
 	}
 }
 
@@ -58,6 +62,11 @@ func (s sslCertificateManagerImpl) Create(sslCertificateName string, mcrt api.Ma
 		if http.IsQuotaExceeded(err) {
 			s.event.TooManyCertificates(mcrt, err)
 			s.metrics.ObserveSslCertificateQuotaError()
+
+			if err := s.state.SetExcludedFromSLO(types.NewCertId(mcrt.Namespace, mcrt.Name)); err != nil {
+				return err
+			}
+
 			return err
 		}
 

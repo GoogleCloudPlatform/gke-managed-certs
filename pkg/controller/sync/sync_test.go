@@ -72,30 +72,68 @@ var listerSuccess = fake.NewLister(nil, []*api.ManagedCertificate{mockMcrt(domai
 var randomFailsGenericErr = newRandom(genericError, "")
 var randomSuccess = newRandom(nil, sslCertificateName)
 
-func empty() *fakeState {
-	return newEmptyState()
+func empty() *fake.FakeState {
+	return fake.NewState()
 }
-func withEntry() *fakeState {
-	return newState(mcrtId, sslCertificateName)
+func withEntry() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{SslCertificateName: sslCertificateName},
+	})
 }
-func withEntryAndSslCertificateCreationFails() *fakeState {
-	return newStateWithOverride(mcrtId, sslCertificateName, false, cnt_errors.ErrManagedCertificateNotFound, false, nil)
+func withEntryAndExcludedFromSLOFails() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName: sslCertificateName,
+			ExcludedFromSLOErr: genericError,
+		},
+	})
 }
-func withEntryAndSslCertificateCreationReported() *fakeState {
-	return newStateWithOverride(mcrtId, sslCertificateName, true, nil, false, nil)
+func withEntryAndExcludedFromSLOSet() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName: sslCertificateName,
+			ExcludedFromSLO:    true,
+		},
+	})
 }
-func withEntryAndSoftDeletedFails() *fakeState {
-	return newStateWithOverride(mcrtId, sslCertificateName, false, nil, false, cnt_errors.ErrManagedCertificateNotFound)
+func withEntryAndSslCertificateCreationFails() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName:        sslCertificateName,
+			SslCertificateCreationErr: cnt_errors.ErrManagedCertificateNotFound,
+		},
+	})
 }
-func withEntryAndSoftDeleted() *fakeState {
-	return newStateWithOverride(mcrtId, sslCertificateName, false, nil, true, nil)
+func withEntryAndSslCertificateCreationReported() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName:             sslCertificateName,
+			SslCertificateCreationReported: true,
+		},
+	})
+}
+func withEntryAndSoftDeletedFails() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName: sslCertificateName,
+			SoftDeletedErr:     cnt_errors.ErrManagedCertificateNotFound,
+		},
+	})
+}
+func withEntryAndSoftDeleted() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName: sslCertificateName,
+			SoftDeleted:        true,
+		},
+	})
 }
 
 type in struct {
 	lister       mcrtlister.ManagedCertificateLister
 	metrics      *fake.FakeMetrics
 	random       fakeRandom
-	state        *fakeState
+	state        *fake.FakeState
 	mcrt         *api.ManagedCertificate
 	sslCreateErr error
 	sslDeleteErr error
@@ -107,7 +145,8 @@ type out struct {
 	entryInState                bool
 	createLatencyMetricObserved bool
 	wantSoftDeleted             bool
-	updateCalled                bool
+	wantEcludedFromSLO          bool
+	wantUpdateCalled            bool
 	err                         error
 }
 
@@ -125,9 +164,9 @@ var testCases = []struct {
 			state:   empty(),
 		},
 		out{
-			entryInState: false,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     false,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -139,9 +178,9 @@ var testCases = []struct {
 			state:   withEntry(),
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -153,9 +192,9 @@ var testCases = []struct {
 			state:   empty(),
 		},
 		out{
-			entryInState: false,
-			updateCalled: false,
-			err:          nil,
+			entryInState:     false,
+			wantUpdateCalled: false,
+			err:              nil,
 		},
 	},
 	{
@@ -167,10 +206,10 @@ var testCases = []struct {
 			state:   withEntryAndSoftDeleted(),
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             nil,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              nil,
 		},
 	},
 	{
@@ -182,9 +221,9 @@ var testCases = []struct {
 			state:   withEntryAndSoftDeletedFails(),
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          cnt_errors.ErrManagedCertificateNotFound,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -196,10 +235,10 @@ var testCases = []struct {
 			state:   withEntry(),
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             nil,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              nil,
 		},
 	},
 	{
@@ -212,10 +251,10 @@ var testCases = []struct {
 			sslDeleteErr: googleNotFound,
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             nil,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              nil,
 		},
 	},
 	{
@@ -228,10 +267,10 @@ var testCases = []struct {
 			sslDeleteErr: genericError,
 		},
 		out{
-			entryInState:    true,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             genericError,
+			entryInState:     true,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -245,7 +284,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                true,
+			wantUpdateCalled:            true,
 			err:                         nil,
 		},
 	},
@@ -260,7 +299,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                true,
+			wantUpdateCalled:            true,
 			err:                         nil,
 		},
 	},
@@ -273,9 +312,9 @@ var testCases = []struct {
 			state:   empty(),
 		},
 		out{
-			entryInState: false,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     false,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -289,7 +328,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                true,
+			wantUpdateCalled:            true,
 			err:                         nil,
 		},
 	},
@@ -303,9 +342,9 @@ var testCases = []struct {
 			sslExistsErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -318,9 +357,9 @@ var testCases = []struct {
 			sslExistsErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -333,9 +372,9 @@ var testCases = []struct {
 			sslCreateErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -348,9 +387,38 @@ var testCases = []struct {
 			sslCreateErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
+		},
+	},
+	{
+		"Lister success, entry in state, SslCertificate creation succeeds, excluded from SLO: entry not found",
+		in{
+			lister:  listerSuccess,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndExcludedFromSLOFails(),
+		},
+		out{
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
+		},
+	},
+	{
+		"Lister success, entry in state, SslCertificate creation succeeds, excluded from SLO",
+		in{
+			lister:  listerSuccess,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndExcludedFromSLOSet(),
+		},
+		out{
+			entryInState:                true,
+			createLatencyMetricObserved: false,
+			wantUpdateCalled:            true,
+			err:                         nil,
 		},
 	},
 	{
@@ -362,9 +430,9 @@ var testCases = []struct {
 			state:   withEntryAndSslCertificateCreationFails(),
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          cnt_errors.ErrManagedCertificateNotFound,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -378,7 +446,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                true,
+			wantUpdateCalled:            true,
 			err:                         nil,
 		},
 	},
@@ -394,7 +462,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                false,
+			wantUpdateCalled:            false,
 			err:                         genericError,
 		},
 	},
@@ -410,7 +478,7 @@ var testCases = []struct {
 		out{
 			entryInState:                true,
 			createLatencyMetricObserved: true,
-			updateCalled:                false,
+			wantUpdateCalled:            false,
 			err:                         genericError,
 		},
 	},
@@ -425,9 +493,9 @@ var testCases = []struct {
 			sslGetErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -441,9 +509,9 @@ var testCases = []struct {
 			sslGetErr: genericError,
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          genericError,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -456,10 +524,10 @@ var testCases = []struct {
 			mcrt:    mockMcrt(domainBar),
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -473,10 +541,10 @@ var testCases = []struct {
 			sslDeleteErr: googleNotFound,
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -490,10 +558,10 @@ var testCases = []struct {
 			sslDeleteErr: genericError,
 		},
 		out{
-			entryInState:    true,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             genericError,
+			entryInState:     true,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              genericError,
 		},
 	},
 	{
@@ -506,10 +574,10 @@ var testCases = []struct {
 			mcrt:    mockMcrt(domainBar),
 		},
 		out{
-			entryInState:    false,
-			wantSoftDeleted: true,
-			updateCalled:    false,
-			err:             cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			entryInState:     false,
+			wantSoftDeleted:  true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -522,9 +590,9 @@ var testCases = []struct {
 			mcrt:    mockMcrt(domainBar),
 		},
 		out{
-			entryInState: true,
-			updateCalled: false,
-			err:          cnt_errors.ErrManagedCertificateNotFound,
+			entryInState:     true,
+			wantUpdateCalled: false,
+			err:              cnt_errors.ErrManagedCertificateNotFound,
 		},
 	},
 }
@@ -541,18 +609,22 @@ func TestManagedCertificate(t *testing.T) {
 				tc.in.sslExistsErr, tc.in.sslGetErr)
 			sut := New(client, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
 
-			err := sut.ManagedCertificate(mcrtId)
+			if err := sut.ManagedCertificate(mcrtId); err != tc.out.err {
+				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
+			}
 
 			if _, err := tc.in.state.GetSslCertificateName(mcrtId); (err == nil) != tc.out.entryInState {
 				t.Errorf("Entry in state %t, want %t, err: %v", err == nil, tc.out.entryInState, err)
 			}
 
-			if tc.out.wantSoftDeleted != tc.in.state.softDeleted {
-				t.Errorf("Soft deleted: %t, want: %t", tc.in.state.softDeleted, tc.out.wantSoftDeleted)
+			softDeleted, err := tc.in.state.IsSoftDeleted(mcrtId)
+			if err == nil && tc.out.wantSoftDeleted != softDeleted {
+				t.Errorf("Soft deleted: %t, want: %t", softDeleted, tc.out.wantSoftDeleted)
 			}
 
 			reported, _ := tc.in.state.IsSslCertificateCreationReported(mcrtId)
-			entryExists := tc.in.state.entryExists
+			_, err = tc.in.state.GetSslCertificateName(mcrtId)
+			entryExists := err == nil
 			if entryExists != tc.out.entryInState || reported != tc.out.createLatencyMetricObserved {
 				t.Errorf("Entry in state %t, want %t; CreateSslCertificateLatency metric observed %t, want %t",
 					entryExists, tc.out.entryInState, reported, tc.out.createLatencyMetricObserved)
@@ -562,12 +634,8 @@ func TestManagedCertificate(t *testing.T) {
 					tc.in.metrics.SslCertificateCreationLatencyObserved)
 			}
 
-			if tc.out.updateCalled != updateCalled {
-				t.Errorf("Update called %t, want %t", updateCalled, tc.out.updateCalled)
-			}
-
-			if err != tc.out.err {
-				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
+			if tc.out.wantUpdateCalled != updateCalled {
+				t.Errorf("Update called %t, want %t", updateCalled, tc.out.wantUpdateCalled)
 			}
 		})
 	}
