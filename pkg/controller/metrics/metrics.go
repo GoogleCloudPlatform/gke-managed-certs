@@ -41,6 +41,7 @@ type Metrics interface {
 	ObserveManagedCertificatesStatuses(statuses map[string]int)
 	ObserveSslCertificateBackendError()
 	ObserveSslCertificateQuotaError()
+	ObserveSslCertificateBindingLatency(creationTime time.Time)
 	ObserveSslCertificateCreationLatency(creationTime time.Time)
 }
 
@@ -49,6 +50,7 @@ type metricsImpl struct {
 	managedCertificateStatus        *prometheus.GaugeVec
 	sslCertificateBackendErrorTotal prometheus.Counter
 	sslCertificateQuotaErrorTotal   prometheus.Counter
+	sslCertificateBindingLatency    prometheus.Histogram
 	sslCertificateCreationLatency   prometheus.Histogram
 }
 
@@ -77,6 +79,15 @@ func New(config *config.Config) Metrics {
 				Name:      "sslcertificate_quota_error_total",
 				Help: `The number of out-of-quota errors occurred
 				when performing actions on SslCertificate resources`,
+			},
+		),
+		sslCertificateBindingLatency: promauto.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "sslcertificate_binding_latency_seconds",
+				Help: `Time elapsed from creating a valid ManagedCertificate resource to binding a first
+				corresponding SslCertificate resource with Ingress via annotation pre-shared-cert`,
+				Buckets: prometheus.ExponentialBuckets(1.0, 1.3, 10),
 			},
 		),
 		sslCertificateCreationLatency: promauto.NewHistogram(
@@ -123,7 +134,15 @@ func (m metricsImpl) ObserveSslCertificateQuotaError() {
 	m.sslCertificateQuotaErrorTotal.Inc()
 }
 
-// ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid ManagedCertficate resource was created.
+// ObserveSslCertificateBindingLatency observes the time it took to bind an SslCertficate resource with Ingress after
+// a valid ManagedCertficate resource was created.
+func (m metricsImpl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
+	diff := time.Now().UTC().Sub(creationTime).Seconds()
+	m.sslCertificateBindingLatency.Observe(diff)
+}
+
+// ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid
+// ManagedCertficate resource was created.
 func (m metricsImpl) ObserveSslCertificateCreationLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
 	m.sslCertificateCreationLatency.Observe(diff)

@@ -26,6 +26,7 @@ type FakeMetrics struct {
 	ManagedCertificatesStatuses           map[string]int
 	SslCertificateBackendErrorObserved    int
 	SslCertificateQuotaErrorObserved      int
+	SslCertificateBindingLatencyObserved  int
 	SslCertificateCreationLatencyObserved int
 }
 
@@ -53,6 +54,10 @@ func (f *FakeMetrics) ObserveSslCertificateBackendError() {
 
 func (f *FakeMetrics) ObserveSslCertificateQuotaError() {
 	f.SslCertificateQuotaErrorObserved++
+}
+
+func (f *FakeMetrics) ObserveSslCertificateBindingLatency(creationTime time.Time) {
+	f.SslCertificateBindingLatencyObserved++
 }
 
 func (f *FakeMetrics) ObserveSslCertificateCreationLatency(creationTime time.Time) {

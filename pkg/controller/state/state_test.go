@@ -68,6 +68,26 @@ func isSoftDeleted(t *testing.T, state State, tuple tuple, wantSoftDeleted bool)
 	}
 }
 
+func isExcludedFromSLO(t *testing.T, state State, tuple tuple, wantExcluded bool) {
+	t.Helper()
+	excluded, err := state.IsExcludedFromSLO(tuple.Id)
+	if err != nil && wantExcluded {
+		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
+	} else if excluded != wantExcluded {
+		t.Fatalf("Excluded from SLO for %s is %t, want %t", tuple.Id.String(), excluded, wantExcluded)
+	}
+}
+
+func isSslCertificateBindingReported(t *testing.T, state State, tuple tuple, wantReported bool) {
+	t.Helper()
+	reported, err := state.IsSslCertificateBindingReported(tuple.Id)
+	if err != nil && wantReported {
+		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
+	} else if reported != wantReported {
+		t.Fatalf("SslCertificate binding metric reported for %s is %t, want %t", tuple.Id.String(), reported, wantReported)
+	}
+}
+
 func isSslCertificateCreationReported(t *testing.T, state State, tuple tuple, wantReported bool) {
 	t.Helper()
 	reported, err := state.IsSslCertificateCreationReported(tuple.Id)
@@ -78,8 +98,28 @@ func isSslCertificateCreationReported(t *testing.T, state State, tuple tuple, wa
 	}
 }
 
+func setExcludedFromSLO(state State, tuple tuple, configmap configMap, changeCount *int) error {
+	if err := state.SetExcludedFromSLO(tuple.Id); err != nil {
+		return err
+	}
+
+	(*changeCount)++
+	configmap.check(*changeCount)
+	return nil
+}
+
 func setSoftDeleted(state State, tuple tuple, configmap configMap, changeCount *int) error {
 	if err := state.SetSoftDeleted(tuple.Id); err != nil {
+		return err
+	}
+
+	(*changeCount)++
+	configmap.check(*changeCount)
+	return nil
+}
+
+func setSslCertificateBindingReported(state State, tuple tuple, configmap configMap, changeCount *int) error {
+	if err := state.SetSslCertificateBindingReported(tuple.Id); err != nil {
 		return err
 	}
 
@@ -239,6 +279,16 @@ func TestState(t *testing.T) {
 			deleteEntry(sut, tuple{types.NewCertId("non existing ns", "non existing name"), ""}, testCase.configmap, &changeCount)
 
 			foo := tuple{types.NewCertId("custom", "foo"), "2"}
+			isExcludedFromSLO(t, sut, foo, false)
+			if err := setExcludedFromSLO(sut, foo, testCase.configmap, &changeCount); err == nil {
+				t.Fatalf("Storing excluded from SLO for non-existing entry should fail")
+			}
+
+			isSslCertificateBindingReported(t, sut, foo, false)
+			if err := setSslCertificateBindingReported(sut, foo, testCase.configmap, &changeCount); err == nil {
+				t.Fatalf("Storing SslCertificate binding for non-existing entry should fail")
+			}
+
 			isSslCertificateCreationReported(t, sut, foo, false)
 			if err := setSslCertificateCreationReported(sut, foo, testCase.configmap, &changeCount); err == nil {
 				t.Fatalf("Storing SslCertificate creation for non-existing entry should fail")
@@ -251,6 +301,14 @@ func TestState(t *testing.T) {
 
 			getSslCertificateName(t, sut, tuple{types.NewCertId("custom", "foo"), ""}, false)
 			setSslCertificateName(sut, foo, testCase.configmap, &changeCount)
+
+			isExcludedFromSLO(t, sut, foo, false)
+			setExcludedFromSLO(sut, foo, testCase.configmap, &changeCount)
+			isExcludedFromSLO(t, sut, foo, true)
+
+			isSslCertificateBindingReported(t, sut, foo, false)
+			setSslCertificateBindingReported(sut, foo, testCase.configmap, &changeCount)
+			isSslCertificateBindingReported(t, sut, foo, true)
 
 			isSslCertificateCreationReported(t, sut, foo, false)
 			setSslCertificateCreationReported(sut, foo, testCase.configmap, &changeCount)

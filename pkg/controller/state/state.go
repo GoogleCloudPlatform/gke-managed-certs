@@ -46,16 +46,22 @@ type State interface {
 
 	Delete(id types.CertId)
 	GetSslCertificateName(id types.CertId) (string, error)
+	IsExcludedFromSLO(id types.CertId) (bool, error)
 	IsSoftDeleted(id types.CertId) (bool, error)
+	IsSslCertificateBindingReported(id types.CertId) (bool, error)
 	IsSslCertificateCreationReported(id types.CertId) (bool, error)
+	SetExcludedFromSLO(id types.CertId) error
 	SetSoftDeleted(id types.CertId) error
+	SetSslCertificateBindingReported(id types.CertId) error
 	SetSslCertificateCreationReported(id types.CertId) error
 	SetSslCertificateName(id types.CertId, sslCertificateName string)
 }
 
 type entry struct {
+	ExcludedFromSLO                bool
 	SoftDeleted                    bool
 	SslCertificateName             string
+	SslCertificateBindingReported  bool
 	SslCertificateCreationReported bool
 }
 
@@ -121,6 +127,20 @@ func (state *stateImpl) GetSslCertificateName(id types.CertId) (string, error) {
 	return entry.SslCertificateName, nil
 }
 
+// IsExcludedFromSLO returns true if entry associated with given ManagedCertificate id will not be taken into account
+// for calculating SLO.
+func (state *stateImpl) IsExcludedFromSLO(id types.CertId) (bool, error) {
+	state.RLock()
+	defer state.RUnlock()
+	entry, exists := state.mapping[id]
+
+	if !exists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return entry.ExcludedFromSLO, nil
+}
+
 // IsSoftDeleted returns true if entry associated with given ManagedCertificate id is marked as soft deleted.
 func (state *stateImpl) IsSoftDeleted(id types.CertId) (bool, error) {
 	state.RLock()
@@ -134,6 +154,19 @@ func (state *stateImpl) IsSoftDeleted(id types.CertId) (bool, error) {
 	return entry.SoftDeleted, nil
 }
 
+// IsSslCertificateBindingReported returns true if SslCertificate binding metric has already been reported for ManagedCertificate id
+func (state *stateImpl) IsSslCertificateBindingReported(id types.CertId) (bool, error) {
+	state.RLock()
+	defer state.RUnlock()
+	entry, exists := state.mapping[id]
+
+	if !exists {
+		return false, errors.ErrManagedCertificateNotFound
+	}
+
+	return entry.SslCertificateBindingReported, nil
+}
+
 // IsSslCertificateCreationReported returns true if SslCertificate creation metric has already been reported for ManagedCertificate id
 func (state *stateImpl) IsSslCertificateCreationReported(id types.CertId) (bool, error) {
 	state.RLock()
@@ -145,6 +178,25 @@ func (state *stateImpl) IsSslCertificateCreationReported(id types.CertId) (bool,
 	}
 
 	return entry.SslCertificateCreationReported, nil
+}
+
+// SetExcludedFromSLO sets to true a flag indicating that entry associated with given ManagedCertificate id should not be taken
+// into account for the purposes of SLO calculation.
+func (state *stateImpl) SetExcludedFromSLO(id types.CertId) error {
+	state.Lock()
+	defer state.Unlock()
+
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
+	}
+
+	v.ExcludedFromSLO = true
+
+	state.mapping[id] = v
+	state.persist()
+
+	return nil
 }
 
 // SetSoftDeleted sets to true a flag indicating that entry associated with given ManagedCertificate id has been deleted.
@@ -165,7 +217,27 @@ func (state *stateImpl) SetSoftDeleted(id types.CertId) error {
 	return nil
 }
 
-// SetSslCertificateCreationReported sets to true a flag indicating that SslCertificate creation metric has been already reported for ManagedCertificate id
+// SetSslCertificateBindingReported sets to true a flag indicating that SslCertificate binding metric has been already
+// reported for ManagedCertificate id
+func (state *stateImpl) SetSslCertificateBindingReported(id types.CertId) error {
+	state.Lock()
+	defer state.Unlock()
+
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
+	}
+
+	v.SslCertificateBindingReported = true
+
+	state.mapping[id] = v
+	state.persist()
+
+	return nil
+}
+
+// SetSslCertificateCreationReported sets to true a flag indicating that SslCertificate creation metric has been already
+// reported for ManagedCertificate id
 func (state *stateImpl) SetSslCertificateCreationReported(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
