@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
@@ -110,7 +109,7 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 		},
 		{
 			"State two elements, lister one element and fails",
-			errors.New("test error"),
+			errors.New("generic error"),
 			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
 			[]types.CertId{types.NewCertId("default", "baz")},
 			nil,
@@ -122,19 +121,7 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 		t.Run(testCase.desc, func(t *testing.T) {
 			var mcrts []*api.ManagedCertificate
 			for _, id := range testCase.listerIds {
-				mcrts = append(mcrts, &api.ManagedCertificate{
-					ObjectMeta: metav1.ObjectMeta{
-						CreationTimestamp: metav1.Now().Rfc3339Copy(),
-						Namespace:         id.Namespace,
-						Name:              id.Name,
-					},
-					Spec: api.ManagedCertificateSpec{
-						Domains: []string{"example.com"},
-					},
-					Status: api.ManagedCertificateStatus{
-						CertificateStatus: "Active",
-					},
-				})
+				mcrts = append(mcrts, fake.NewManagedCertificate(id, "example.com"))
 			}
 
 			metrics := fake.NewMetrics()

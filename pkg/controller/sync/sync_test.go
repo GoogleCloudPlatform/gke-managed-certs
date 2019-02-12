@@ -22,7 +22,6 @@ import (
 
 	"google.golang.org/api/googleapi"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cgo_testing "k8s.io/client-go/testing"
@@ -63,16 +62,7 @@ var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
 }, "test_name")
 
 func mockMcrt(domain string) *api.ManagedCertificate {
-	return &api.ManagedCertificate{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.Now().Rfc3339Copy(),
-			Namespace:         mcrtId.Namespace,
-			Name:              mcrtId.Name,
-		},
-		Spec: api.ManagedCertificateSpec{
-			Domains: []string{domain},
-		},
-	}
+	return fake.NewManagedCertificate(mcrtId, domain)
 }
 
 var listerFailsGenericErr = fake.NewLister(genericError, nil)

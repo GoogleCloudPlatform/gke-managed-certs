@@ -27,6 +27,12 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
+)
+
+var (
+	domain = "foo.com"
+	certId = types.NewCertId("default", "bar")
 )
 
 type fakeSsl struct {
@@ -102,8 +108,8 @@ func (f *fakeEvent) TooManyCertificates(mcrt api.ManagedCertificate, err error) 
 	f.tooManyCnt++
 }
 
-var normal = errors.New("normal error")
-var quotaExceeded = &googleapi.Error{
+var genericErr = errors.New("generic error")
+var quotaExceededErr = &googleapi.Error{
 	Code: 403,
 	Errors: []googleapi.ErrorItem{
 		googleapi.ErrorItem{
@@ -111,24 +117,33 @@ var quotaExceeded = &googleapi.Error{
 		},
 	},
 }
-var notFound = &googleapi.Error{
+var notFoundErr = &googleapi.Error{
 	Code: 404,
 }
 var cert = &compute.SslCertificate{}
-var mcrt = &api.ManagedCertificate{}
 
 func TestCreate(t *testing.T) {
 	testCases := []struct {
 		ssl                   ssl.Ssl
-		mcrt                  api.ManagedCertificate
 		wantErr               error
 		wantTooManyCertsEvent bool
 		wantBackendErrorEvent bool
 		wantCreateEvent       bool
 	}{
-		{withErr(nil), *mcrt, nil, false, false, true},
-		{withErr(quotaExceeded), *mcrt, quotaExceeded, true, false, false},
-		{withErr(normal), *mcrt, normal, false, true, false},
+		{
+			ssl:             withErr(nil),
+			wantCreateEvent: true,
+		},
+		{
+			ssl:                   withErr(quotaExceededErr),
+			wantErr:               quotaExceededErr,
+			wantTooManyCertsEvent: true,
+		},
+		{
+			ssl:                   withErr(genericErr),
+			wantErr:               genericErr,
+			wantBackendErrorEvent: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -136,7 +151,7 @@ func TestCreate(t *testing.T) {
 		metrics := fake.NewMetrics()
 		sut := New(event, metrics, tc.ssl)
 
-		err := sut.Create("", tc.mcrt)
+		err := sut.Create("", *fake.NewManagedCertificate(certId, domain))
 
 		if err != tc.wantErr {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
@@ -177,12 +192,31 @@ func TestDelete(t *testing.T) {
 		wantErrorEvent  bool
 		wantDeleteEvent bool
 	}{
-		{withErr(nil), nil, nil, false, false},
-		{withErr(nil), mcrt, nil, false, true},
-		{withErr(normal), nil, normal, false, false},
-		{withErr(normal), mcrt, normal, true, false},
-		{withErr(notFound), nil, nil, false, false},
-		{withErr(notFound), mcrt, nil, false, false},
+		{
+			ssl: withErr(nil),
+		},
+		{
+			ssl:             withErr(nil),
+			mcrt:            fake.NewManagedCertificate(certId, domain),
+			wantDeleteEvent: true,
+		},
+		{
+			ssl:     withErr(genericErr),
+			wantErr: genericErr,
+		},
+		{
+			ssl:            withErr(genericErr),
+			mcrt:           fake.NewManagedCertificate(certId, domain),
+			wantErr:        genericErr,
+			wantErrorEvent: true,
+		},
+		{
+			ssl: withErr(notFoundErr),
+		},
+		{
+			ssl:  withErr(notFoundErr),
+			mcrt: fake.NewManagedCertificate(certId, domain),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -221,14 +255,42 @@ func TestExists(t *testing.T) {
 		wantErr        error
 		wantErrorEvent bool
 	}{
-		{withExists(nil, false), nil, false, nil, false},
-		{withExists(nil, false), mcrt, false, nil, false},
-		{withExists(nil, true), nil, true, nil, false},
-		{withExists(nil, true), mcrt, true, nil, false},
-		{withExists(normal, false), nil, false, normal, false},
-		{withExists(normal, false), mcrt, false, normal, true},
-		{withExists(normal, true), nil, false, normal, false},
-		{withExists(normal, true), mcrt, false, normal, true},
+		{
+			ssl: withExists(nil, false),
+		},
+		{
+			ssl:  withExists(nil, false),
+			mcrt: fake.NewManagedCertificate(certId, domain),
+		},
+		{
+			ssl:        withExists(nil, true),
+			wantExists: true,
+		},
+		{
+			ssl:        withExists(nil, true),
+			mcrt:       fake.NewManagedCertificate(certId, domain),
+			wantExists: true,
+		},
+		{
+			ssl:     withExists(genericErr, false),
+			wantErr: genericErr,
+		},
+		{
+			ssl:            withExists(genericErr, false),
+			mcrt:           fake.NewManagedCertificate(certId, domain),
+			wantErr:        genericErr,
+			wantErrorEvent: true,
+		},
+		{
+			ssl:     withExists(genericErr, true),
+			wantErr: genericErr,
+		},
+		{
+			ssl:            withExists(genericErr, true),
+			mcrt:           fake.NewManagedCertificate(certId, domain),
+			wantErr:        genericErr,
+			wantErrorEvent: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -264,14 +326,42 @@ func TestGet(t *testing.T) {
 		wantErr        error
 		wantErrorEvent bool
 	}{
-		{withCert(nil, nil), nil, nil, nil, false},
-		{withCert(nil, nil), mcrt, nil, nil, false},
-		{withCert(nil, cert), nil, cert, nil, false},
-		{withCert(nil, cert), mcrt, cert, nil, false},
-		{withCert(normal, nil), nil, nil, normal, false},
-		{withCert(normal, nil), mcrt, nil, normal, true},
-		{withCert(normal, cert), nil, nil, normal, false},
-		{withCert(normal, cert), mcrt, nil, normal, true},
+		{
+			ssl: withCert(nil, nil),
+		},
+		{
+			ssl:  withCert(nil, nil),
+			mcrt: fake.NewManagedCertificate(certId, domain),
+		},
+		{
+			ssl:      withCert(nil, cert),
+			wantCert: cert,
+		},
+		{
+			ssl:      withCert(nil, cert),
+			mcrt:     fake.NewManagedCertificate(certId, domain),
+			wantCert: cert,
+		},
+		{
+			ssl:     withCert(genericErr, nil),
+			wantErr: genericErr,
+		},
+		{
+			ssl:            withCert(genericErr, nil),
+			mcrt:           fake.NewManagedCertificate(certId, domain),
+			wantErr:        genericErr,
+			wantErrorEvent: true,
+		},
+		{
+			ssl:     withCert(genericErr, cert),
+			wantErr: genericErr,
+		},
+		{
+			ssl:            withCert(genericErr, cert),
+			mcrt:           fake.NewManagedCertificate(certId, domain),
+			wantErr:        genericErr,
+			wantErrorEvent: true,
+		},
 	}
 
 	for _, tc := range testCases {
