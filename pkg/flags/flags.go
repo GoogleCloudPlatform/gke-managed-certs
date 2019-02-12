@@ -41,7 +41,7 @@ discovery is attempted.`)
 		"Path to a file containing the gce config.")
 	flag.StringVar(&F.KubeConfigFilePath, "kube-config-file-path", "",
 		"Path to kubeconfig file with authorization and master location information.")
-	flag.StringVar(&F.PrometheusAddress, "prometheus-address", ":8944",
+	flag.StringVar(&F.PrometheusAddress, "prometheus-address", ":8910",
 		"The address to expose Prometheus metrics")
 
 	flag.Parse()
