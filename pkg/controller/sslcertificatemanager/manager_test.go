@@ -17,6 +17,7 @@ limitations under the License.
 package sslcertificatemanager
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -43,11 +44,11 @@ type fakeSsl struct {
 
 var _ ssl.Ssl = (*fakeSsl)(nil)
 
-func (f fakeSsl) Create(name string, domains []string) error {
+func (f fakeSsl) Create(ctx context.Context, name string, domains []string) error {
 	return f.err
 }
 
-func (f fakeSsl) Delete(name string) error {
+func (f fakeSsl) Delete(ctx context.Context, name string) error {
 	return f.err
 }
 
@@ -156,6 +157,8 @@ func TestCreate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx := context.Background()
+
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
 		state := fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
@@ -163,7 +166,7 @@ func TestCreate(t *testing.T) {
 		})
 		sut := New(event, metrics, tc.ssl, state)
 
-		err := sut.Create("", *fake.NewManagedCertificate(certId, domain))
+		err := sut.Create(ctx, "", *fake.NewManagedCertificate(certId, domain))
 
 		if err != tc.wantErr {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
@@ -238,11 +241,13 @@ func TestDelete(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx := context.Background()
+
 		event := &fakeEvent{0, 0, 0, 0}
 		metrics := fake.NewMetrics()
 		sut := New(event, metrics, tc.ssl, fake.NewState())
 
-		err := sut.Delete("", tc.mcrt)
+		err := sut.Delete(ctx, "", tc.mcrt)
 
 		if err != tc.wantErr {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)

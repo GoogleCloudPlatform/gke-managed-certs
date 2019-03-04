@@ -17,7 +17,9 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
@@ -64,41 +66,46 @@ func (c *controller) enqueueAll() {
 	c.metrics.ObserveManagedCertificatesStatuses(statuses)
 }
 
-func (c *controller) handle(key string) error {
+func (c *controller) handle(ctx context.Context, key string) error {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
 
-	if err := c.sync.ManagedCertificate(types.NewCertId(namespace, name)); err != nil {
+	if err := c.sync.ManagedCertificate(ctx, types.NewCertId(namespace, name)); err != nil {
 		return err
 	}
 
 	return err
 }
 
-func (c *controller) processNextManagedCertificate() {
+func (c *controller) processNextManagedCertificate(ctx context.Context) {
 	obj, shutdown := c.queue.Get()
 
 	if shutdown {
 		return
 	}
 
-	defer c.queue.Done(obj)
+	go func() {
+		defer c.queue.Done(obj)
 
-	key, ok := obj.(string)
-	if !ok {
-		c.queue.Forget(obj)
-		runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
-		return
-	}
+		key, ok := obj.(string)
+		if !ok {
+			c.queue.Forget(obj)
+			runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
+			return
+		}
 
-	err := c.handle(key)
-	if err == nil {
-		c.queue.Forget(obj)
-		return
-	}
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
 
-	c.queue.AddRateLimited(obj)
-	runtime.HandleError(err)
+		err := c.handle(ctx, key)
+		if err == nil {
+			c.queue.Forget(obj)
+			return
+		}
+
+		c.queue.AddRateLimited(obj)
+		runtime.HandleError(err)
+	}()
 }

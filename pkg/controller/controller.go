@@ -102,8 +102,8 @@ func (c *controller) Run(ctx context.Context) error {
 	}
 	glog.Info("ManagedCertificate cache synced")
 
-	go wait.Until(c.processNextManagedCertificate, time.Second, ctx.Done())
-	go wait.Until(c.synchronizeAllManagedCertificates, time.Minute, ctx.Done())
+	go wait.Until(func() { c.processNextManagedCertificate(ctx) }, time.Second, ctx.Done())
+	go wait.Until(func() { c.synchronizeAllManagedCertificates(ctx) }, time.Minute, ctx.Done())
 	go wait.Until(c.binder.BindCertificates, time.Second, ctx.Done())
 
 	glog.Info("Waiting for stop signal or error")
@@ -113,9 +113,9 @@ func (c *controller) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *controller) synchronizeAllManagedCertificates() {
+func (c *controller) synchronizeAllManagedCertificates(ctx context.Context) {
 	c.state.ForeachKey(func(id types.CertId) {
-		if err := c.sync.ManagedCertificate(id); err != nil {
+		if err := c.sync.ManagedCertificate(ctx, id); err != nil {
 			runtime.HandleError(err)
 		}
 	})

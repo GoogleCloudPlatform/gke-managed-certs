@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	quota_exceeded = "quotaExceeded"
+	quotaExceeded = "quotaExceeded"
 )
 
 // IsNotFound checks if err is an HTTP Not Found (404) error.
@@ -42,7 +42,7 @@ func IsNotFound(err error) bool {
 func IsQuotaExceeded(err error) bool {
 	if apiErr, ok := err.(*googleapi.Error); ok {
 		for _, errItem := range apiErr.Errors {
-			if errItem.Reason == quota_exceeded {
+			if errItem.Reason == quotaExceeded {
 				return true
 			}
 		}

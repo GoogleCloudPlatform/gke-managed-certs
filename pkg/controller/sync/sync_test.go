@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -600,6 +601,8 @@ var testCases = []struct {
 func TestManagedCertificate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := context.Background()
+
 			client := &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &cgo_testing.Fake{}}
 			updateCalled := false
 			client.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
@@ -609,7 +612,7 @@ func TestManagedCertificate(t *testing.T) {
 				tc.in.sslExistsErr, tc.in.sslGetErr)
 			sut := New(client, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
 
-			if err := sut.ManagedCertificate(mcrtId); err != tc.out.err {
+			if err := sut.ManagedCertificate(ctx, mcrtId); err != tc.out.err {
 				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
 			}
 

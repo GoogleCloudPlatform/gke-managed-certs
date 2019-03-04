@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -57,7 +58,7 @@ type fakeSync struct {
 
 var _ sync.Sync = &fakeSync{}
 
-func (f *fakeSync) ManagedCertificate(id types.CertId) error {
+func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.CertId) error {
 	f.ids = append(f.ids, id)
 	return nil
 }
@@ -119,6 +120,8 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
+			ctx := context.Background()
+
 			var mcrts []*api.ManagedCertificate
 			for _, id := range testCase.listerIds {
 				mcrts = append(mcrts, fake.NewManagedCertificate(id, "example.com"))
@@ -136,7 +139,7 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 				sync:    sync,
 			}
 
-			sut.synchronizeAllManagedCertificates()
+			sut.synchronizeAllManagedCertificates(ctx)
 
 			if !reflect.DeepEqual(testCase.stateIds, sync.ids) {
 				t.Fatalf("Synced %v, want %v", sync.ids, testCase.stateIds)

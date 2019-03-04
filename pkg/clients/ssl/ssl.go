@@ -18,6 +18,11 @@ limitations under the License.
 package ssl
 
 import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	compute "google.golang.org/api/compute/v0.beta"
 
@@ -26,18 +31,19 @@ import (
 )
 
 const (
+	statusDone  = "DONE"
 	typeManaged = "MANAGED"
 )
 
 type Ssl interface {
-	Create(name string, domains []string) error
-	Delete(name string) error
+	Create(ctx context.Context, name string, domains []string) error
+	Delete(ctx context.Context, name string) error
 	Exists(name string) (bool, error)
 	Get(name string) (*compute.SslCertificate, error)
 }
 
 type sslImpl struct {
-	service   *compute.SslCertificatesService
+	service   *compute.Service
 	projectID string
 }
 
@@ -51,13 +57,13 @@ func New(config *config.Config) (Ssl, error) {
 	}
 
 	return &sslImpl{
-		service:   service.SslCertificates,
+		service:   service,
 		projectID: config.Compute.ProjectID,
 	}, nil
 }
 
 // Create creates a new SslCertificate resource.
-func (s sslImpl) Create(name string, domains []string) error {
+func (s sslImpl) Create(ctx context.Context, name string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -66,14 +72,22 @@ func (s sslImpl) Create(name string, domains []string) error {
 		Type: typeManaged,
 	}
 
-	_, err := s.service.Insert(s.projectID, sslCertificate).Do()
-	return err
+	operation, err := s.service.SslCertificates.Insert(s.projectID, sslCertificate).Do()
+	if err != nil {
+		return err
+	}
+
+	return s.waitFor(ctx, operation.Name)
 }
 
 // Delete deletes an SslCertificate resource.
-func (s sslImpl) Delete(name string) error {
-	_, err := s.service.Delete(s.projectID, name).Do()
-	return err
+func (s sslImpl) Delete(ctx context.Context, name string) error {
+	operation, err := s.service.SslCertificates.Delete(s.projectID, name).Do()
+	if err != nil {
+		return err
+	}
+
+	return s.waitFor(ctx, operation.Name)
 }
 
 // Exists returns true if an SslCertificate exists, false if it is deleted. Error is not nil if an error has occurred.
@@ -92,5 +106,30 @@ func (s sslImpl) Exists(name string) (bool, error) {
 
 // Get fetches an SslCertificate resource.
 func (s sslImpl) Get(name string) (*compute.SslCertificate, error) {
-	return s.service.Get(s.projectID, name).Do()
+	return s.service.SslCertificates.Get(s.projectID, name).Do()
+}
+
+func (s sslImpl) waitFor(ctx context.Context, operationName string) error {
+	for {
+		glog.Infof("Wait for operation %s", operationName)
+		operation, err := s.service.GlobalOperations.Get(s.projectID, operationName).Do()
+		if err != nil {
+			return fmt.Errorf("could not get operation %s: %s", operationName, err.Error())
+		}
+
+		if operation.Status == statusDone {
+			glog.Infof("Operation %s done, %+v", operationName, operation)
+			if operation.HttpErrorMessage == "" {
+				return nil
+			}
+
+			return fmt.Errorf("operation %s failed: %s", operationName, operation.HttpErrorMessage)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Second):
+		}
+	}
 }

@@ -18,6 +18,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
@@ -38,7 +39,7 @@ import (
 )
 
 type Sync interface {
-	ManagedCertificate(id types.CertId) error
+	ManagedCertificate(ctx context.Context, id types.CertId) error
 }
 
 type syncImpl struct {
@@ -110,14 +111,16 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 	return nil
 }
 
-func (s syncImpl) deleteSslCertificate(mcrt *api.ManagedCertificate, id types.CertId, sslCertificateName string) error {
+func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *api.ManagedCertificate, id types.CertId,
+	sslCertificateName string) error {
+
 	glog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
 	if err := s.state.SetSoftDeleted(id); err != nil {
 		return err
 	}
 
 	glog.Infof("Delete SslCertificate %s for ManagedCertificate %s", sslCertificateName, id.String())
-	if err := http.IgnoreNotFound(s.ssl.Delete(sslCertificateName, mcrt)); err != nil {
+	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, mcrt)); err != nil {
 		return err
 	}
 
@@ -126,7 +129,7 @@ func (s syncImpl) deleteSslCertificate(mcrt *api.ManagedCertificate, id types.Ce
 	return nil
 }
 
-func (s syncImpl) ensureSslCertificate(sslCertificateName string, id types.CertId,
+func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName string, id types.CertId,
 	mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
 
 	exists, err := s.ssl.Exists(sslCertificateName, mcrt)
@@ -135,7 +138,7 @@ func (s syncImpl) ensureSslCertificate(sslCertificateName string, id types.CertI
 	}
 
 	if !exists {
-		if err := s.ssl.Create(sslCertificateName, *mcrt); err != nil {
+		if err := s.ssl.Create(ctx, sslCertificateName, *mcrt); err != nil {
 			return nil, err
 		}
 
@@ -154,14 +157,14 @@ func (s syncImpl) ensureSslCertificate(sslCertificateName string, id types.CertI
 	}
 
 	glog.Infof("ManagedCertificate %v and SslCertificate %v are different", mcrt, sslCert)
-	if err := s.deleteSslCertificate(mcrt, id, sslCertificateName); err != nil {
+	if err := s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName); err != nil {
 		return nil, err
 	}
 
 	return nil, errors.ErrSslCertificateOutOfSyncGotDeleted
 }
 
-func (s syncImpl) ManagedCertificate(id types.CertId) error {
+func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error {
 	mcrt, err := s.lister.ManagedCertificates(id.Namespace).Get(id.Name)
 	if http.IsNotFound(err) {
 		sslCertificateName, err := s.state.GetSslCertificateName(id)
@@ -172,7 +175,7 @@ func (s syncImpl) ManagedCertificate(id types.CertId) error {
 		}
 
 		glog.Infof("ManagedCertificate %s already deleted", id.String())
-		return s.deleteSslCertificate(nil, id, sslCertificateName)
+		return s.deleteSslCertificate(ctx, nil, id, sslCertificateName)
 	} else if err != nil {
 		return err
 	}
@@ -184,7 +187,7 @@ func (s syncImpl) ManagedCertificate(id types.CertId) error {
 		return err
 	}
 
-	sslCert, err := s.ensureSslCertificate(sslCertificateName, id, mcrt)
+	sslCert, err := s.ensureSslCertificate(ctx, sslCertificateName, id, mcrt)
 	if err != nil {
 		return err
 	}

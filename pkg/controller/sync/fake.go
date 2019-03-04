@@ -17,6 +17,8 @@ limitations under the License.
 package sync
 
 import (
+	"context"
+
 	compute "google.golang.org/api/compute/v0.beta"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
@@ -66,7 +68,7 @@ func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, exis
 	}
 
 	if mcrt != nil {
-		ssl.Create(key, *mcrt)
+		ssl.Create(context.Background(), key, *mcrt)
 	}
 
 	ssl.createErr = createErr
@@ -77,7 +79,7 @@ func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, exis
 	return ssl
 }
 
-func (f *fakeSsl) Create(sslCertificateName string, mcrt api.ManagedCertificate) error {
+func (f *fakeSsl) Create(ctx context.Context, sslCertificateName string, mcrt api.ManagedCertificate) error {
 	f.mapping[sslCertificateName] = &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: mcrt.Spec.Domains,
@@ -89,7 +91,7 @@ func (f *fakeSsl) Create(sslCertificateName string, mcrt api.ManagedCertificate)
 	return f.createErr
 }
 
-func (f *fakeSsl) Delete(sslCertificateName string, mcrt *api.ManagedCertificate) error {
+func (f *fakeSsl) Delete(ctx context.Context, sslCertificateName string, mcrt *api.ManagedCertificate) error {
 	delete(f.mapping, sslCertificateName)
 	return f.deleteErr
 }
