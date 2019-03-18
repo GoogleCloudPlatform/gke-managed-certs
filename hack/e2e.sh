@@ -24,9 +24,11 @@ set -x
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
 
-CRD_VALIDATION_ENABLED=${CRD_VALIDATION_ENABLED:-true}
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
 PLATFORM=${PLATFORM:-"GCP"}
+TAG=${TAG:-"ci_latest"}
+
+image="eu.gcr.io/managed-certs-gke/managed-certificate-controller:${TAG}"
 
 function init {
   if [ -f $SERVICE_ACCOUNT_KEY ]
@@ -52,7 +54,9 @@ function tear_down {
   if [ $PLATFORM = "GCP" ]
   then
     kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true
-    kubectl delete -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml --ignore-not-found=true
+
+    sed -e 's/CONTROLLER_IMAGE/${image}/g' ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
+      | kubectl delete --ignore-not-found=true -f -
   fi
 }
 
@@ -62,7 +66,9 @@ function set_up {
   if [ $PLATFORM = "GCP" ]
   then
     kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
-    kubectl create -f ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml
+
+    sed -e 's/CONTROLLER_IMAGE/${image}/g' ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
+      | kubectl create -f -
   fi
 }
 
@@ -71,18 +77,17 @@ function main {
   tear_down
   set_up
 
-  make -C ${SCRIPT_ROOT} run-e2e-in-docker \
-    CRD_VALIDATION_ENABLED=$CRD_VALIDATION_ENABLED DNS_ZONE=$DNS_ZONE && exitcode=$? || exitcode=$?
+  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE && exitcode=$? || exitcode=$?
 
   tear_down
 
   exit $exitcode
 }
 
-while getopts "p:v:z:" opt; do
+while getopts "p:t:z:" opt; do
   case $opt in
     p) PLATFORM=$OPTARG ;;
-    v) CRD_VALIDATION_ENABLED=$OPTARG ;;
+    t) TAG=$OPTARG ;;
     z) DNS_ZONE=$OPTARG ;;
     :)
       echo "Option $OPTARG requires an argument." >&2

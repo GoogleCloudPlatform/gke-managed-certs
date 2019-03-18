@@ -18,30 +18,13 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-const (
-	crdValidationEnabledEnv = "CRD_VALIDATION_ENABLED"
-)
-
 func TestCRDValidation(t *testing.T) {
 	t.Parallel()
-
-	crdValidationFlag := os.Getenv(crdValidationEnabledEnv)
-	crdValidationEnabled, err := strconv.ParseBool(crdValidationFlag)
-	if err != nil {
-		t.Fatalf("Could not parse %s as boolean", crdValidationFlag)
-	}
-
-	if !crdValidationEnabled {
-		t.Logf("CRD validation tests disabled with a flag")
-		return
-	}
 
 	type testCase struct {
 		domains []string
