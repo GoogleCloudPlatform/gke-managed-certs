@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -42,7 +43,8 @@ func ensurePropagated(name string) error {
 		}
 
 		if !certificates.Equal(*mcrt, *sslCert) {
-			return fmt.Errorf("Certificates different, want equal domains; ManagedCertificate: %v, SslCertificate: %v", mcrt, sslCert)
+			return fmt.Errorf("Certificates have different domains, want same; %v, %v",
+				mcrt.Spec.Domains, sslCert.Managed.Domains)
 		}
 
 		return nil
@@ -69,7 +71,7 @@ func TestPropagation(t *testing.T) {
 					return fmt.Errorf("SslCertificate name empty in status of %s:%s", namespace, mcrtName)
 				}
 
-				return clients.SslCertificate.Delete(mcrt.Status.CertificateName)
+				return clients.SslCertificate.Delete(context.Background(), mcrt.Status.CertificateName)
 			},
 			"Deleted SslCertificate is recreated",
 		},

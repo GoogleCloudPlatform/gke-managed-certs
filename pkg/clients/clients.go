@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/oauth2"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -74,7 +75,9 @@ func New(config *config.Config) (*Clients, error) {
 	managedCertificateClient := versioned.NewForConfigOrDie(clusterConfig)
 	managedCertificateFactory := externalversions.NewSharedInformerFactory(managedCertificateClient, 0)
 
-	ssl, err := ssl.New(config)
+	oauthClient := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
+	oauthClient.Timeout = config.Compute.Timeout
+	ssl, err := ssl.New(oauthClient, config.Compute.ProjectID)
 	if err != nil {
 		return nil, err
 	}

@@ -60,6 +60,10 @@ func (f fakeSsl) Get(name string) (*compute.SslCertificate, error) {
 	return f.sslCertificate, f.err
 }
 
+func (f fakeSsl) List() ([]*compute.SslCertificate, error) {
+	return nil, errors.New("not implemented")
+}
+
 func withErr(err error) fakeSsl {
 	return fakeSsl{
 		err:            err,

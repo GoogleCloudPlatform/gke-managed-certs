@@ -55,7 +55,7 @@ function tear_down {
   then
     kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true
 
-    sed -e 's/CONTROLLER_IMAGE/${image}/g' ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
+    sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
       | kubectl delete --ignore-not-found=true -f -
   fi
 }
@@ -67,7 +67,7 @@ function set_up {
   then
     kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
 
-    sed -e 's/CONTROLLER_IMAGE/${image}/g' ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
+    sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
       | kubectl create -f -
   fi
 }

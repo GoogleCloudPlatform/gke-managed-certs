@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -74,6 +75,7 @@ func generateRandomNames(count int) []string {
 
 func TestProvisioningWorkflow(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
 	ingressName := "test-workflow-ingress"
 	if err := clients.Ingress.Delete(namespace, ingressName); err != nil {
@@ -112,10 +114,11 @@ func TestProvisioningWorkflow(t *testing.T) {
 	glog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
-	if err := clients.SslCertificate.Create(additionalSslCertificateName, []string{additionalSslCertificateDomain}); err != nil {
+	if err := clients.SslCertificate.Create(ctx, additionalSslCertificateName,
+		[]string{additionalSslCertificateDomain}); err != nil {
 		t.Fatal(err)
 	}
-	defer clients.SslCertificate.Delete(additionalSslCertificateName)
+	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
 	glog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
 
 	ing, err := clients.Ingress.Get(namespace, ingressName)

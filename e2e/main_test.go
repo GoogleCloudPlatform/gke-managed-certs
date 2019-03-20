@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/golang/glog"
+	compute "google.golang.org/api/compute/v0.beta"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
@@ -37,50 +38,86 @@ var clients *client.Clients
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	if err := setUp(); err != nil {
+	var err error
+	clients, err = client.New()
+	if err != nil {
+		glog.Fatalf("Could not create clients: %s", err.Error())
+	}
+
+	if err := tearDown(clients); err != nil {
+		glog.Fatal(err)
+	}
+
+	sslCertificatesBegin, err := clients.SslCertificate.List()
+	if err != nil {
 		glog.Fatal(err)
 	}
 
 	exitCode := m.Run()
 
-	if err := tearDown(); err != nil {
+	if err := tearDown(clients); err != nil {
 		glog.Fatal(err)
 	}
+
+	utils.Retry(func() error {
+		sslCertificatesEnd, err := clients.SslCertificate.List()
+		if err != nil {
+			return err
+		}
+
+		if added, removed, equal := diff(sslCertificatesBegin, sslCertificatesEnd); !equal {
+			return fmt.Errorf("Waiting for SslCertificates clean up. + %v - %v, want both empty", added, removed)
+		}
+
+		return nil
+	})
 
 	os.Exit(exitCode)
 }
 
-func setUp() error {
-	glog.Infof("setting up")
-
-	var err error
-	if clients, err = client.New(); err != nil {
-		return fmt.Errorf("Could not create clients: %s", err.Error())
-	}
-
-	err = tearDown()
-	glog.Infof("set up finished")
-	return err
-}
-
-func tearDown() error {
+func tearDown(clients *client.Clients) error {
 	glog.Infof("tearing down")
 
-	err := func() error {
-		if err := clients.ManagedCertificate.DeleteAll(namespace); err != nil {
-			return err
-		}
-
-		if err := utils.Retry(clients.SslCertificate.DeleteOwn); err != nil {
-			return err
-		}
-
-		return nil
-	}()
-	if err != nil {
-		return fmt.Errorf("Error tearing down resources: %s", err.Error())
+	if err := clients.ManagedCertificate.DeleteAll(namespace); err != nil {
+		return err
 	}
 
 	glog.Infof("tear down success")
 	return nil
+}
+
+func diff(begin, end []*compute.SslCertificate) ([]string, []string, bool) {
+	var added, removed []string
+
+	for _, b := range begin {
+		found := false
+
+		for _, e := range end {
+			if b.Name == e.Name {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			removed = append(removed, b.Name)
+		}
+	}
+
+	for _, e := range end {
+		found := false
+
+		for _, b := range begin {
+			if e.Name == b.Name {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			added = append(added, e.Name)
+		}
+	}
+
+	return added, removed, len(added) == 0 && len(removed) == 0
 }

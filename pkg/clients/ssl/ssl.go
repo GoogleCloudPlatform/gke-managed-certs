@@ -20,14 +20,13 @@ package ssl
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/oauth2"
 	compute "google.golang.org/api/compute/v0.beta"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
@@ -40,6 +39,7 @@ type Ssl interface {
 	Delete(ctx context.Context, name string) error
 	Exists(name string) (bool, error)
 	Get(name string) (*compute.SslCertificate, error)
+	List() ([]*compute.SslCertificate, error)
 }
 
 type sslImpl struct {
@@ -47,10 +47,7 @@ type sslImpl struct {
 	projectID string
 }
 
-func New(config *config.Config) (Ssl, error) {
-	client := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
-	client.Timeout = config.Compute.Timeout
-
+func New(client *http.Client, projectID string) (Ssl, error) {
 	service, err := compute.New(client)
 	if err != nil {
 		return nil, err
@@ -58,7 +55,7 @@ func New(config *config.Config) (Ssl, error) {
 
 	return &sslImpl{
 		service:   service,
-		projectID: config.Compute.ProjectID,
+		projectID: projectID,
 	}, nil
 }
 
@@ -97,7 +94,7 @@ func (s sslImpl) Exists(name string) (bool, error) {
 		return true, nil
 	}
 
-	if http.IsNotFound(err) {
+	if utilshttp.IsNotFound(err) {
 		return false, nil
 	}
 
@@ -107,6 +104,16 @@ func (s sslImpl) Exists(name string) (bool, error) {
 // Get fetches an SslCertificate resource.
 func (s sslImpl) Get(name string) (*compute.SslCertificate, error) {
 	return s.service.SslCertificates.Get(s.projectID, name).Do()
+}
+
+// List fetches all SslCertificate resources.
+func (s sslImpl) List() ([]*compute.SslCertificate, error) {
+	sslCertificates, err := s.service.SslCertificates.List(s.projectID).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	return sslCertificates.Items, nil
 }
 
 func (s sslImpl) waitFor(ctx context.Context, operationName string) error {

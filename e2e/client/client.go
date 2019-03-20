@@ -33,7 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/dns"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/managedcertificate"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/sslcertificate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 )
 
 const (
@@ -47,7 +47,7 @@ type Clients struct {
 	Dns                dns.Dns
 	Ingress            ingress.Ingress
 	ManagedCertificate managedcertificate.ManagedCertificate
-	SslCertificate     sslcertificate.SslCertificate
+	SslCertificate     ssl.Ssl
 }
 
 func New() (*Clients, error) {
@@ -82,7 +82,7 @@ func New() (*Clients, error) {
 		return nil, err
 	}
 
-	sslCertificateClient, err := sslcertificate.New(oauthClient, projectID)
+	sslCertificateClient, err := ssl.New(oauthClient, projectID)
 	if err != nil {
 		return nil, err
 	}
