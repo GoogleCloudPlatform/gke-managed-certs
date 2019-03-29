@@ -43,7 +43,7 @@ func TestCRDValidation(t *testing.T) {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
 			name := fmt.Sprintf("crd-validation-%d", i)
-			err := clients.ManagedCertificate.Create(namespace, name, tc.domains)
+			err := clients.ManagedCertificate.Create(name, tc.domains)
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}

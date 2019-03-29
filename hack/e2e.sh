@@ -50,7 +50,6 @@ function init {
 }
 
 function tear_down {
-  kubectl delete -f ${SCRIPT_ROOT}/deploy/http-hello.yaml --ignore-not-found=true
   if [ $PLATFORM = "GCP" ]
   then
     kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true
@@ -61,8 +60,6 @@ function tear_down {
 }
 
 function set_up {
-  kubectl create -f ${SCRIPT_ROOT}/deploy/http-hello.yaml
-
   if [ $PLATFORM = "GCP" ]
   then
     kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml

@@ -25,8 +25,13 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
+	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
@@ -34,14 +39,104 @@ const (
 	annotation                     = "networking.gke.io/managed-certificates"
 	annotationSeparator            = ","
 	maxNameLength                  = 15
+	port                           = 8080
 	statusActive                   = "Active"
 	statusSuccess                  = 200
 )
 
+func mustCreateBackendService(t *testing.T, name string) {
+	t.Helper()
+
+	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Deleted deployment %s", name)
+
+	appHello := map[string]string{"app": name}
+	args := []string{"-c", "echo 'Hello world!' > index.html; python -m SimpleHTTPServer 8080"}
+
+	depl := &extv1beta1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: extv1beta1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: appHello,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: appHello,
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					Containers: []corev1.Container{
+						{
+							Name:    "http-hello",
+							Image:   "python:2.7",
+							Command: []string{"/bin/bash"},
+							Args:    args,
+							Ports:   []corev1.ContainerPort{{ContainerPort: port}},
+						},
+					},
+				},
+			},
+		},
+	}
+	if _, err := clients.Deployment.Create(depl); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Created deployment %s", name)
+
+	if err := utilshttp.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Deleted service %s", name)
+
+	serv := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeNodePort,
+			Ports:    []corev1.ServicePort{{Port: port}},
+			Selector: appHello,
+		},
+	}
+	if _, err := clients.Service.Create(serv); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Created service %s", name)
+}
+
+func mustCreateIngress(t *testing.T, name string) {
+	t.Helper()
+
+	if err := utilshttp.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Deleted ingress %s", name)
+
+	ing := &extv1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: extv1beta1.IngressSpec{
+			Backend: &extv1beta1.IngressBackend{
+				ServiceName: "http-hello",
+				ServicePort: intstr.FromInt(port),
+			},
+		},
+	}
+	if _, err := clients.Ingress.Create(ing); err != nil {
+		t.Fatal(err)
+	}
+	glog.Infof("Created ingress %s", name)
+}
+
 func getIngressIP(name string) (string, error) {
 	var ip string
 	err := utils.Retry(func() error {
-		ing, err := clients.Ingress.Get(namespace, name)
+		ing, err := clients.Ingress.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -77,17 +172,16 @@ func TestProvisioningWorkflow(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	ingressName := "test-workflow-ingress"
-	if err := clients.Ingress.Delete(namespace, ingressName); err != nil {
-		t.Fatal(err)
-	}
-	glog.Infof("Deleted ingress %s:%s", namespace, ingressName)
+	backendServiceName := "http-hello"
+	mustCreateBackendService(t, backendServiceName)
+	defer func() {
+		clients.Deployment.Delete(backendServiceName, &metav1.DeleteOptions{})
+		clients.Service.Delete(backendServiceName, &metav1.DeleteOptions{})
+	}()
 
-	if err := clients.Ingress.Create(namespace, ingressName); err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Ingress.Delete(namespace, ingressName)
-	glog.Infof("Created ingress %s:%s", namespace, ingressName)
+	ingressName := "test-workflow-ingress"
+	mustCreateIngress(t, ingressName)
+	defer clients.Ingress.Delete(ingressName, &metav1.DeleteOptions{})
 
 	ip, err := getIngressIP(ingressName)
 	if err != nil {
@@ -106,7 +200,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 	for i, domain := range domains {
 		mcrtName := fmt.Sprintf("provisioning-workflow-%d", i)
 		mcrtNames = append(mcrtNames, mcrtName)
-		err := clients.ManagedCertificate.Create(namespace, mcrtName, []string{domain})
+		err := clients.ManagedCertificate.Create(mcrtName, []string{domain})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,12 +215,12 @@ func TestProvisioningWorkflow(t *testing.T) {
 	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
 	glog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
 
-	ing, err := clients.Ingress.Get(namespace, ingressName)
+	ing, err := clients.Ingress.Get(ingressName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ing.Annotations[annotation] = strings.Join(mcrtNames, annotationSeparator)
-	if err := clients.Ingress.Update(ing); err != nil {
+	if _, err := clients.Ingress.Update(ing); err != nil {
 		t.Fatal(err)
 	}
 	glog.Infof("Annotated Ingress with %s=%s", annotation, ing.Annotations[annotation])
@@ -134,7 +228,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
 		err := utils.Retry(func() error {
 			for _, mcrtName := range mcrtNames {
-				mcrt, err := clients.ManagedCertificate.Get(namespace, mcrtName)
+				mcrt, err := clients.ManagedCertificate.Get(mcrtName)
 				if err != nil {
 					return err
 				}

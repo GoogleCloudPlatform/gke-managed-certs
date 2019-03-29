@@ -39,27 +39,49 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	var err error
-	clients, err = client.New()
+	clients, err = client.New(namespace)
 	if err != nil {
 		glog.Fatalf("Could not create clients: %s", err.Error())
 	}
 
-	if err := tearDown(clients); err != nil {
-		glog.Fatal(err)
-	}
-
-	sslCertificatesBegin, err := clients.SslCertificate.List()
+	sslCertificatesBegin, err := setUp(clients)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
 	exitCode := m.Run()
 
-	if err := tearDown(clients); err != nil {
+	if err := tearDown(clients, sslCertificatesBegin); err != nil {
 		glog.Fatal(err)
 	}
 
-	utils.Retry(func() error {
+	os.Exit(exitCode)
+}
+
+func setUp(clients *client.Clients) ([]*compute.SslCertificate, error) {
+	glog.Info("setting up")
+
+	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
+		return nil, err
+	}
+
+	sslCertificatesBegin, err := clients.SslCertificate.List()
+	if err != nil {
+		return nil, err
+	}
+
+	glog.Info("set up success")
+	return sslCertificatesBegin, nil
+}
+
+func tearDown(clients *client.Clients, sslCertificatesBegin []*compute.SslCertificate) error {
+	glog.Infof("tearing down")
+
+	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
+		return err
+	}
+
+	if err := utils.Retry(func() error {
 		sslCertificatesEnd, err := clients.SslCertificate.List()
 		if err != nil {
 			return err
@@ -70,15 +92,7 @@ func TestMain(m *testing.M) {
 		}
 
 		return nil
-	})
-
-	os.Exit(exitCode)
-}
-
-func tearDown(clients *client.Clients) error {
-	glog.Infof("tearing down")
-
-	if err := clients.ManagedCertificate.DeleteAll(namespace); err != nil {
+	}); err != nil {
 		return err
 	}
 

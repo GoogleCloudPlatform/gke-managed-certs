@@ -75,7 +75,6 @@ release: release-ci clean
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for continuous integration
 release-ci: build-binary-in-docker run-test-in-docker docker
-	make -C http-hello
 
 run-e2e-in-docker: docker-runner-builder auth-configure-docker
 	docker run -v `pwd`:${runner_path} \

@@ -25,13 +25,14 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/dns"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 )
@@ -44,24 +45,31 @@ const (
 )
 
 type Clients struct {
+	Deployment         extv1beta1.DeploymentInterface
 	Dns                dns.Dns
-	Ingress            ingress.Ingress
+	Ingress            extv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.ManagedCertificate
+	Service            corev1.ServiceInterface
 	SslCertificate     ssl.Ssl
 }
 
-func New() (*Clients, error) {
+func New(namespace string) (*Clients, error) {
 	config, err := getRestConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	ingressClient, err := ingress.New(config)
+	coreClient, err := corev1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	managedCertificateClient, err := managedcertificate.New(config)
+	extClient, err := extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	managedCertificateClient, err := managedcertificate.New(config, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -88,9 +96,11 @@ func New() (*Clients, error) {
 	}
 
 	return &Clients{
+		Deployment:         extClient.Deployments(namespace),
 		Dns:                dnsClient,
-		Ingress:            ingressClient,
+		Ingress:            extClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
+		Service:            coreClient.Services(namespace),
 		SslCertificate:     sslCertificateClient,
 	}, nil
 }
