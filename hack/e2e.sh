@@ -52,8 +52,6 @@ function init {
 function tear_down {
   if [ $PLATFORM = "GCP" ]
   then
-    kubectl delete -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml --ignore-not-found=true
-
     sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
       | kubectl delete --ignore-not-found=true -f -
   fi
@@ -62,8 +60,6 @@ function tear_down {
 function set_up {
   if [ $PLATFORM = "GCP" ]
   then
-    kubectl create -f ${SCRIPT_ROOT}/deploy/managedcertificates-crd.yaml
-
     sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
       | kubectl create -f -
   fi
@@ -74,7 +70,7 @@ function main {
   tear_down
   set_up
 
-  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE && exitcode=$? || exitcode=$?
+  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM && exitcode=$? || exitcode=$?
 
   tear_down
 

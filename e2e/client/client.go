@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -45,6 +46,7 @@ const (
 )
 
 type Clients struct {
+	CustomResource     apiextv1beta1.CustomResourceDefinitionInterface
 	Deployment         extv1beta1.DeploymentInterface
 	Dns                dns.Dns
 	Ingress            extv1beta1.IngressInterface
@@ -60,6 +62,11 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	coreClient, err := corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	apiExtClient, err := apiextv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +103,7 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	return &Clients{
+		CustomResource:     apiExtClient.CustomResourceDefinitions(),
 		Deployment:         extClient.Deployments(namespace),
 		Dns:                dnsClient,
 		Ingress:            extClient.Ingresses(namespace),
