@@ -53,7 +53,10 @@ func mustCreateBackendService(t *testing.T, name string) {
 	glog.Infof("Deleted deployment %s", name)
 
 	appHello := map[string]string{"app": name}
-	args := []string{"-c", "echo 'Hello world!' > index.html; python -m SimpleHTTPServer 8080"}
+	args := []string{
+		"-e",
+		fmt.Sprintf("require('http').createServer(function (req, res) { res.end('Hello world!'); }).listen(%d);", port),
+	}
 
 	depl := &extv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -72,8 +75,8 @@ func mustCreateBackendService(t *testing.T, name string) {
 					Containers: []corev1.Container{
 						{
 							Name:    "http-hello",
-							Image:   "python:2.7",
-							Command: []string{"/bin/bash"},
+							Image:   "node:11-slim",
+							Command: []string{"node"},
 							Args:    args,
 							Ports:   []corev1.ContainerPort{{ContainerPort: port}},
 						},
