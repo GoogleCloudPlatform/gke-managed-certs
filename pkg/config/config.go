@@ -130,7 +130,7 @@ func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, s
 		defer config.Close()
 
 		var cfg gce.ConfigFile
-		if err := gcfg.ReadInto(&cfg, config); err != nil {
+		if err := gcfg.FatalOnly(gcfg.ReadInto(&cfg, config)); err != nil {
 			return nil, "", fmt.Errorf("Could not read config %v", err)
 		}
 		glog.Infof("Using GCE provider config %+v", cfg)
