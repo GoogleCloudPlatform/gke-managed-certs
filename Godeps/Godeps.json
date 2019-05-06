@@ -367,8 +367,8 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Comment": "v1.1.4",
-			"Rev": "2adff0894ba3bc2eeb9f9aea45fefd49802e1a13"
+			"Comment": "v1.1.1-26-g037e5aa",
+			"Rev": "037e5aa7efe80d77d79a345684aa9e167540cbad"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519",
