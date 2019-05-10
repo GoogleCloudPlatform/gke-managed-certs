@@ -28,6 +28,7 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -46,12 +47,15 @@ const (
 )
 
 type Clients struct {
+	ClusterRole        rbacv1beta1.ClusterRoleInterface
+	ClusterRoleBinding rbacv1beta1.ClusterRoleBindingInterface
 	CustomResource     apiextv1beta1.CustomResourceDefinitionInterface
 	Deployment         extv1beta1.DeploymentInterface
 	Dns                dns.Dns
 	Ingress            extv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.ManagedCertificate
 	Service            corev1.ServiceInterface
+	ServiceAccount     corev1.ServiceAccountInterface
 	SslCertificate     ssl.Ssl
 }
 
@@ -72,6 +76,11 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	extClient, err := extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	rbacClient, err := rbacv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -103,12 +112,15 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	return &Clients{
+		ClusterRole:        rbacClient.ClusterRoles(),
+		ClusterRoleBinding: rbacClient.ClusterRoleBindings(),
 		CustomResource:     apiExtClient.CustomResourceDefinitions(),
 		Deployment:         extClient.Deployments(namespace),
 		Dns:                dnsClient,
 		Ingress:            extClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
 		Service:            coreClient.Services(namespace),
+		ServiceAccount:     coreClient.ServiceAccounts(namespace),
 		SslCertificate:     sslCertificateClient,
 	}, nil
 }

@@ -59,17 +59,11 @@ func mustCreateBackendService(t *testing.T, name string) {
 	}
 
 	depl := &extv1beta1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: extv1beta1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: appHello,
-			},
+			Selector: &metav1.LabelSelector{MatchLabels: appHello},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: appHello,
-				},
+				ObjectMeta: metav1.ObjectMeta{Labels: appHello},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyAlways,
 					Containers: []corev1.Container{
@@ -96,9 +90,7 @@ func mustCreateBackendService(t *testing.T, name string) {
 	glog.Infof("Deleted service %s", name)
 
 	serv := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeNodePort,
 			Ports:    []corev1.ServicePort{{Port: port}},
@@ -120,9 +112,7 @@ func mustCreateIngress(t *testing.T, name string) {
 	glog.Infof("Deleted ingress %s", name)
 
 	ing := &extv1beta1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: extv1beta1.IngressSpec{
 			Backend: &extv1beta1.IngressBackend{
 				ServiceName: "http-hello",

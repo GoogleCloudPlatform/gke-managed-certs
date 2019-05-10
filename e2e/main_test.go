@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -26,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
@@ -35,8 +33,9 @@ import (
 )
 
 const (
-	namespace   = "default"
-	platformEnv = "PLATFORM"
+	controllerImageTagEnv = "TAG"
+	namespace             = "default"
+	platformEnv           = "PLATFORM"
 )
 
 var clients *client.Clients
@@ -68,101 +67,17 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func createManagedCertificateCRD() error {
-	domainRegex := `^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$`
-	var maxDomains int64 = 1
-	var maxDomainLength int64 = 63
-	crd := apiextv1beta1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "managedcertificates.networking.gke.io",
-		},
-		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
-			Group:   "networking.gke.io",
-			Version: "v1beta1",
-			Names: apiextv1beta1.CustomResourceDefinitionNames{
-				Plural:     "managedcertificates",
-				Singular:   "managedcertificate",
-				Kind:       "ManagedCertificate",
-				ShortNames: []string{"mcrt"},
-			},
-			Scope: apiextv1beta1.NamespaceScoped,
-			Validation: &apiextv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextv1beta1.JSONSchemaProps{
-					Properties: map[string]apiextv1beta1.JSONSchemaProps{
-						"status": {
-							Properties: map[string]apiextv1beta1.JSONSchemaProps{
-								"certificateStatus": {Type: "string"},
-								"domainStatus": {
-									Type: "array",
-									Items: &apiextv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextv1beta1.JSONSchemaProps{
-											Type:     "object",
-											Required: []string{"domain", "status"},
-											Properties: map[string]apiextv1beta1.JSONSchemaProps{
-												"domain": {Type: "string"},
-												"status": {Type: "string"},
-											},
-										},
-									},
-								},
-								"certificateName": {Type: "string"},
-								"expireTime":      {Type: "string", Format: "date-time"},
-							},
-						},
-						"spec": {
-							Properties: map[string]apiextv1beta1.JSONSchemaProps{
-								"domains": {
-									Type:     "array",
-									MaxItems: &maxDomains,
-									Items: &apiextv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextv1beta1.JSONSchemaProps{
-											Type:      "string",
-											MaxLength: &maxDomainLength,
-											Pattern:   domainRegex,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	if _, err := clients.CustomResource.Create(&crd); err != nil {
-		return err
-	}
-	glog.Infof("Created custom resource definition %s", crd.Name)
-
-	if err := utils.Retry(func() error {
-		crd, err := clients.CustomResource.Get(crd.Name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("ManagedCertificate CRD not yet established: %v", err)
-		}
-
-		for _, c := range crd.Status.Conditions {
-			if c.Type == apiextv1beta1.Established && c.Status == apiextv1beta1.ConditionTrue {
-				return nil
-			}
-		}
-
-		return errors.New("ManagedCertificate CRD not yet established")
-	}); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
 	glog.Info("setting up")
 
 	if !gke {
-		if err := createManagedCertificateCRD(); err != nil {
+		if err := deployCRD(); err != nil {
+			return nil, err
+		}
+
+		tag := os.Getenv(controllerImageTagEnv)
+		glog.Infof("Controller image tag=%s", tag)
+		if err := deployController(tag); err != nil {
 			return nil, err
 		}
 	}
@@ -208,6 +123,10 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 			return err
 		}
 		glog.Infof("Deleted custom resource definition %s", name)
+
+		if err := deleteController(); err != nil {
+			return err
+		}
 	}
 
 	glog.Infof("tear down success")

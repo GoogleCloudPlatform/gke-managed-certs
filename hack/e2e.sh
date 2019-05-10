@@ -22,57 +22,13 @@ set -o pipefail
 set -x
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-SERVICE_ACCOUNT_KEY="/etc/service-account/service-account.json"
 
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
 PLATFORM=${PLATFORM:-"GCP"}
 TAG=${TAG:-"ci_latest"}
 
-image="eu.gcr.io/managed-certs-gke/managed-certificate-controller:${TAG}"
-
-function init {
-  if [ -f $SERVICE_ACCOUNT_KEY ]
-  then
-    echo "Install kubectl 1.11"
-    curl -L -o kubectl https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl
-    chmod +x kubectl
-  fi
-
-  export PATH=$PWD:$PATH
-  echo "Prepend \$PATH with CWD: $PATH"
-  echo "Kubectl version: `kubectl version`"
-
-  if [ -f $SERVICE_ACCOUNT_KEY ]
-  then
-    echo "Set namespace default"
-    kubectl config set-context `kubectl config current-context` --namespace=default
-  fi
-}
-
-function tear_down {
-  if [ $PLATFORM = "GCP" ]
-  then
-    sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
-      | kubectl delete --ignore-not-found=true -f -
-  fi
-}
-
-function set_up {
-  if [ $PLATFORM = "GCP" ]
-  then
-    sed -e "s|CONTROLLER_IMAGE|${image}|g" ${SCRIPT_ROOT}/deploy/managed-certificate-controller.yaml \
-      | kubectl create -f -
-  fi
-}
-
 function main {
-  init
-  tear_down
-  set_up
-
-  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM && exitcode=$? || exitcode=$?
-
-  tear_down
+  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM TAG=$TAG && exitcode=$? || exitcode=$?
 
   exit $exitcode
 }
