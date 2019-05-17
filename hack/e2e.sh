@@ -24,14 +24,8 @@ set -x
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
-PLATFORM=${PLATFORM:-"GCP"}
+PLATFORM=${PLATFORM:-"gcp"}
 TAG=${TAG:-"ci_latest"}
-
-function main {
-  make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM TAG=$TAG && exitcode=$? || exitcode=$?
-
-  exit $exitcode
-}
 
 while getopts "p:t:z:" opt; do
   case $opt in
@@ -45,4 +39,4 @@ while getopts "p:t:z:" opt; do
   esac
 done
 
-main
+make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM TAG=$TAG
