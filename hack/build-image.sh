@@ -23,26 +23,12 @@ set -x
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
-DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
-PLATFORM=${PLATFORM:-"gcp"}
 PULL_NUMBER=${PULL_NUMBER:-""}
 TAG=${TAG:-"ci_latest"}
-
-while getopts "p:t:z:" opt; do
-  case $opt in
-    p) PLATFORM=$OPTARG ;;
-    t) TAG=$OPTARG ;;
-    z) DNS_ZONE=$OPTARG ;;
-    :)
-      echo "Option $OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
 
 if [ ! -z "$PULL_NUMBER" ]
 then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM TAG=$TAG
+make -C ${SCRIPT_ROOT} release-ci TAG=$TAG
