@@ -65,8 +65,10 @@ e2e:
 	DNS_ZONE=${DNS_ZONE} \
 	PLATFORM=${PLATFORM} \
 	TAG=${TAG} \
-	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt
-	dest=/tmp/artifacts; cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml
+	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt && \
+	exitcode=$${?} && \
+	cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml && \
+	exit $${exitcode}
 
 # Formats go source code with gofmt
 gofmt:
