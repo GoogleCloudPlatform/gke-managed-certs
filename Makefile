@@ -64,19 +64,18 @@ docker-runner-builder:
 	done
 
 e2e:
-	- dest=/tmp/artifacts; \
+	dest=/tmp/artifacts; \
 	rm -rf $${dest}/* && mkdir -p $${dest} && \
-	CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
-	KUBECONFIG=${KUBECONFIG} \
-	KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
-	PROJECT_ID=${PROJECT_ID} \
-	DNS_ZONE=${DNS_ZONE} \
-	PLATFORM=${PLATFORM} \
-	TAG=${TAG} \
-	godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt && \
-	exitcode=$${?} && \
-	cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml && \
-	exit $${exitcode}
+	{ \
+		CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
+		KUBECONFIG=${KUBECONFIG} \
+		KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
+		PROJECT_ID=${PROJECT_ID} \
+		DNS_ZONE=${DNS_ZONE} \
+		PLATFORM=${PLATFORM} \
+		TAG=${TAG} \
+		godep go test ./e2e/... -v -test.timeout=60m -log_dir $${dest} > $${dest}/e2e.out.txt && exitcode=$${?} || exitcode=$${?} ; \
+	} && cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml && exit $${exitcode}
 
 # Formats go source code with gofmt
 gofmt:
