@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
@@ -36,7 +36,7 @@ func (c *controller) enqueue(obj interface{}) {
 		return
 	}
 
-	glog.Infof("Enqueuing ManagedCertificate: %+v", obj)
+	klog.Infof("Enqueuing ManagedCertificate: %+v", obj)
 	c.queue.AddRateLimited(key)
 }
 
@@ -48,7 +48,7 @@ func (c *controller) enqueueAll() {
 	}
 
 	if len(mcrts) <= 0 {
-		glog.Info("No ManagedCertificates found in cluster")
+		klog.Info("No ManagedCertificates found in cluster")
 		return
 	}
 

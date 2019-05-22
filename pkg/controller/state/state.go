@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
@@ -80,7 +80,7 @@ func New(configmap configmap.ConfigMap) State {
 
 	config, err := configmap.Get(configMapNamespace, configMapName)
 	if err != nil {
-		glog.Warning(err)
+		klog.Warning(err)
 	} else if len(config.Data) > 0 {
 		mapping = unmarshal(config.Data)
 	}

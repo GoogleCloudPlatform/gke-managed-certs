@@ -26,7 +26,7 @@ rules:
     resources: ["managedcertificates"]
     verbs: ["*"]
   - apiGroups: ["", "extensions"]
-    resources: ["configmaps", "events", "ingresses"]
+    resources: ["configmaps", "endpoints", "events", "ingresses"]
     verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

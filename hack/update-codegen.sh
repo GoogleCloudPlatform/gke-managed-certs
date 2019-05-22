@@ -23,16 +23,9 @@ SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 go get -d k8s.io/code-generator/...
 
 # Checkout code-generator to compatible version
-(cd $GOPATH/src/k8s.io/code-generator && git checkout 3dcf91f64f638563e5106f21f50c31fa361c918d)
+(cd $GOPATH/src/k8s.io/code-generator && git checkout origin/release-1.14 -B release-1.14)
 
 REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
 $GOPATH/src/k8s.io/code-generator/generate-groups.sh all \
   $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1 \
   --go-header-file $SCRIPT_ROOT/hack/header.go.txt
-
-# This hack is required as the autogens don't work for upper case letters in package names.
-# This issue: https://github.com/kubernetes/code-generator/issues/22 needs to be resolved to remove this hack.
-REPOSITORY_LOWER=`echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]'`
-rm -rf $GOPATH/src/$REPOSITORY/pkg/clientgen/clientset/versioned/typed
-mv $GOPATH/src/$REPOSITORY_LOWER/pkg/clientgen/clientset/versioned/typed $GOPATH/src/$REPOSITORY/pkg/clientgen/clientset/versioned
-find $GOPATH/src/$REPOSITORY/pkg/clientgen -name "*.go" | xargs sed -i 's/googlecloudplatform/GoogleCloudPlatform/g'

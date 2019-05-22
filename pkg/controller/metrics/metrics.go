@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/klog"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client-go metrics registration
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
@@ -106,7 +106,7 @@ func New(config *config.Config) Metrics {
 func (m metricsImpl) Start(address string) {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(address, nil)
-	glog.Fatalf("Failed to expose metrics: %s", err.Error())
+	klog.Fatalf("Failed to expose metrics: %s", err.Error())
 }
 
 // ObserveManagedCertificatesStatuses accepts a mapping from ManagedCertificate certificate status to number of occurences of this status among ManagedCertificate resources and records the data as a metric.

@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
@@ -89,27 +89,27 @@ func (c *controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Info("Controller.Run()")
+	klog.Info("Controller.Run()")
 
-	glog.Info("Start reporting metrics")
+	klog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
 	c.clients.Run(ctx)
 
-	glog.Info("Waiting for ManagedCertificate cache sync")
+	klog.Info("Waiting for ManagedCertificate cache sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.synced) {
 		return fmt.Errorf("Timed out waiting for ManagedCertificate cache sync")
 	}
-	glog.Info("ManagedCertificate cache synced")
+	klog.Info("ManagedCertificate cache synced")
 
 	go wait.Until(func() { c.processNextManagedCertificate(ctx) }, time.Second, ctx.Done())
 	go wait.Until(func() { c.synchronizeAllManagedCertificates(ctx) }, time.Minute, ctx.Done())
 	go wait.Until(c.binder.BindCertificates, time.Second, ctx.Done())
 
-	glog.Info("Waiting for stop signal or error")
+	klog.Info("Waiting for stop signal or error")
 
 	<-ctx.Done()
-	glog.Info("Received stop signal, shutting down")
+	klog.Info("Received stop signal, shutting down")
 	return nil
 }
 

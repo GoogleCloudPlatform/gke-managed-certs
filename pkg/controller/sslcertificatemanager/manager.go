@@ -20,8 +20,8 @@ package sslcertificatemanager
 import (
 	"context"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
+	"k8s.io/klog"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
@@ -58,7 +58,7 @@ func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl, state state.St
 // Create creates an SslCertificate object. It generates a TooManyCertificates event if SslCertificate quota
 // is exceeded or BackendError event if another generic error occurs. On success it generates a Create event.
 func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateName string, mcrt api.ManagedCertificate) error {
-	glog.Infof("Creating SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
+	klog.Infof("Creating SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
 
 	if err := s.ssl.Create(ctx, sslCertificateName, mcrt.Spec.Domains); err != nil {
 		if http.IsQuotaExceeded(err) {
@@ -79,14 +79,14 @@ func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateNam
 
 	s.event.Create(mcrt, sslCertificateName)
 
-	glog.Infof("Created SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
+	klog.Infof("Created SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
 	return nil
 }
 
 // Delete deletes an SslCertificate object, existing or not. If a generic error occurs, it generates a BackendError
 // event. If the SslCertificate object exists and is successfully deleted, a Delete event is generated.
 func (s sslCertificateManagerImpl) Delete(ctx context.Context, sslCertificateName string, mcrt *api.ManagedCertificate) error {
-	glog.Infof("Deleting SslCertificate %s", sslCertificateName)
+	klog.Infof("Deleting SslCertificate %s", sslCertificateName)
 
 	err := s.ssl.Delete(ctx, sslCertificateName)
 
@@ -103,7 +103,7 @@ func (s sslCertificateManagerImpl) Delete(ctx context.Context, sslCertificateNam
 		return err
 	}
 
-	glog.Infof("Deleted SslCertificate %s", sslCertificateName)
+	klog.Infof("Deleted SslCertificate %s", sslCertificateName)
 	return nil
 }
 

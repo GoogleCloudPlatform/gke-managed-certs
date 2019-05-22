@@ -21,8 +21,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
+	"k8s.io/klog"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	networkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
@@ -75,7 +75,7 @@ func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
 		return "", err
 	}
 
-	glog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s", sslCertificateName, id.String())
+	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s", sslCertificateName, id.String())
 	s.state.SetSslCertificateName(id, sslCertificateName)
 	return sslCertificateName, nil
 }
@@ -86,7 +86,7 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 		return err
 	}
 	if excludedFromSLO {
-		glog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
+		klog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
 		return nil
 	}
 
@@ -114,17 +114,17 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *api.ManagedCertificate, id types.CertId,
 	sslCertificateName string) error {
 
-	glog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
+	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
 	if err := s.state.SetSoftDeleted(id); err != nil {
 		return err
 	}
 
-	glog.Infof("Delete SslCertificate %s for ManagedCertificate %s", sslCertificateName, id.String())
+	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s", sslCertificateName, id.String())
 	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, mcrt)); err != nil {
 		return err
 	}
 
-	glog.Infof("Remove entry for ManagedCertificate %s from state", id.String())
+	klog.Infof("Remove entry for ManagedCertificate %s from state", id.String())
 	s.state.Delete(id)
 	return nil
 }
@@ -156,7 +156,7 @@ func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName s
 		return sslCert, nil
 	}
 
-	glog.Infof("ManagedCertificate %v and SslCertificate %v are different", mcrt, sslCert)
+	klog.Infof("ManagedCertificate %v and SslCertificate %v are different", mcrt, sslCert)
 	if err := s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName); err != nil {
 		return nil, err
 	}
@@ -174,13 +174,13 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 			return err
 		}
 
-		glog.Infof("ManagedCertificate %s already deleted", id.String())
+		klog.Infof("ManagedCertificate %s already deleted", id.String())
 		return s.deleteSslCertificate(ctx, nil, id, sslCertificateName)
 	} else if err != nil {
 		return err
 	}
 
-	glog.Infof("Syncing ManagedCertificate %s", id.String())
+	klog.Infof("Syncing ManagedCertificate %s", id.String())
 
 	sslCertificateName, err := s.ensureSslCertificateName(id)
 	if err != nil {

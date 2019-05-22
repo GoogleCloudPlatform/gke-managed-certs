@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
@@ -41,34 +41,35 @@ const (
 var clients *client.Clients
 
 func TestMain(m *testing.M) {
+	klog.InitFlags(nil)
 	flag.Parse()
 
 	var err error
 	clients, err = client.New(namespace)
 	if err != nil {
-		glog.Fatalf("Could not create clients: %s", err.Error())
+		klog.Fatalf("Could not create clients: %s", err.Error())
 	}
 
 	platform := os.Getenv(platformEnv)
-	glog.Infof("platform=%s", platform)
+	klog.Infof("platform=%s", platform)
 	gke := (strings.ToLower(platform) == "gke")
 
 	sslCertificatesBegin, err := setUp(clients, gke)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	exitCode := m.Run()
 
 	if err := tearDown(clients, gke, sslCertificatesBegin); err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	os.Exit(exitCode)
 }
 
 func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
-	glog.Info("setting up")
+	klog.Info("setting up")
 
 	if !gke {
 		if err := deployCRD(); err != nil {
@@ -76,7 +77,7 @@ func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error)
 		}
 
 		tag := os.Getenv(controllerImageTagEnv)
-		glog.Infof("Controller image tag=%s", tag)
+		klog.Infof("Controller image tag=%s", tag)
 		if err := deployController(tag); err != nil {
 			return nil, err
 		}
@@ -91,12 +92,12 @@ func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error)
 		return nil, err
 	}
 
-	glog.Info("set up success")
+	klog.Info("set up success")
 	return sslCertificatesBegin, nil
 }
 
 func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute.SslCertificate) error {
-	glog.Infof("tearing down")
+	klog.Infof("tearing down")
 
 	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
 		return err
@@ -122,14 +123,14 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 		if err := utilshttp.IgnoreNotFound(clients.CustomResource.Delete(name, &metav1.DeleteOptions{})); err != nil {
 			return err
 		}
-		glog.Infof("Deleted custom resource definition %s", name)
+		klog.Infof("Deleted custom resource definition %s", name)
 
 		if err := deleteController(); err != nil {
 			return err
 		}
 	}
 
-	glog.Infof("tear down success")
+	klog.Infof("tear down success")
 	return nil
 }
 

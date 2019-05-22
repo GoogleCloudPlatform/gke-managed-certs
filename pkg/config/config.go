@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
 	gcfg "gopkg.in/gcfg.v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
@@ -71,11 +71,22 @@ type certificateStatusConfig struct {
 	Domain map[string]string
 }
 
+type masterElectionConfig struct {
+	// Maximum duration that a leader can be stopped before it is replaced by another candidate
+	LeaseDuration time.Duration
+	// Interval between attempts by an acting master to renew a leadership slot
+	RenewDeadline time.Duration
+	// Duration the clients should wait between attempting acquisition and renewal of a leadership
+	RetryPeriod time.Duration
+}
+
 type Config struct {
 	// CertificateStatus holds mappings of SslCertificate statuses to ManagedCertificate statuses
 	CertificateStatus certificateStatusConfig
 	// Compute is GCP-specific configuration
 	Compute computeConfig
+	// MasterElection holds configuration settings needed for electing master
+	MasterElection masterElectionConfig
 	// SslCertificateNamePrefix is a prefix prepended to SslCertificate resources created by the controller
 	SslCertificateNamePrefix string
 }
@@ -86,7 +97,7 @@ func New(gceConfigFilePath string) (*Config, error) {
 		return nil, err
 	}
 
-	glog.Infof("TokenSource: %#v, projectID: %s", tokenSource, projectID)
+	klog.Infof("TokenSource: %#v, projectID: %s", tokenSource, projectID)
 
 	domainStatuses := make(map[string]string, 0)
 	domainStatuses[sslActive] = managedActive
@@ -115,13 +126,18 @@ func New(gceConfigFilePath string) (*Config, error) {
 			ProjectID:   projectID,
 			Timeout:     30 * time.Second,
 		},
+		MasterElection: masterElectionConfig{
+			LeaseDuration: 15 * time.Second,
+			RenewDeadline: 10 * time.Second,
+			RetryPeriod:   2 * time.Second,
+		},
 		SslCertificateNamePrefix: SslCertificateNamePrefix,
 	}, nil
 }
 
 func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, string, error) {
 	if gceConfigFilePath != "" {
-		glog.V(1).Info("In a GKE cluster")
+		klog.V(1).Info("In a GKE cluster")
 
 		config, err := os.Open(gceConfigFilePath)
 		if err != nil {
@@ -133,7 +149,7 @@ func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, s
 		if err := gcfg.FatalOnly(gcfg.ReadInto(&cfg, config)); err != nil {
 			return nil, "", fmt.Errorf("Could not read config %v", err)
 		}
-		glog.Infof("Using GCE provider config %+v", cfg)
+		klog.Infof("Using GCE provider config %+v", cfg)
 
 		return gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody), cfg.Global.ProjectID, nil
 	}
@@ -144,11 +160,11 @@ func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, s
 	}
 
 	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
-		glog.V(1).Info("In a GCP cluster")
+		klog.V(1).Info("In a GCP cluster")
 		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
 		return tokenSource, projectID, err
 	} else {
-		glog.V(1).Info("Using default TokenSource")
+		klog.V(1).Info("Using default TokenSource")
 		return google.ComputeTokenSource(""), projectID, nil
 	}
 }

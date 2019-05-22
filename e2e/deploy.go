@@ -20,12 +20,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
@@ -110,7 +110,7 @@ func deployCRD() error {
 	if _, err := clients.CustomResource.Create(&crd); err != nil {
 		return err
 	}
-	glog.Infof("Created custom resource definition %s", crd.Name)
+	klog.Infof("Created custom resource definition %s", crd.Name)
 
 	if err := utils.Retry(func() error {
 		crd, err := clients.CustomResource.Get(crd.Name, metav1.GetOptions{})
@@ -134,14 +134,15 @@ func deployCRD() error {
 
 // Deploys Managed Certificate controller with all related objects
 func deployController(tag string) error {
-	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
-	if err := utilshttp.IgnoreNotFound(clients.ServiceAccount.Delete(serviceAccountName, &metav1.DeleteOptions{})); err != nil {
+	if err := deleteController(); err != nil {
 		return err
 	}
+
+	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
 	if _, err := clients.ServiceAccount.Create(&serviceAccount); err != nil {
 		return err
 	}
-	glog.Infof("Created service account %s", serviceAccountName)
+	klog.Infof("Created service account %s", serviceAccountName)
 
 	clusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
@@ -153,7 +154,7 @@ func deployController(tag string) error {
 			},
 			{
 				APIGroups: []string{"", "extensions"},
-				Resources: []string{"configmaps", "events", "ingresses"},
+				Resources: []string{"configmaps", "endpoints", "events", "ingresses"},
 				Verbs:     []string{"*"},
 			},
 		},
@@ -161,7 +162,7 @@ func deployController(tag string) error {
 	if _, err := clients.ClusterRole.Create(&clusterRole); err != nil {
 		return err
 	}
-	glog.Infof("Created cluster role %s", clusterRoleName)
+	klog.Infof("Created cluster role %s", clusterRoleName)
 
 	clusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
@@ -172,13 +173,10 @@ func deployController(tag string) error {
 			Name:     clusterRoleName,
 		},
 	}
-	if err := utilshttp.IgnoreNotFound(clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})); err != nil {
-		return err
-	}
 	if _, err := clients.ClusterRoleBinding.Create(&clusterRoleBinding); err != nil {
 		return err
 	}
-	glog.Infof("Created cluster role binding %s", clusterRoleBindingName)
+	klog.Infof("Created cluster role binding %s", clusterRoleBindingName)
 
 	appCtrl := map[string]string{"app": deploymentName}
 	image := fmt.Sprintf("eu.gcr.io/managed-certs-gke/managed-certificate-controller:%s", tag)
@@ -257,13 +255,10 @@ func deployController(tag string) error {
 			},
 		},
 	}
-	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
-		return err
-	}
 	if _, err := clients.Deployment.Create(&deployment); err != nil {
 		return err
 	}
-	glog.Infof("Created deployment %s", deploymentName)
+	klog.Infof("Created deployment %s", deploymentName)
 
 	return nil
 }
@@ -273,23 +268,22 @@ func deleteController() error {
 	if err := utilshttp.IgnoreNotFound(clients.ServiceAccount.Delete(serviceAccountName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
-	glog.Infof("Deleted service account %s", serviceAccountName)
+	klog.Infof("Deleted service account %s", serviceAccountName)
 
 	if err := utilshttp.IgnoreNotFound(clients.ClusterRole.Delete(clusterRoleName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
-	glog.Infof("Deleted cluster role %s", clusterRoleName)
+	klog.Infof("Deleted cluster role %s", clusterRoleName)
 
-	err := clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
-	if utilshttp.IgnoreNotFound(err) != nil {
+	if err := utilshttp.IgnoreNotFound(clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
-	glog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
+	klog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
 
-	if utilshttp.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
-	glog.Infof("Deleted deployment %s", deploymentName)
+	klog.Infof("Deleted deployment %s", deploymentName)
 
 	return nil
 }

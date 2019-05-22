@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/dns"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client/managedcertificate"
@@ -96,10 +96,10 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	projectID := os.Getenv(projectIDEnv)
-	glog.Infof("projectID=%s", projectID)
+	klog.Infof("projectID=%s", projectID)
 
 	dnsZone := os.Getenv(dnsZoneEnv)
-	glog.Infof("dnsZone=%s", dnsZone)
+	klog.Infof("dnsZone=%s", dnsZone)
 
 	dnsClient, err := dns.New(oauthClient, dnsZone)
 	if err != nil {
@@ -150,19 +150,19 @@ func getOauthClient() (*http.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("gcloud auth list: %s", gcloudAuthList)
+	klog.Infof("gcloud auth list: %s", gcloudAuthList)
 
 	gcloudInfo, err := gcloud("info")
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("gcloud info: %s", gcloudInfo)
+	klog.Infof("gcloud info: %s", gcloudInfo)
 
 	gcloudConfigurations, err := gcloud("config", "configurations", "list")
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("gcloud config configurations list: %s", gcloudConfigurations)
+	klog.Infof("gcloud config configurations list: %s", gcloudConfigurations)
 
 	accessToken, err := gcloud("auth", "print-access-token")
 	if err != nil {

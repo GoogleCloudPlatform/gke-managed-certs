@@ -20,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -38,11 +38,11 @@ func Retry(action func() error) error {
 		}
 
 		if i < maxRetries {
-			glog.Warningf("%d. retry in %d seconds because of %s", i, timeout, err.Error())
+			klog.Warningf("%d. retry in %d seconds because of %s", i, timeout, err.Error())
 			time.Sleep(timeout * time.Second)
 		}
 	}
 
-	glog.Errorf("Failed because of exceeding the retry limit")
+	klog.Errorf("Failed because of exceeding the retry limit")
 	return retryError
 }

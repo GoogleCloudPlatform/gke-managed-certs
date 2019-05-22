@@ -24,6 +24,8 @@ import (
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -41,6 +43,12 @@ import (
 type Clients struct {
 	// ConfigMap manages ConfigMap objects
 	ConfigMap configmap.ConfigMap
+
+	// Coordination is used for electing master
+	Coordination coordinationv1.CoordinationV1Interface
+
+	// Core manages core Kubernetes objects
+	Core corev1.CoreV1Interface
 
 	// Event manages Event objects
 	Event event.Event
@@ -89,6 +97,8 @@ func New(config *config.Config) (*Clients, error) {
 
 	return &Clients{
 		ConfigMap:                         configmap.New(clusterConfig),
+		Coordination:                      kubernetesClient.CoordinationV1(),
+		Core:                              kubernetesClient.CoreV1(),
 		Event:                             event,
 		IngressClient:                     ingressClient,
 		IngressInformerFactory:            ingressFactory,

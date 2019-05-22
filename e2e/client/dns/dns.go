@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/golang/glog"
 	dns "google.golang.org/api/dns/v2beta1"
+	"k8s.io/klog"
 )
 
 const (
@@ -95,12 +95,12 @@ func (d dnsImpl) DeleteAll() error {
 		}
 	}
 
-	glog.Infof("Delete all DNS A records in %s.%s; all names: %v; all A names: %v", d.zone, topLevelZone, allNames, allANames)
+	klog.Infof("Delete all DNS A records in %s.%s; all names: %v; all A names: %v", d.zone, topLevelZone, allNames, allANames)
 
 	_, err = d.service.Changes.Create(projectID, d.zone, &dns.Change{
 		Deletions: recordsA,
 	}).Do()
 
-	glog.Infof("Successfully deleted DNS A records: %v", allANames)
+	klog.Infof("Successfully deleted DNS A records: %v", allANames)
 	return err
 }

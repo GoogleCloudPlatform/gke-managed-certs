@@ -18,12 +18,12 @@ limitations under the License.
 package event
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 )
@@ -51,7 +51,7 @@ type eventImpl struct {
 // New creates an event recorder to send custom events to Kubernetes.
 func New(client kubernetes.Interface) (Event, error) {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(glog.V(4).Infof)
+	broadcaster.StartLogging(klog.V(4).Infof)
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace)})
 
 	eventsScheme := runtime.NewScheme()

@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	listers "k8s.io/client-go/listers/extensions/v1beta1"
+	"k8s.io/klog"
 
 	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
@@ -74,7 +74,7 @@ func (b binderImpl) BindCertificates() {
 			mcrtsToAttach = append(mcrtsToAttach, id.String())
 		}
 		sort.Strings(mcrtsToAttach)
-		glog.Infof("Attach ManagedCertificates: %v", strings.Join(mcrtsToAttach, ", "))
+		klog.Infof("Attach ManagedCertificates: %v", strings.Join(mcrtsToAttach, ", "))
 	}
 
 	if len(sslCertificatesToDetach) > 0 {
@@ -83,7 +83,7 @@ func (b binderImpl) BindCertificates() {
 			sslCertsToDetach = append(sslCertsToDetach, sslCert)
 		}
 		sort.Strings(sslCertsToDetach)
-		glog.Infof("Detach SslCertificates: %v", strings.Join(sslCertsToDetach, ", "))
+		klog.Infof("Detach SslCertificates: %v", strings.Join(sslCertsToDetach, ", "))
 	}
 
 	if err := b.ensureCertificatesAttached(managedCertificatesToAttach, sslCertificatesToDetach); err != nil {
@@ -165,7 +165,7 @@ func (b binderImpl) ensureCertificatesAttached(managedCertificatesToAttach map[t
 			continue
 		}
 
-		glog.Infof("Annotation %s on Ingress %s:%s was %s, set to %s", annotationPreSharedCertKey, ingress.Namespace,
+		klog.Infof("Annotation %s on Ingress %s:%s was %s, set to %s", annotationPreSharedCertKey, ingress.Namespace,
 			ingress.Name, ingress.Annotations[annotationPreSharedCertKey], preSharedCertValue)
 
 		if ingress.Annotations == nil {
@@ -187,7 +187,7 @@ func (b binderImpl) ensureCertificatesAttached(managedCertificatesToAttach map[t
 					return err
 				}
 				if excludedFromSLO {
-					glog.Infof("Skipping reporting SslCertificate binding metric, because %s is marked as excluded from SLO calculations.", id.String())
+					klog.Infof("Skipping reporting SslCertificate binding metric, because %s is marked as excluded from SLO calculations.", id.String())
 					return nil
 				}
 

@@ -131,7 +131,7 @@ func (c *FakeManagedCertificates) DeleteCollection(options *v1.DeleteOptions, li
 // Patch applies the patch and returns the patched managedCertificate.
 func (c *FakeManagedCertificates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ManagedCertificate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(managedcertificatesResource, c.ns, name, data, subresources...), &v1beta1.ManagedCertificate{})
+		Invokes(testing.NewPatchSubresourceAction(managedcertificatesResource, c.ns, name, pt, data, subresources...), &v1beta1.ManagedCertificate{})
 
 	if obj == nil {
 		return nil, err

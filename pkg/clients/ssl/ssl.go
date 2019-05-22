@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v0.beta"
+	"k8s.io/klog"
 
 	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
@@ -118,14 +118,14 @@ func (s sslImpl) List() ([]*compute.SslCertificate, error) {
 
 func (s sslImpl) waitFor(ctx context.Context, operationName string) error {
 	for {
-		glog.Infof("Wait for operation %s", operationName)
+		klog.Infof("Wait for operation %s", operationName)
 		operation, err := s.service.GlobalOperations.Get(s.projectID, operationName).Do()
 		if err != nil {
 			return fmt.Errorf("could not get operation %s: %s", operationName, err.Error())
 		}
 
 		if operation.Status == statusDone {
-			glog.Infof("Operation %s done, %+v", operationName, operation)
+			klog.Infof("Operation %s done, %+v", operationName, operation)
 			if operation.HttpErrorMessage == "" {
 				return nil
 			}

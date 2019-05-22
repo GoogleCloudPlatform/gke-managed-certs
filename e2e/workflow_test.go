@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/glog"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
@@ -50,7 +50,7 @@ func mustCreateBackendService(t *testing.T, name string) {
 	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Deleted deployment %s", name)
+	klog.Infof("Deleted deployment %s", name)
 
 	appHello := map[string]string{"app": name}
 	args := []string{
@@ -82,12 +82,12 @@ func mustCreateBackendService(t *testing.T, name string) {
 	if _, err := clients.Deployment.Create(depl); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Created deployment %s", name)
+	klog.Infof("Created deployment %s", name)
 
 	if err := utilshttp.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Deleted service %s", name)
+	klog.Infof("Deleted service %s", name)
 
 	serv := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -100,7 +100,7 @@ func mustCreateBackendService(t *testing.T, name string) {
 	if _, err := clients.Service.Create(serv); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Created service %s", name)
+	klog.Infof("Created service %s", name)
 }
 
 func mustCreateIngress(t *testing.T, name string) {
@@ -109,7 +109,7 @@ func mustCreateIngress(t *testing.T, name string) {
 	if err := utilshttp.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Deleted ingress %s", name)
+	klog.Infof("Deleted ingress %s", name)
 
 	ing := &extv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -123,7 +123,7 @@ func mustCreateIngress(t *testing.T, name string) {
 	if _, err := clients.Ingress.Create(ing); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Created ingress %s", name)
+	klog.Infof("Created ingress %s", name)
 }
 
 func getIngressIP(name string) (string, error) {
@@ -180,14 +180,14 @@ func TestProvisioningWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Ingress IP: %s", ip)
+	klog.Infof("Ingress IP: %s", ip)
 
 	defer clients.Dns.DeleteAll()
 	domains, err := clients.Dns.Create(generateRandomNames(2), ip)
 	if err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Generated random domains: %v", domains)
+	klog.Infof("Generated random domains: %v", domains)
 
 	var mcrtNames []string
 	for i, domain := range domains {
@@ -198,7 +198,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	glog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
+	klog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
 	if err := clients.SslCertificate.Create(ctx, additionalSslCertificateName,
@@ -206,7 +206,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
-	glog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
+	klog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
 
 	ing, err := clients.Ingress.Get(ingressName, metav1.GetOptions{})
 	if err != nil {
@@ -216,7 +216,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 	if _, err := clients.Ingress.Update(ing); err != nil {
 		t.Fatal(err)
 	}
-	glog.Infof("Annotated Ingress with %s=%s", annotation, ing.Annotations[annotation])
+	klog.Infof("Annotated Ingress with %s=%s", annotation, ing.Annotations[annotation])
 
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
 		err := utils.Retry(func() error {

@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Networking() networkingv1beta1.NetworkingV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
 func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
-	return c.networkingV1beta1
-}
-
-// Deprecated: Networking retrieves the default version of NetworkingClient.
-// Please explicitly pick a version.
-func (c *Clientset) Networking() networkingv1beta1.NetworkingV1beta1Interface {
 	return c.networkingV1beta1
 }
 
