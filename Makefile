@@ -31,7 +31,7 @@ build-binary: clean deps
 	ld_flags="-X $${pkg}/pkg/version.Version=${VERSION} -X $${pkg}/pkg/version.GitCommit=${GIT_COMMIT}"; \
 	godep go build -o ${name} -ldflags "$${ld_flags}"
 
-# Builds the managed certs controller binary using a docker runner image
+# Builds the managed-certificate-controller binary using a docker runner image
 build-binary-in-docker: docker-runner-builder
 	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make build-binary GIT_COMMIT=${GIT_COMMIT} VERSION=${VERSION}'
 
@@ -45,15 +45,23 @@ cross:
 deps:
 	go get github.com/tools/godep
 
-# Builds and pushes a docker image with managed certs controller binary
+# Builds and pushes a docker image with managed-certificate-controller binary
 docker: auth-configure-docker
-	docker build --pull -t ${REGISTRY}/${name}:${TAG} -t ${REGISTRY}/${name}:${VERSION} .
-	docker push ${REGISTRY}/${name}:${TAG}
-	docker push ${REGISTRY}/${name}:${VERSION}
+	until docker build --pull -t ${REGISTRY}/${name}:${TAG} -t ${REGISTRY}/${name}:${VERSION} .; do \
+		echo "Building managed-cetrificate-controller image failed, retrying in 10 seconds..." && sleep 10; \
+	done
+	until docker push ${REGISTRY}/${name}:${TAG}; do \
+		echo "Pushing managed-certificate-controller image failed, retrying in 10 seconds..." && sleep 10; \
+	done
+	until docker push ${REGISTRY}/${name}:${VERSION}; do \
+		echo "Pushing managed-certificate-controller image failed, retrying in 10 seconds..." && sleep 10; \
+	done
 
 # Builds a runner image, i. e. an image used to build a managed-certificate-controller binary and to run its tests.
 docker-runner-builder:
-	docker build -t ${runner_image} runner
+	until docker build -t ${runner_image} runner; do \
+		echo "Building runner image failed, retrying in 10 seconds..." && sleep 10; \
+	done
 
 e2e:
 	- dest=/tmp/artifacts; \
