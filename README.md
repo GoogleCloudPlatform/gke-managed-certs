@@ -4,7 +4,13 @@ Managed Certificates in GKE simplify user flow in managing HTTPS traffic. Instea
 
 For that to work you need to run your cluster on a platform with [Google Cloud Load Balancer](https://github.com/kubernetes/ingress-gce), that is a cluster in GKE or your own cluster in GCP.
 
-# Installation
+# Installation on your GKE cluster
+
+If you are a user of GKE (`1.12.6-gke.7` or higher), the managed certificate controlled provided by this repo is already installed for you and ready to be used right now!
+
+You do not have to follow the below steps [Installation on your own cluster on GCP](#installation-on-your-own-cluster-on-gcp). Instead, follow this getting started guide and start using `networking.gke.io/v1beta1` and `ManagedCertificate`.  
+
+# Installation on your own cluster on GCP
 
 ## Prerequisites
 
