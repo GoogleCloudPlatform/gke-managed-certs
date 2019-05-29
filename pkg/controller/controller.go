@@ -115,8 +115,13 @@ func (c *controller) Run(ctx context.Context) error {
 
 func (c *controller) synchronizeAllManagedCertificates(ctx context.Context) {
 	c.state.ForeachKey(func(id types.CertId) {
-		if err := c.sync.ManagedCertificate(ctx, id); err != nil {
-			runtime.HandleError(err)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if err := c.sync.ManagedCertificate(ctx, id); err != nil {
+				runtime.HandleError(err)
+			}
 		}
 	})
 	c.enqueueAll()

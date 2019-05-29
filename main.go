@@ -39,7 +39,8 @@ import (
 // which is closed on one of these signals. If a second signal is caught, the program
 // is terminated with exit code 1.
 //
-// Based on k8s.io/apiserver/pkg/server.SetupSignalHandler.
+// Based on k8s.io/apiserver/pkg/server.SetupSignalHandler. This implementation may be
+// called multiple times.
 func setupSignalHandler() <-chan struct{} {
 	shutdownHandler := make(chan os.Signal, 2)
 	stop := make(chan struct{})
@@ -119,7 +120,7 @@ func main() {
 				}
 			},
 			OnStoppedLeading: func() {
-				cancel()
+				cancel() // Cancel ctx, shut down and wait for being restarted by kubelet.
 			},
 		},
 	})

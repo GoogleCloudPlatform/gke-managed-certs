@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/debian-base-amd64:0.3
+FROM gcr.io/distroless/base
 LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 
-ENV DEBIAN_FRONTEND noninteractive
-RUN clean-install ca-certificates
-
 ADD managed-certificate-controller /managed-certificate-controller
-ADD run.sh /run.sh
 
-ENTRYPOINT ["./run.sh"]
+ENTRYPOINT [ \
+	"./managed-certificate-controller", \
+	"--alsologtostderr", \
+	"-v=3", \
+	"-log_file=/tmp/managed_certificate_controller.log" \
+]

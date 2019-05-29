@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -85,6 +86,19 @@ func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error)
 
 	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
 		return nil, err
+	}
+
+	// Try to remove SslCertificate resources that might have been left after previous test runs. Ignore errors.
+	if sslCertificates, err := clients.SslCertificate.List(); err != nil {
+		return nil, err
+	} else if len(sslCertificates) > 0 {
+		klog.Infof("Found %d SslCertificate resources, attempting clean up", len(sslCertificates))
+		for _, sslCertificate := range sslCertificates {
+			klog.Infof("Trying to delete SslCertificate %s", sslCertificate.Name)
+			if err := clients.SslCertificate.Delete(context.Background(), sslCertificate.Name); err != nil {
+				klog.Warningf("Failed to delete %s, err: %v", sslCertificate.Name, err)
+			}
+		}
 	}
 
 	sslCertificatesBegin, err := clients.SslCertificate.List()
