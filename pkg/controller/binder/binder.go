@@ -74,7 +74,6 @@ func (b binderImpl) BindCertificates() {
 			mcrtsToAttach = append(mcrtsToAttach, id.String())
 		}
 		sort.Strings(mcrtsToAttach)
-		klog.Infof("Attach ManagedCertificates: %v", strings.Join(mcrtsToAttach, ", "))
 	}
 
 	if len(sslCertificatesToDetach) > 0 {
@@ -83,7 +82,6 @@ func (b binderImpl) BindCertificates() {
 			sslCertsToDetach = append(sslCertsToDetach, sslCert)
 		}
 		sort.Strings(sslCertsToDetach)
-		klog.Infof("Detach SslCertificates: %v", strings.Join(sslCertsToDetach, ", "))
 	}
 
 	if err := b.ensureCertificatesAttached(managedCertificatesToAttach, sslCertificatesToDetach); err != nil {

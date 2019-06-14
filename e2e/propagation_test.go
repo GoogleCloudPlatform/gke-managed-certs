@@ -52,8 +52,6 @@ func ensurePropagated(name string) error {
 }
 
 func TestPropagation(t *testing.T) {
-	t.Parallel()
-
 	type testCase struct {
 		action func(mcrtName string) error
 		desc   string
@@ -82,7 +80,7 @@ func TestPropagation(t *testing.T) {
 					return err
 				}
 
-				mcrt.Spec.Domains = []string{"foo.com"}
+				mcrt.Spec.Domains = []string{"propagation-rename.example.com"}
 				return clients.ManagedCertificate.Update(mcrt)
 			},
 			"Modifications in ManagedCertificate are propagated to SslCertificate",
@@ -93,7 +91,7 @@ func TestPropagation(t *testing.T) {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
 			name := fmt.Sprintf("propagation-%d", i)
-			domain := fmt.Sprintf("example-%d.com", i)
+			domain := fmt.Sprintf("propagation-%d.example.com", i)
 			if err := clients.ManagedCertificate.Create(name, []string{domain}); err != nil {
 				t.Fatalf("Creation failed: %s", err.Error())
 			}
@@ -114,7 +112,7 @@ func TestPropagation(t *testing.T) {
 
 	t.Run("Deleting ManagedCertificate deletes SslCertificate", func(t *testing.T) {
 		name := "propagation-to-be-deleted"
-		domain := "example-to-be-deleted.com"
+		domain := "propagation-to-be-deleted.example.com"
 		if err := clients.ManagedCertificate.Create(name, []string{domain}); err != nil {
 			t.Fatal(err)
 		}

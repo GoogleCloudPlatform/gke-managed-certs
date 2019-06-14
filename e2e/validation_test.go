@@ -24,8 +24,6 @@ import (
 )
 
 func TestCRDValidation(t *testing.T) {
-	t.Parallel()
-
 	type testCase struct {
 		domains []string
 		success bool
@@ -33,10 +31,26 @@ func TestCRDValidation(t *testing.T) {
 	}
 
 	testCases := []testCase{
-		{[]string{"a.com", "b.com"}, false, "Multiple domain names not allowed"},
-		{[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.com"}, false, "Domain >63 chars not allowed"},
-		{[]string{"*.example.com"}, false, "Domain with a wildcard not allowed"},
-		{[]string{"example.com"}, true, "Single non-wildcard domain <=63 characters allowed"},
+		{
+			[]string{"a.validation.example.com", "b.validation.example.com"},
+			false,
+			"Multiple domain names not allowed",
+		},
+		{
+			[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.validation.example.com"},
+			false,
+			"Domain >63 chars not allowed",
+		},
+		{
+			[]string{"*.validation.example.com"},
+			false,
+			"Domain with a wildcard not allowed",
+		},
+		{
+			[]string{"validation.example.com"},
+			true,
+			"Single non-wildcard domain <=63 characters allowed",
+		},
 	}
 
 	for i, tc := range testCases {

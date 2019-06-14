@@ -162,7 +162,6 @@ func generateRandomNames(count int) []string {
 }
 
 func TestProvisioningWorkflow(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	backendServiceName := "http-hello"
