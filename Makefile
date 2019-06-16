@@ -7,9 +7,10 @@ KUBERNETES_PROVIDER ?= gke
 ARTIFACTS ?= /tmp/artifacts
 CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
 CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
+PROJECT_ID ?= ${PROJECT}
 PROJECT_ID ?= $(shell gcloud config list --format="value(core.project)")
 DNS_ZONE ?= managedcertsgke
-PLATFORM ?= GKE
+PLATFORM ?= gke
 
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)

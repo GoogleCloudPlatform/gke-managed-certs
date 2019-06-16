@@ -25,6 +25,7 @@ SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
 PLATFORM=${PLATFORM:-"gcp"}
+PROJECT=${PROJECT:-""}
 PULL_NUMBER=${PULL_NUMBER:-""}
 TAG=${TAG:-"ci_latest"}
 
@@ -45,4 +46,5 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-make -C ${SCRIPT_ROOT} run-e2e-in-docker DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM TAG=$TAG
+make -C ${SCRIPT_ROOT} run-e2e-in-docker \
+  DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM PROJECT=$PROJECT TAG=$TAG
