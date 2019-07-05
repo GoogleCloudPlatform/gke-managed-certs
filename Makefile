@@ -41,7 +41,7 @@ clean:
 
 # Checks if Google criteria for releasing code as OSS are met
 cross:
-	/google/data/ro/teams/opensource/cross .
+	if [ -e /google/data/ro/teams/opensource/cross ]; then /google/data/ro/teams/opensource/cross .; fi
 
 deps:
 	go get github.com/tools/godep
