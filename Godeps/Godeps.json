@@ -1590,13 +1590,13 @@
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/client/metrics/prometheus",
-			"Comment": "v1.14.3-beta.0-20-g4ccdc8b71b",
-			"Rev": "4ccdc8b71b2790b2853b3ac43cdda623f8b22b12"
+			"Comment": "v1.14.4-beta.0-1-g0020140bf3",
+			"Rev": "0020140bf31231f53c919ccf69a8fa8d2c757d61"
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
-			"Comment": "v1.14.3-beta.0-20-g4ccdc8b71b",
-			"Rev": "4ccdc8b71b2790b2853b3ac43cdda623f8b22b12"
+			"Comment": "v1.14.4-beta.0-1-g0020140bf3",
+			"Rev": "0020140bf31231f53c919ccf69a8fa8d2c757d61"
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
