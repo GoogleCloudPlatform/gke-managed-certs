@@ -27,10 +27,10 @@ auth-configure-docker:
 		gcloud auth configure-docker || true
 
 # Builds the managed certs controller binary
-build-binary: clean deps
+build-binary: clean
 	pkg=github.com/GoogleCloudPlatform/gke-managed-certs; \
 	ld_flags="-X $${pkg}/pkg/version.Version=${VERSION} -X $${pkg}/pkg/version.GitCommit=${GIT_COMMIT}"; \
-	godep go build -o ${name} -ldflags "$${ld_flags}"
+	go build -o ${name} -ldflags "$${ld_flags}"
 
 # Builds the managed-certificate-controller binary using a docker runner image
 build-binary-in-docker: docker-runner-builder
@@ -42,9 +42,6 @@ clean:
 # Checks if Google criteria for releasing code as OSS are met
 cross:
 	if [ -e /google/data/ro/teams/opensource/cross ]; then /google/data/ro/teams/opensource/cross .; fi
-
-deps:
-	go get github.com/tools/godep
 
 # Builds and pushes a docker image with managed-certificate-controller binary
 docker: auth-configure-docker
@@ -75,7 +72,7 @@ e2e:
 		DNS_ZONE=${DNS_ZONE} \
 		PLATFORM=${PLATFORM} \
 		TAG=${TAG} \
-		godep go test ./e2e/... -test.timeout=60m \
+		go test ./e2e/... -test.timeout=60m \
 			-logtostderr=false -alsologtostderr=true -v -log_dir=$${dest} \
 			> $${dest}/e2e.out.txt && exitcode=$${?} || exitcode=$${?} ; \
 	} && cat $${dest}/e2e.out.txt | go-junit-report > $${dest}/junit_01.xml && exit $${exitcode}
@@ -83,7 +80,7 @@ e2e:
 # Formats go source code with gofmt
 gofmt:
 	gofmt -w main.go
-	find . -mindepth 1 -maxdepth 1 -name Godeps -o -name vendor -prune -o -type d -print | xargs gofmt -w
+	find . -mindepth 1 -maxdepth 1 -name vendor -prune -o -type d -print | xargs gofmt -w
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
 release: release-ci clean
@@ -105,9 +102,9 @@ run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:${runner_path} ${runner_image}:latest bash -c 'cd ${runner_path} && make test'
 
 test:
-	godep go test ./pkg/... -cover
+	go test ./pkg/... -cover
 
 vet:
-	godep go vet ./...
+	go vet ./...
 
-.PHONY: all auth-configure-docker build-binary build-binary-in-docker build-dev clean cross deps docker docker-runner-builder e2e release release-ci run-e2e-in-docker run-test-in-docker test vet
+.PHONY: all auth-configure-docker build-binary build-binary-in-docker build-dev clean cross docker docker-runner-builder e2e release release-ci run-e2e-in-docker run-test-in-docker test vet

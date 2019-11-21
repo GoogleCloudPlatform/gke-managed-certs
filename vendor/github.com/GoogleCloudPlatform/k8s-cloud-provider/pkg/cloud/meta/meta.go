@@ -71,7 +71,7 @@ var AllServices = []*ServiceInfo{
 		Resource:    "addresses",
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&ga.AddressesService{}),
-		options: AggregatedList,
+		options:     AggregatedList,
 	},
 	{
 		Object:      "Address",
@@ -80,7 +80,7 @@ var AllServices = []*ServiceInfo{
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.AddressesService{}),
-		options: AggregatedList,
+		options:     AggregatedList,
 	},
 	{
 		Object:      "Address",
@@ -89,7 +89,7 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.AddressesService{}),
-		options: AggregatedList,
+		options:     AggregatedList,
 	},
 	{
 		Object:      "Address",
@@ -167,6 +167,18 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
+		Object:      "BackendService",
+		Service:     "RegionBackendServices",
+		Resource:    "backendServices",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionBackendServicesService{}),
+		additionalMethods: []string{
+			"GetHealth",
+			"Update",
+		},
+	},
+	{
 		Object:      "Disk",
 		Service:     "Disks",
 		Resource:    "disks",
@@ -203,6 +215,9 @@ var AllServices = []*ServiceInfo{
 		Resource:    "forwardingRules",
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&ga.ForwardingRulesService{}),
+		additionalMethods: []string{
+			"SetTarget",
+		},
 	},
 	{
 		Object:      "ForwardingRule",
@@ -211,6 +226,9 @@ var AllServices = []*ServiceInfo{
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.ForwardingRulesService{}),
+		additionalMethods: []string{
+			"SetTarget",
+		},
 	},
 	{
 		Object:      "ForwardingRule",
@@ -219,6 +237,9 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.ForwardingRulesService{}),
+		additionalMethods: []string{
+			"SetTarget",
+		},
 	},
 	{
 		Object:      "ForwardingRule",
@@ -291,6 +312,17 @@ var AllServices = []*ServiceInfo{
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.RegionHealthChecksService{}),
+		additionalMethods: []string{
+			"Update",
+		},
+	},
+	{
+		Object:      "HealthCheck",
+		Service:     "RegionHealthChecks",
+		Resource:    "healthChecks",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionHealthChecksService{}),
 		additionalMethods: []string{
 			"Update",
 		},
@@ -418,6 +450,20 @@ var AllServices = []*ServiceInfo{
 		options: AggregatedList,
 	},
 	{
+		Object:      "NetworkEndpointGroup",
+		Service:     "NetworkEndpointGroups",
+		Resource:    "networkEndpointGroups",
+		version:     VersionGA,
+		keyType:     Zonal,
+		serviceType: reflect.TypeOf(&ga.NetworkEndpointGroupsService{}),
+		additionalMethods: []string{
+			"AttachNetworkEndpoints",
+			"DetachNetworkEndpoints",
+			"ListNetworkEndpoints",
+		},
+		options: AggregatedList,
+	},
+	{
 		Object:   "Project",
 		Service:  "Projects",
 		Resource: "projects",
@@ -462,6 +508,38 @@ var AllServices = []*ServiceInfo{
 		Resource:    "sslCertificates",
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&ga.SslCertificatesService{}),
+	},
+	{
+		Object:      "SslCertificate",
+		Service:     "SslCertificates",
+		Resource:    "sslCertificates",
+		version:     VersionBeta,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&beta.SslCertificatesService{}),
+	},
+	{
+		Object:      "SslCertificate",
+		Service:     "SslCertificates",
+		Resource:    "sslCertificates",
+		version:     VersionAlpha,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&alpha.SslCertificatesService{}),
+	},
+	{
+		Object:      "SslCertificate",
+		Service:     "RegionSslCertificates",
+		Resource:    "sslCertificates",
+		version:     VersionAlpha,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&alpha.RegionSslCertificatesService{}),
+	},
+	{
+		Object:      "SslCertificate",
+		Service:     "RegionSslCertificates",
+		Resource:    "sslCertificates",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionSslCertificatesService{}),
 	},
 	{
 		Object:      "Subnetwork",
@@ -523,9 +601,20 @@ var AllServices = []*ServiceInfo{
 		Object:      "TargetHttpProxy",
 		Service:     "RegionTargetHttpProxies",
 		Resource:    "targetHttpProxies",
-		version: 		 VersionAlpha,
+		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.RegionTargetHttpProxiesService{}),
+		additionalMethods: []string{
+			"SetUrlMap",
+		},
+	},
+	{
+		Object:      "TargetHttpProxy",
+		Service:     "RegionTargetHttpProxies",
+		Resource:    "targetHttpProxies",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionTargetHttpProxiesService{}),
 		additionalMethods: []string{
 			"SetUrlMap",
 		},
@@ -572,6 +661,18 @@ var AllServices = []*ServiceInfo{
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.RegionTargetHttpsProxiesService{}),
+		additionalMethods: []string{
+			"SetSslCertificates",
+			"SetUrlMap",
+		},
+	},
+	{
+		Object:      "TargetHttpsProxy",
+		Service:     "RegionTargetHttpsProxies",
+		Resource:    "targetHttpsProxies",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionTargetHttpsProxiesService{}),
 		additionalMethods: []string{
 			"SetSslCertificates",
 			"SetUrlMap",
@@ -627,6 +728,17 @@ var AllServices = []*ServiceInfo{
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.RegionUrlMapsService{}),
+		additionalMethods: []string{
+			"Update",
+		},
+	},
+	{
+		Object:      "UrlMap",
+		Service:     "RegionUrlMaps",
+		Resource:    "urlMaps",
+		version:     VersionBeta,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&beta.RegionUrlMapsService{}),
 		additionalMethods: []string{
 			"Update",
 		},
