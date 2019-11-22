@@ -78,6 +78,20 @@
   version = "v1.3.2"
 
 [[projects]]
+  digest = "1:1d1cbf539d9ac35eb3148129f96be5537f1a1330cadcc7e3a83b4e72a59672a3"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/flags",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "UT"
+  revision = "2d0692c2e9617365a95b295612ac0d4415ba4627"
+  version = "v0.3.1"
+
+[[projects]]
   digest = "1:a6181aca1fd5e27103f9a920876f29ac72854df7345a39f3b01e61c8c94cc8af"
   name = "github.com/google/gofuzz"
   packages = ["."]
@@ -454,8 +468,8 @@
   version = "v2.2.7"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:c1eecbff5fa39a78676e0a7ed245be7338ef18e5566479bbe0e76f1ef852cd0c"
+  branch = "release-1.15"
+  digest = "1:d89afbf3588e87d2c9e6efdd5528d249b32d23a12fbd7ec324f3cb373c6fb76c"
   name = "k8s.io/api"
   packages = [
     "admissionregistration/v1beta1",
@@ -496,11 +510,11 @@
     "storage/v1beta1",
   ]
   pruneopts = "UT"
-  revision = "159aefb8556bb8ed4be7631461d1558546d304db"
+  revision = "3a12735a829ac2f7817379647da6d47c39327512"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:729a3a90766b910308b136dd16ea990022c73bd9dbcf3767591ccba8c027fae5"
+  branch = "release-1.15"
+  digest = "1:e91e98666ff49fbd3d3ec7643ec3db73dcc910cfa0649de5d1fd0e568736d354"
   name = "k8s.io/apiextensions-apiserver"
   packages = [
     "pkg/apis/apiextensions",
@@ -509,11 +523,11 @@
     "pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
   ]
   pruneopts = "UT"
-  revision = "b14e3c49469af4da3c55bf32d25697451683b8d5"
+  revision = "6b6acca910e3e9ad2467b9053aa099b24833e4e3"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:87bfa0718cb4ed1243eaefd5c757e34aac44461f4c6f5581706bf959adc2e536"
+  branch = "release-1.15"
+  digest = "1:6055b35ab4227f3b2319e6b628c129c050423c95b066429e675888e090f85694"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/errors",
@@ -561,19 +575,11 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "UT"
-  revision = "c5d2f014d689246b84637774317fa0288dd3129b"
+  revision = "31ade1b30762be61c32b2e8db2a11aa8b0b8960e"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:55d9fa1e87d2e5f9f34f071849414edbdf3ac1da22c23fb5885c7296105ebb55"
-  name = "k8s.io/apiserver"
-  packages = ["pkg/util/feature"]
-  pruneopts = "UT"
-  revision = "8577c320c87f72116b2f889c902b60edfe920ca8"
-
-[[projects]]
-  branch = "release-11.0"
-  digest = "1:063e9d964efc035c24fb40e31b21dea2832391fb0dab903050a813a6251f15a5"
+  branch = "release-12.0"
+  digest = "1:1d9b99ffb63d2b079a05a4ce424aac8de37187da1419c7372173302197665a08"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -735,22 +741,21 @@
     "util/workqueue",
   ]
   pruneopts = "UT"
-  revision = "8e412805300829bc5a39e63eaccfc8a3355e4797"
+  revision = "5f2132fc4383659da452dba21a1c6c9890b0e062"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:c2508ac697a07aaac605ada2dfaccd0cee9a7ebef16bf64fe7e1e007f565a77c"
+  branch = "release-1.15"
+  digest = "1:c8abb26268ac2de6e265d713fb92a270998363dbf184329313affc15105f8462"
   name = "k8s.io/cloud-provider"
   packages = [
     ".",
-    "features",
     "service/helpers",
     "volume",
     "volume/errors",
     "volume/helpers",
   ]
   pruneopts = "UT"
-  revision = "9775d7be84940ade3d69258fd907b61cc3cdb66a"
+  revision = "ec30339415e7401fa27d184762ffb394485b3ce4"
 
 [[projects]]
   branch = "master"
@@ -776,23 +781,29 @@
   revision = "30be4d16710a"
 
 [[projects]]
-  branch = "release-1.14"
-  digest = "1:07b3c7821731685fd9a4616620c36276861f245cbce3e2a4f6b276f176189854"
+  branch = "release-1.15"
+  digest = "1:5257c14ce8a0e2b178f7de41c4c91221dd47175536118db2202f9ffbaa2aeac4"
   name = "k8s.io/kubernetes"
-  packages = [
-    "pkg/client/metrics/prometheus",
-    "pkg/cloudprovider/providers/gce",
-  ]
+  packages = ["pkg/client/metrics/prometheus"]
   pruneopts = "UT"
-  revision = "6193bbb5d0bb9b81f830f95764df63d560ad133d"
+  revision = "54260e2be0c03f933e0fe42cc8e5fcd22a04bc39"
 
 [[projects]]
-  digest = "1:fe6d8a630e17dd49e0fea7c3d7ff7eb0429bb3ae831f01ab1fea4e0e36d5cf12"
+  branch = "release-1.15"
+  digest = "1:9201a136c5fb16ecbcedd590ddee3ee931f6c7a8fd9a67947c2e4c7a9eb6033c"
+  name = "k8s.io/legacy-cloud-providers"
+  packages = ["gce"]
+  pruneopts = "UT"
+  revision = "4c8c56f03619a91fbb875b69ae23d792c1a284cb"
+
+[[projects]]
+  digest = "1:a48227b601e54fe2c0479faca1f48612d67d03ccee0742744e518066cf0cfb66"
   name = "k8s.io/utils"
   packages = [
     "buffer",
     "integer",
     "net",
+    "pointer",
     "trace",
   ]
   pruneopts = "UT"
@@ -862,7 +873,7 @@
     "k8s.io/component-base/config",
     "k8s.io/klog",
     "k8s.io/kubernetes/pkg/client/metrics/prometheus",
-    "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
+    "k8s.io/legacy-cloud-providers/gce",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -28,7 +28,7 @@ import (
 	compute "google.golang.org/api/compute/v0.beta"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 const (
