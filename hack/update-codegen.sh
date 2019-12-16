@@ -27,5 +27,5 @@ go get -d k8s.io/code-generator/...
 
 REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
 $GOPATH/src/k8s.io/code-generator/generate-groups.sh all \
-  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1 \
+  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1,v1beta2 \
   --go-header-file $SCRIPT_ROOT/hack/header.go.txt
