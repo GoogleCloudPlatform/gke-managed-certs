@@ -52,12 +52,10 @@ func ensurePropagated(name string) error {
 }
 
 func TestPropagation(t *testing.T) {
-	type testCase struct {
+	for i, tc := range []struct {
 		action func(mcrtName string) error
 		desc   string
-	}
-
-	testCases := []testCase{
+	}{
 		{
 			func(mcrtName string) error {
 				mcrt, err := clients.ManagedCertificate.Get(mcrtName)
@@ -85,11 +83,10 @@ func TestPropagation(t *testing.T) {
 			},
 			"Modifications in ManagedCertificate are propagated to SslCertificate",
 		},
-	}
-
-	for i, tc := range testCases {
+	} {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
 			name := fmt.Sprintf("propagation-%d", i)
 			domain := fmt.Sprintf("propagation-%d.example.com", i)
 			if err := clients.ManagedCertificate.Create(name, []string{domain}); err != nil {

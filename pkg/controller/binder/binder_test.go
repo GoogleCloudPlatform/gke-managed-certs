@@ -27,11 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake"
 	lister "k8s.io/client-go/listers/extensions/v1beta1"
-	cgo_testing "k8s.io/client-go/testing"
+	cgotesting "k8s.io/client-go/testing"
 
-	mcrt_api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
-	cnt_errors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
-	cnt_fake "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	cntfake "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -78,21 +78,21 @@ func (f *fakeIngressLister) Ingresses(namespace string) lister.IngressNamespaceL
 }
 
 func TestBindCertificates(t *testing.T) {
-	ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgo_testing.Fake{}}
+	ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
 	ingressLister := newFakeIngressLister(false, "default", "mcrt1,mcrt2", "sslCert1")
 
 	mcrt1 := types.NewCertId("default", "mcrt1")
 	mcrt2 := types.NewCertId("default", "mcrt2")
-	mcrtLister := cnt_fake.NewLister(nil, []*mcrt_api.ManagedCertificate{
-		cnt_fake.NewManagedCertificate(mcrt1, "foo.com"),
-		cnt_fake.NewManagedCertificate(mcrt2, "bar.com"),
+	mcrtLister := cntfake.NewLister(nil, []*apisv1beta2.ManagedCertificate{
+		cntfake.NewManagedCertificate(mcrt1, "foo.com"),
+		cntfake.NewManagedCertificate(mcrt2, "bar.com"),
 	})
-	state := cnt_fake.NewStateWithEntries(map[types.CertId]cnt_fake.StateEntry{
-		mcrt1: cnt_fake.StateEntry{SslCertificateName: "sslCert1", SoftDeleted: true},
-		mcrt2: cnt_fake.StateEntry{SslCertificateName: "sslCert2", SoftDeleted: false},
+	state := cntfake.NewStateWithEntries(map[types.CertId]cntfake.StateEntry{
+		mcrt1: cntfake.StateEntry{SslCertificateName: "sslCert1", SoftDeleted: true},
+		mcrt2: cntfake.StateEntry{SslCertificateName: "sslCert2", SoftDeleted: false},
 	})
 
-	metrics := cnt_fake.NewMetrics()
+	metrics := cntfake.NewMetrics()
 	sut := New(ingressClient, ingressLister, mcrtLister, metrics, state)
 
 	sut.BindCertificates()
@@ -116,7 +116,7 @@ func TestBindCertificates(t *testing.T) {
 func TestGetCertificatesFromState(t *testing.T) {
 	for _, tc := range []struct {
 		desc                            string
-		stateEntries                    map[types.CertId]cnt_fake.StateEntry
+		stateEntries                    map[types.CertId]cntfake.StateEntry
 		wantManagedCertificatesToAttach map[types.CertId]string
 		wantSslCertificatesToDetach     map[string]bool
 	}{
@@ -128,10 +128,10 @@ func TestGetCertificatesFromState(t *testing.T) {
 		},
 		{
 			"Non-empty failing entries passed, want empty output",
-			map[types.CertId]cnt_fake.StateEntry{
-				types.NewCertId("default", "a"): cnt_fake.StateEntry{
+			map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "a"): cntfake.StateEntry{
 					SslCertificateName: "b",
-					SoftDeletedErr:     cnt_errors.ErrManagedCertificateNotFound,
+					SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
 				},
 			},
 			nil,
@@ -145,16 +145,16 @@ func TestGetCertificatesFromState(t *testing.T) {
 		},
 		{
 			"Non-empty entries passed, want one to attach",
-			map[types.CertId]cnt_fake.StateEntry{
-				types.NewCertId("default", "mcrt1"): cnt_fake.StateEntry{SslCertificateName: "sslCert1"},
+			map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "mcrt1"): cntfake.StateEntry{SslCertificateName: "sslCert1"},
 			},
 			map[types.CertId]string{types.NewCertId("default", "mcrt1"): "sslCert1"},
 			nil,
 		},
 		{
 			"Non-empty entries passed, want one to detach",
-			map[types.CertId]cnt_fake.StateEntry{
-				types.NewCertId("default", "mcrt2"): cnt_fake.StateEntry{
+			map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "mcrt2"): cntfake.StateEntry{
 					SslCertificateName: "sslCert2",
 					SoftDeleted:        true,
 				},
@@ -164,9 +164,9 @@ func TestGetCertificatesFromState(t *testing.T) {
 		},
 		{
 			"Non-empty entries passed, want one to attach and one to detach",
-			map[types.CertId]cnt_fake.StateEntry{
-				types.NewCertId("default", "mcrt1"): cnt_fake.StateEntry{SslCertificateName: "sslCert1"},
-				types.NewCertId("default", "mcrt2"): cnt_fake.StateEntry{
+			map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "mcrt1"): cntfake.StateEntry{SslCertificateName: "sslCert1"},
+				types.NewCertId("default", "mcrt2"): cntfake.StateEntry{
 					SslCertificateName: "sslCert2",
 					SoftDeleted:        true,
 				},
@@ -180,7 +180,7 @@ func TestGetCertificatesFromState(t *testing.T) {
 			sut := binderImpl{
 				ingressClient: ingressClient,
 				ingressLister: newFakeIngressLister(false, "", "", ""),
-				state:         cnt_fake.NewStateWithEntries(tc.stateEntries),
+				state:         cntfake.NewStateWithEntries(tc.stateEntries),
 			}
 			mcrtToAttach, sslCertToDetach := sut.getCertificatesFromState()
 
@@ -213,7 +213,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 		annotationPreSharedCert       string
 		managedCertificatesToAttach   map[types.CertId]string
 		sslCertificatesToDetach       map[string]bool
-		stateEntries                  map[types.CertId]cnt_fake.StateEntry
+		stateEntries                  map[types.CertId]cntfake.StateEntry
 		wantErr                       bool
 		wantAnnotationPreSharedCert   string
 		wantBindingLatencyObservedFor []types.CertId
@@ -236,7 +236,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
 		},
@@ -257,9 +257,9 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "foobar",
 			annotationManagedCertificates: "mcrt1,mcrt2",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1", mcrtId2: "sslCert2"},
-			stateEntries: map[types.CertId]cnt_fake.StateEntry{
-				mcrtId1: cnt_fake.StateEntry{},
-				mcrtId2: cnt_fake.StateEntry{},
+			stateEntries: map[types.CertId]cntfake.StateEntry{
+				mcrtId1: cntfake.StateEntry{},
+				mcrtId2: cntfake.StateEntry{},
 			},
 			wantAnnotationPreSharedCert:   "sslCert2",
 			wantBindingLatencyObservedFor: []types.CertId{mcrtId2},
@@ -270,7 +270,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			annotationManagedCertificates: "mcrt1",
 			annotationPreSharedCert:       "sslCertX",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
 			wantAnnotationPreSharedCert:   "sslCertX,sslCert1",
 			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
 		},
@@ -281,7 +281,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			annotationPreSharedCert:       "sslCertX,sslCert2",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
 			sslCertificatesToDetach:       map[string]bool{"sslCert2": true},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
 			wantAnnotationPreSharedCert:   "sslCertX,sslCert1",
 			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
 		},
@@ -290,7 +290,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{ExcludedFromSLOErr: errFake}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{ExcludedFromSLOErr: errFake}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 			wantErr:                       true,
 		},
@@ -299,7 +299,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{ExcludedFromSLO: true}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{ExcludedFromSLO: true}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 		},
 		{
@@ -307,7 +307,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
 		},
@@ -317,7 +317,7 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{SslCertificateBindingErr: errFake}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{SslCertificateBindingErr: errFake}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 			wantErr:                       true,
 		},
@@ -327,20 +327,20 @@ func TestEnsureCertificatesAttached(t *testing.T) {
 			ingressNamespace:              "default",
 			annotationManagedCertificates: "mcrt1",
 			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cnt_fake.StateEntry{mcrtId1: cnt_fake.StateEntry{SslCertificateBindingReported: true}},
+			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{SslCertificateBindingReported: true}},
 			wantAnnotationPreSharedCert:   "sslCert1",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgo_testing.Fake{}}
+			ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
 			ingressLister := newFakeIngressLister(tc.ingressFails, tc.ingressNamespace, tc.annotationManagedCertificates,
 				tc.annotationPreSharedCert)
-			mcrtLister := cnt_fake.NewLister(nil, []*mcrt_api.ManagedCertificate{
-				cnt_fake.NewManagedCertificate(mcrtId1, "foo.com"),
-				cnt_fake.NewManagedCertificate(mcrtId2, "bar.com"),
+			mcrtLister := cntfake.NewLister(nil, []*apisv1beta2.ManagedCertificate{
+				cntfake.NewManagedCertificate(mcrtId1, "foo.com"),
+				cntfake.NewManagedCertificate(mcrtId2, "bar.com"),
 			})
-			metrics := cnt_fake.NewMetrics()
-			state := cnt_fake.NewStateWithEntries(tc.stateEntries)
+			metrics := cntfake.NewMetrics()
+			state := cntfake.NewStateWithEntries(tc.stateEntries)
 			sut := binderImpl{
 				ingressClient: ingressClient,
 				ingressLister: ingressLister,

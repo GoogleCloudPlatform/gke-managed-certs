@@ -24,22 +24,20 @@ import (
 )
 
 func TestCRDValidation(t *testing.T) {
-	type testCase struct {
+	var domains101 []string
+	for i := 0; i < 101; i++ {
+		domains101 = append(domains101, fmt.Sprintf("too-many-%d.validation.example.com", i))
+	}
+
+	for i, tc := range []struct {
 		domains []string
 		success bool
 		desc    string
-	}
-
-	testCases := []testCase{
-		{
-			[]string{"a.validation.example.com", "b.validation.example.com"},
-			false,
-			"Multiple domain names not allowed",
-		},
+	}{
 		{
 			[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.validation.example.com"},
 			false,
-			"Domain >63 chars not allowed",
+			"Domain >63 characters not allowed",
 		},
 		{
 			[]string{"*.validation.example.com"},
@@ -47,15 +45,24 @@ func TestCRDValidation(t *testing.T) {
 			"Domain with a wildcard not allowed",
 		},
 		{
+			domains101,
+			false,
+			"More than 100 SANs not allowed",
+		},
+		{
 			[]string{"validation.example.com"},
 			true,
 			"Single non-wildcard domain <=63 characters allowed",
 		},
-	}
-
-	for i, tc := range testCases {
+		{
+			[]string{"validation1.example.com", "validation2.example.com"},
+			true,
+			"Multiple domain names allowed",
+		},
+	} {
 		i, tc := i, tc
 		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
 			name := fmt.Sprintf("crd-validation-%d", i)
 			err := clients.ManagedCertificate.Create(name, tc.domains)
 			if err == nil && !tc.success {

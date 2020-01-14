@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/client-go/util/workqueue"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
@@ -122,7 +122,7 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 		t.Run(testCase.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			var mcrts []*api.ManagedCertificate
+			var mcrts []*apisv1beta2.ManagedCertificate
 			for _, id := range testCase.listerIds {
 				mcrts = append(mcrts, fake.NewManagedCertificate(id, "example.com"))
 			}

@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 )
 
 const (
@@ -38,10 +38,10 @@ const (
 )
 
 type Event interface {
-	BackendError(mcrt api.ManagedCertificate, err error)
-	Create(mcrt api.ManagedCertificate, sslCertificateName string)
-	Delete(mcrt api.ManagedCertificate, sslCertificateName string)
-	TooManyCertificates(mcrt api.ManagedCertificate, err error)
+	BackendError(mcrt apisv1beta2.ManagedCertificate, err error)
+	Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string)
+	Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string)
+	TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error)
 }
 
 type eventImpl struct {
@@ -55,7 +55,7 @@ func New(client kubernetes.Interface) (Event, error) {
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace)})
 
 	eventsScheme := runtime.NewScheme()
-	if err := api.AddToScheme(eventsScheme); err != nil {
+	if err := apisv1beta2.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}
 
@@ -65,21 +65,21 @@ func New(client kubernetes.Interface) (Event, error) {
 }
 
 // BackendError creates an event when a transient error occurrs when calling GCP API.
-func (e eventImpl) BackendError(mcrt api.ManagedCertificate, err error) {
+func (e eventImpl) BackendError(mcrt apisv1beta2.ManagedCertificate, err error) {
 	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonBackendError, err.Error())
 }
 
 // Create creates an event when an SslCertificate associated with ManagedCertificate is created.
-func (e eventImpl) Create(mcrt api.ManagedCertificate, sslCertificateName string) {
+func (e eventImpl) Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
 	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
 }
 
 // Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
-func (e eventImpl) Delete(mcrt api.ManagedCertificate, sslCertificateName string) {
+func (e eventImpl) Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
 	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
 }
 
 // TooManyCertificates creates an event when quota for maximum number of SslCertificates per GCP project is exceeded.
-func (e eventImpl) TooManyCertificates(mcrt api.ManagedCertificate, err error) {
+func (e eventImpl) TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error) {
 	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
 }

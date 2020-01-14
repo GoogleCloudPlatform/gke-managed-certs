@@ -41,7 +41,8 @@ const (
 // Deploys Managed Certificate CRD
 func deployCRD() error {
 	domainRegex := `^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$`
-	var maxDomains int64 = 1
+	var maxDomains1 int64 = 1
+	var maxDomains100 int64 = 100
 	var maxDomainLength int64 = 63
 	crd := apiextv1beta1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
@@ -52,48 +53,93 @@ func deployCRD() error {
 			Name: "managedcertificates.networking.gke.io",
 		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
-			Group:   "networking.gke.io",
-			Version: "v1beta1",
-			Names: apiextv1beta1.CustomResourceDefinitionNames{
-				Plural:     "managedcertificates",
-				Singular:   "managedcertificate",
-				Kind:       "ManagedCertificate",
-				ShortNames: []string{"mcrt"},
-			},
-			Scope: apiextv1beta1.NamespaceScoped,
-			Validation: &apiextv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextv1beta1.JSONSchemaProps{
-					Properties: map[string]apiextv1beta1.JSONSchemaProps{
-						"status": {
+			Group: "networking.gke.io",
+			Versions: []apiextv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: false,
+					Schema: &apiextv1beta1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextv1beta1.JSONSchemaProps{
 							Properties: map[string]apiextv1beta1.JSONSchemaProps{
-								"certificateStatus": {Type: "string"},
-								"domainStatus": {
-									Type: "array",
-									Items: &apiextv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextv1beta1.JSONSchemaProps{
-											Type:     "object",
-											Required: []string{"domain", "status"},
-											Properties: map[string]apiextv1beta1.JSONSchemaProps{
-												"domain": {Type: "string"},
-												"status": {Type: "string"},
+								"status": {
+									Properties: map[string]apiextv1beta1.JSONSchemaProps{
+										"certificateStatus": {Type: "string"},
+										"domainStatus": {
+											Type: "array",
+											Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1beta1.JSONSchemaProps{
+													Type:     "object",
+													Required: []string{"domain", "status"},
+													Properties: map[string]apiextv1beta1.JSONSchemaProps{
+														"domain": {Type: "string"},
+														"status": {Type: "string"},
+													},
+												},
+											},
+										},
+										"certificateName": {Type: "string"},
+										"expireTime":      {Type: "string", Format: "date-time"},
+									},
+								},
+								"spec": {
+									Properties: map[string]apiextv1beta1.JSONSchemaProps{
+										"domains": {
+											Type:     "array",
+											MaxItems: &maxDomains1,
+											Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MaxLength: &maxDomainLength,
+													Pattern:   domainRegex,
+												},
 											},
 										},
 									},
 								},
-								"certificateName": {Type: "string"},
-								"expireTime":      {Type: "string", Format: "date-time"},
 							},
 						},
-						"spec": {
+					},
+				},
+				{
+					Name:    "v1beta2",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextv1beta1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextv1beta1.JSONSchemaProps{
 							Properties: map[string]apiextv1beta1.JSONSchemaProps{
-								"domains": {
-									Type:     "array",
-									MaxItems: &maxDomains,
-									Items: &apiextv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextv1beta1.JSONSchemaProps{
-											Type:      "string",
-											MaxLength: &maxDomainLength,
-											Pattern:   domainRegex,
+								"status": {
+									Properties: map[string]apiextv1beta1.JSONSchemaProps{
+										"certificateStatus": {Type: "string"},
+										"domainStatus": {
+											Type: "array",
+											Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1beta1.JSONSchemaProps{
+													Type:     "object",
+													Required: []string{"domain", "status"},
+													Properties: map[string]apiextv1beta1.JSONSchemaProps{
+														"domain": {Type: "string"},
+														"status": {Type: "string"},
+													},
+												},
+											},
+										},
+										"certificateName": {Type: "string"},
+										"expireTime":      {Type: "string", Format: "date-time"},
+									},
+								},
+								"spec": {
+									Properties: map[string]apiextv1beta1.JSONSchemaProps{
+										"domains": {
+											Type:     "array",
+											MaxItems: &maxDomains100,
+											Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MaxLength: &maxDomainLength,
+													Pattern:   domainRegex,
+												},
+											},
 										},
 									},
 								},
@@ -102,6 +148,13 @@ func deployCRD() error {
 					},
 				},
 			},
+			Names: apiextv1beta1.CustomResourceDefinitionNames{
+				Plural:     "managedcertificates",
+				Singular:   "managedcertificate",
+				Kind:       "ManagedCertificate",
+				ShortNames: []string{"mcrt"},
+			},
+			Scope: apiextv1beta1.NamespaceScoped,
 		},
 	}
 	if err := utilshttp.IgnoreNotFound(clients.CustomResource.Delete(crd.Name, &metav1.DeleteOptions{})); err != nil {

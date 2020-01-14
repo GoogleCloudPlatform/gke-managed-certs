@@ -24,12 +24,12 @@ import (
 
 	compute "google.golang.org/api/compute/v0.beta"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 // CopyStatus sets ManagedCertificate status based on SslCertificate object.
-func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate, config *config.Config) error {
+func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1beta2.ManagedCertificate, config *config.Config) error {
 	certificateStatus, err := translateStatus(config.CertificateStatus.Certificate, sslCert.Managed.Status)
 	if err != nil {
 		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
@@ -37,14 +37,14 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate, co
 	mcrt.Status.CertificateStatus = certificateStatus
 
 	// Initialize with non-nil value to avoid ManagedCertificate CRD validation warnings
-	domainStatuses := make([]api.DomainStatus, 0)
+	domainStatuses := make([]apisv1beta2.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
 		domainStatus, err := translateStatus(config.CertificateStatus.Domain, status)
 		if err != nil {
 			return err
 		}
 
-		domainStatuses = append(domainStatuses, api.DomainStatus{
+		domainStatuses = append(domainStatuses, apisv1beta2.DomainStatus{
 			Domain: domain,
 			Status: domainStatus,
 		})
@@ -58,7 +58,7 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *api.ManagedCertificate, co
 }
 
 // Equal compares ManagedCertificate and SslCertificate for equality, i. e. if their domain sets are equal.
-func Equal(mcrt api.ManagedCertificate, sslCert compute.SslCertificate) bool {
+func Equal(mcrt apisv1beta2.ManagedCertificate, sslCert compute.SslCertificate) bool {
 	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
 	copy(mcrtDomains, mcrt.Spec.Domains)
 	sort.Strings(mcrtDomains)

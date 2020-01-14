@@ -1,12 +1,22 @@
 # Managed Certificates
 
-Managed Certificates simplify user flow in managing HTTPS traffic. Instead of manually acquiring an SSL certificate from a Certificate Authority, configuring it on the load balancer and renewing it on time, now it is only necessary to create a Managed Certificate [Custom Resource object](https://kubernetes.io/docs/concepts/api-extension/custom-resources/) and provide a domain for which you want to obtain a certificate. The certificate will be auto-renewed when necessary.
+Managed Certificates simplify user flow in managing HTTPS traffic.
+Instead of manually acquiring an SSL certificate from a Certificate
+Authority, configuring it on the load balancer and renewing it on time,
+now it is only necessary to create a Managed Certificate
+[Custom Resource object](https://kubernetes.io/docs/concepts/api-extension/custom-resources/)
+and provide the domains for which you want to obtain a certificate.
+The certificate will be auto-renewed when necessary.
 
-For that to work you need to run your cluster on a platform with [Google Cloud Load Balancer](https://github.com/kubernetes/ingress-gce), that is a cluster in GKE or your own cluster in GCP.
+For that to work you need to run your cluster on a platform with
+[Google Cloud Load Balancer](https://github.com/kubernetes/ingress-gce),
+that is a cluster in GKE or your own cluster in GCP.
 
-In a GKE cluster `1.12.6-gke.7+` all the components are already installed. Follow the [how-to](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs) for more information. For a GCP setup follow the instructions below.
+In a GKE cluster `1.12.6-gke.7+` all the components are already installed.
+Follow the [how-to](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs)
+for more information. For a GCP setup follow the instructions below.
 
-This feature is in Beta.
+This feature status is Beta.
 
 # Installation
 
@@ -19,6 +29,11 @@ Managed Certificates consist of two parts:
 ## Prerequisites
 
 1. You need to use a Kubernetes cluster with GKE-Ingress v1.5.1+.
+    * Managed Certificates have been tested against Kubernetes v1.5.7.
+    * Kubernetes v1.15+ most likely will work as well.
+    * Kubernetes v1.13-v1.15 most likely will work if you enable the
+      [CustomResourceWebhookConversion feature](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definition-versioning/),
+      otherwise Managed Certificate CRD validation will not work properly.
 1. You need to grant permissions to the controller so that it is allowed to use
    the GCP Compute API.
     * When creating the cluster, add scope *compute-rw* to the node where you will
@@ -79,7 +94,14 @@ Managed Certificates consist of two parts:
                     - key: key.json
                       path: key.json
                 ```
-1. Configure your domain example.com so that it points at the load balancer created for your cluster by Ingress. Note that if you add a CAA record to restrict the CAs that are allowed to provision certificates for your domain, Managed Certificates currently need Let's Encrypt to be allowed. In the future additional CAs may be available and a CAA record may make it impossible for you to take advantage of them.
+1. Configure your domain example.com so that it points at the load balancer
+created for your cluster by Ingress. Note that if you add a CAA record to restrict
+the CAs that are allowed to provision certificates for your domain, Managed Certificates
+currently support:
+    * [Google Trust Services](http://pki.goog),
+    * Let's Encrypt.
+In the future additional CAs may be available
+and a CAA record may make it impossible for you to take advantage of them.
 
 ## Steps
 
@@ -102,26 +124,28 @@ To install Managed Certificates in your own cluster in GCP, you need to:
 
 # Usage
 
-1. Create a Managed Certificate custom object, specifying a single non-wildcard domain not longer than 63 characters, for which you want
-   to obtain a certificate:  
+1. Create a Managed Certificate custom object, specifying up to 100 non-wildcard domains
+not longer than 63 characters each, for which you want to obtain a certificate:  
     ```yaml
-    apiVersion: networking.gke.io/v1beta1
+    apiVersion: networking.gke.io/v1beta2
     kind: ManagedCertificate
     metadata:
       name: example-certificate
     spec:
       domains:
-      - example.com
+      - example1.com
+      - example2.com
     ```
 2. Configure Ingress to use this custom object to terminate SSL connections:  
     ```console
     $ kubectl annotate ingress [your-ingress-name] networking.gke.io/managed-certificates=example-certificate
     ```  
-If you need, you can specify more multiple managed certificates here, separating their names with commas.
+If you need, you can specify multiple managed certificates here,
+separating their names with commas.
 
 # Clean up
 
-You can do the below steps in any order and doing even one of them will turn SSL off:
+You can do the below steps in any order to turn SSL off:
 
 * Remove annotation from Ingress  
     ```console
@@ -136,3 +160,14 @@ You can do the below steps in any order and doing even one of them will turn SSL
     ```console
     $ kubectl delete -f deploy/managedcertificates-crd.yaml
     ```
+
+# API changes
+
+Managed Certificates support the following versions of Managed Certificate CRD,
+the API: v1beta1 and v1beta2.
+
+v1beta2 is now introduced as a new version of the API to support more than one
+domain per certificate (multi-SAN).
+
+v1beta1 does not support more than one domain per certificate (multi-SAN)
+and is deprecated. In the future the support for v1beta1 will be dropped.

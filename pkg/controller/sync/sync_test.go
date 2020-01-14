@@ -22,16 +22,16 @@ import (
 	"testing"
 
 	"google.golang.org/api/googleapi"
-	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	cgo_testing "k8s.io/client-go/testing"
+	cgotesting "k8s.io/client-go/testing"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
-	fakenetworkingv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1/fake"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2/fake"
+	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
-	cnt_errors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
@@ -46,8 +46,8 @@ var (
 	mcrtId = types.NewCertId("foo", "bar")
 )
 
-func buildUpdateFunc(updateCalled *bool) cgo_testing.ReactionFunc {
-	return cgo_testing.ReactionFunc(func(action cgo_testing.Action) (bool, runtime.Object, error) {
+func buildUpdateFunc(updateCalled *bool) cgotesting.ReactionFunc {
+	return cgotesting.ReactionFunc(func(action cgotesting.Action) (bool, runtime.Object, error) {
 		*updateCalled = true
 		return true, nil, nil
 	})
@@ -57,18 +57,18 @@ var genericError = errors.New("generic error")
 var googleNotFound = &googleapi.Error{
 	Code: 404,
 }
-var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+var k8sNotFound = k8serrors.NewNotFound(schema.GroupResource{
 	Group:    "test_group",
 	Resource: "test_resource",
 }, "test_name")
 
-func mockMcrt(domain string) *api.ManagedCertificate {
+func mockMcrt(domain string) *apisv1beta2.ManagedCertificate {
 	return fake.NewManagedCertificate(mcrtId, domain)
 }
 
 var listerFailsGenericErr = fake.NewLister(genericError, nil)
 var listerFailsNotFound = fake.NewLister(k8sNotFound, nil)
-var listerSuccess = fake.NewLister(nil, []*api.ManagedCertificate{mockMcrt(domainFoo)})
+var listerSuccess = fake.NewLister(nil, []*apisv1beta2.ManagedCertificate{mockMcrt(domainFoo)})
 
 var randomFailsGenericErr = newRandom(genericError, "")
 var randomSuccess = newRandom(nil, sslCertificateName)
@@ -101,7 +101,7 @@ func withEntryAndSslCertificateCreationFails() *fake.FakeState {
 	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
 		mcrtId: fake.StateEntry{
 			SslCertificateName:        sslCertificateName,
-			SslCertificateCreationErr: cnt_errors.ErrManagedCertificateNotFound,
+			SslCertificateCreationErr: cnterrors.ErrManagedCertificateNotFound,
 		},
 	})
 }
@@ -117,7 +117,7 @@ func withEntryAndSoftDeletedFails() *fake.FakeState {
 	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
 		mcrtId: fake.StateEntry{
 			SslCertificateName: sslCertificateName,
-			SoftDeletedErr:     cnt_errors.ErrManagedCertificateNotFound,
+			SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
 		},
 	})
 }
@@ -131,11 +131,11 @@ func withEntryAndSoftDeleted() *fake.FakeState {
 }
 
 type in struct {
-	lister       mcrtlister.ManagedCertificateLister
+	lister       listersv1beta2.ManagedCertificateLister
 	metrics      *fake.FakeMetrics
 	random       fakeRandom
 	state        *fake.FakeState
-	mcrt         *api.ManagedCertificate
+	mcrt         *apisv1beta2.ManagedCertificate
 	sslCreateErr error
 	sslDeleteErr error
 	sslExistsErr error
@@ -224,7 +224,7 @@ var testCases = []struct {
 		out{
 			entryInState:     true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrManagedCertificateNotFound,
+			err:              cnterrors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -433,7 +433,7 @@ var testCases = []struct {
 		out{
 			entryInState:     true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrManagedCertificateNotFound,
+			err:              cnterrors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -528,7 +528,7 @@ var testCases = []struct {
 			entryInState:     false,
 			wantSoftDeleted:  true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -545,7 +545,7 @@ var testCases = []struct {
 			entryInState:     false,
 			wantSoftDeleted:  true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -578,7 +578,7 @@ var testCases = []struct {
 			entryInState:     false,
 			wantSoftDeleted:  true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrSslCertificateOutOfSyncGotDeleted,
+			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{
@@ -593,7 +593,7 @@ var testCases = []struct {
 		out{
 			entryInState:     true,
 			wantUpdateCalled: false,
-			err:              cnt_errors.ErrManagedCertificateNotFound,
+			err:              cnterrors.ErrManagedCertificateNotFound,
 		},
 	},
 }
@@ -603,7 +603,7 @@ func TestManagedCertificate(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			client := &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &cgo_testing.Fake{}}
+			client := &clientsetv1beta2.FakeNetworkingV1beta2{Fake: &cgotesting.Fake{}}
 			updateCalled := false
 			client.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
 

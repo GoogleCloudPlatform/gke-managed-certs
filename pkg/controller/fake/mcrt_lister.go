@@ -19,29 +19,29 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/labels"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
-	mcrtlister "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
 )
 
 type fakeLister struct {
-	managedCertificates []*api.ManagedCertificate
+	managedCertificates []*apisv1beta2.ManagedCertificate
 	err                 error
 }
 
-var _ mcrtlister.ManagedCertificateLister = &fakeLister{}
+var _ listersv1beta2.ManagedCertificateLister = &fakeLister{}
 
-func NewLister(err error, managedCertificates []*api.ManagedCertificate) fakeLister {
+func NewLister(err error, managedCertificates []*apisv1beta2.ManagedCertificate) fakeLister {
 	return fakeLister{
 		managedCertificates: managedCertificates,
 		err:                 err,
 	}
 }
 
-func (f fakeLister) List(selector labels.Selector) ([]*api.ManagedCertificate, error) {
+func (f fakeLister) List(selector labels.Selector) ([]*apisv1beta2.ManagedCertificate, error) {
 	return f.managedCertificates, f.err
 }
 
-func (f fakeLister) ManagedCertificates(namespace string) mcrtlister.ManagedCertificateNamespaceLister {
+func (f fakeLister) ManagedCertificates(namespace string) listersv1beta2.ManagedCertificateNamespaceLister {
 	return fakeNamespaceLister{
 		managedCertificates: f.managedCertificates,
 		err:                 f.err,
@@ -49,17 +49,17 @@ func (f fakeLister) ManagedCertificates(namespace string) mcrtlister.ManagedCert
 }
 
 type fakeNamespaceLister struct {
-	managedCertificates []*api.ManagedCertificate
+	managedCertificates []*apisv1beta2.ManagedCertificate
 	err                 error
 }
 
-var _ mcrtlister.ManagedCertificateNamespaceLister = &fakeNamespaceLister{}
+var _ listersv1beta2.ManagedCertificateNamespaceLister = &fakeNamespaceLister{}
 
-func (f fakeNamespaceLister) List(selector labels.Selector) ([]*api.ManagedCertificate, error) {
+func (f fakeNamespaceLister) List(selector labels.Selector) ([]*apisv1beta2.ManagedCertificate, error) {
 	return f.managedCertificates, f.err
 }
 
-func (f fakeNamespaceLister) Get(name string) (*api.ManagedCertificate, error) {
+func (f fakeNamespaceLister) Get(name string) (*apisv1beta2.ManagedCertificate, error) {
 	for _, mcrt := range f.managedCertificates {
 		if mcrt.Name == name {
 			return mcrt, f.err

@@ -21,7 +21,7 @@ import (
 
 	compute "google.golang.org/api/compute/v0.beta"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 )
@@ -62,7 +62,7 @@ type fakeSsl struct {
 
 var _ sslcertificatemanager.SslCertificateManager = &fakeSsl{}
 
-func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, existsErr, getErr error) *fakeSsl {
+func newSsl(key string, mcrt *apisv1beta2.ManagedCertificate, createErr, deleteErr, existsErr, getErr error) *fakeSsl {
 	ssl := &fakeSsl{
 		mapping: make(map[string]*compute.SslCertificate, 0),
 	}
@@ -79,7 +79,7 @@ func newSsl(key string, mcrt *api.ManagedCertificate, createErr, deleteErr, exis
 	return ssl
 }
 
-func (f *fakeSsl) Create(ctx context.Context, sslCertificateName string, mcrt api.ManagedCertificate) error {
+func (f *fakeSsl) Create(ctx context.Context, sslCertificateName string, mcrt apisv1beta2.ManagedCertificate) error {
 	f.mapping[sslCertificateName] = &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: mcrt.Spec.Domains,
@@ -91,17 +91,17 @@ func (f *fakeSsl) Create(ctx context.Context, sslCertificateName string, mcrt ap
 	return f.createErr
 }
 
-func (f *fakeSsl) Delete(ctx context.Context, sslCertificateName string, mcrt *api.ManagedCertificate) error {
+func (f *fakeSsl) Delete(ctx context.Context, sslCertificateName string, mcrt *apisv1beta2.ManagedCertificate) error {
 	delete(f.mapping, sslCertificateName)
 	return f.deleteErr
 }
 
-func (f *fakeSsl) Exists(sslCertificateName string, mcrt *api.ManagedCertificate) (bool, error) {
+func (f *fakeSsl) Exists(sslCertificateName string, mcrt *apisv1beta2.ManagedCertificate) (bool, error) {
 	_, exists := f.mapping[sslCertificateName]
 	return exists, f.existsErr
 }
 
-func (f *fakeSsl) Get(sslCertificateName string, mcrt *api.ManagedCertificate) (*compute.SslCertificate, error) {
+func (f *fakeSsl) Get(sslCertificateName string, mcrt *apisv1beta2.ManagedCertificate) (*compute.SslCertificate, error) {
 	sslCert := f.mapping[sslCertificateName]
 	return sslCert, f.getErr
 }

@@ -18,7 +18,79 @@ metadata:
   name: managedcertificates.networking.gke.io
 spec:
   group: networking.gke.io
-  version: v1beta1
+  versions:
+    - name: v1beta1
+      served: true
+      storage: false
+      schema:
+        openAPIV3Schema:
+          properties:
+            status:
+              properties:
+                certificateStatus:
+                  type: string
+                domainStatus:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - domain
+                      - status
+                    properties:
+                      domain:
+                        type: string
+                      status:
+                        type: string
+                certificateName:
+                  type: string
+                expireTime:
+                  type: string
+                  format: date-time
+            spec:
+              properties:
+                domains:
+                  type: array
+                  maxItems: 1
+                  items:
+                    type: string
+                    maxLength: 63
+                    pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          properties:
+            status:
+              properties:
+                certificateStatus:
+                  type: string
+                domainStatus:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - domain
+                      - status
+                    properties:
+                      domain:
+                        type: string
+                      status:
+                        type: string
+                certificateName:
+                  type: string
+                expireTime:
+                  type: string
+                  format: date-time
+            spec:
+              properties:
+                domains:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: string
+                    maxLength: 63
+                    pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
   scope: Namespaced
   names:
     plural: managedcertificates
@@ -26,36 +98,3 @@ spec:
     kind: ManagedCertificate
     shortNames:
       - mcrt
-  validation:
-    openAPIV3Schema:
-      properties:
-        status:
-          properties:
-            certificateStatus:
-              type: string
-            domainStatus:
-              type: array
-              items:
-                type: object
-                required:
-                  - domain
-                  - status
-                properties:
-                  domain:
-                    type: string
-                  status:
-                    type: string
-            certificateName:
-              type: string
-            expireTime:
-              type: string
-              format: date-time
-        spec:
-          properties:
-            domains:
-              type: array
-              maxItems: 1
-              items:
-                type: string
-                maxLength: 63
-                pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'

@@ -182,17 +182,17 @@ func TestProvisioningWorkflow(t *testing.T) {
 	klog.Infof("Ingress IP: %s", ip)
 
 	defer clients.Dns.DeleteAll()
-	domains, err := clients.Dns.Create(generateRandomNames(2), ip)
+	domains, err := clients.Dns.Create(generateRandomNames(4), ip)
 	if err != nil {
 		t.Fatal(err)
 	}
 	klog.Infof("Generated random domains: %v", domains)
 
 	var mcrtNames []string
-	for i, domain := range domains {
+	for i := 0; i < len(domains); i += 2 {
 		mcrtName := fmt.Sprintf("provisioning-workflow-%d", i)
 		mcrtNames = append(mcrtNames, mcrtName)
-		err := clients.ManagedCertificate.Create(mcrtName, []string{domain})
+		err := clients.ManagedCertificate.Create(mcrtName, []string{domains[i], domains[i+1]})
 		if err != nil {
 			t.Fatal(err)
 		}

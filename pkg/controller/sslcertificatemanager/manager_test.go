@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	compute "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/googleapi"
 
@@ -97,19 +97,19 @@ type fakeEvent struct {
 
 var _ event.Event = (*fakeEvent)(nil)
 
-func (f *fakeEvent) BackendError(mcrt api.ManagedCertificate, err error) {
+func (f *fakeEvent) BackendError(mcrt apisv1beta2.ManagedCertificate, err error) {
 	f.backendErrorCnt++
 }
 
-func (f *fakeEvent) Create(mcrt api.ManagedCertificate, sslCertificateName string) {
+func (f *fakeEvent) Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
 	f.createCnt++
 }
 
-func (f *fakeEvent) Delete(mcrt api.ManagedCertificate, sslCertificateName string) {
+func (f *fakeEvent) Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
 	f.deleteCnt++
 }
 
-func (f *fakeEvent) TooManyCertificates(mcrt api.ManagedCertificate, err error) {
+func (f *fakeEvent) TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error) {
 	f.tooManyCnt++
 }
 
@@ -212,7 +212,7 @@ func TestCreate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	testCases := []struct {
 		ssl             ssl.Ssl
-		mcrt            *api.ManagedCertificate
+		mcrt            *apisv1beta2.ManagedCertificate
 		wantErr         error
 		wantErrorEvent  bool
 		wantDeleteEvent bool
@@ -277,7 +277,7 @@ func TestDelete(t *testing.T) {
 func TestExists(t *testing.T) {
 	testCases := []struct {
 		ssl            ssl.Ssl
-		mcrt           *api.ManagedCertificate
+		mcrt           *apisv1beta2.ManagedCertificate
 		wantExists     bool
 		wantErr        error
 		wantErrorEvent bool
@@ -348,7 +348,7 @@ func TestExists(t *testing.T) {
 func TestGet(t *testing.T) {
 	testCases := []struct {
 		ssl            ssl.Ssl
-		mcrt           *api.ManagedCertificate
+		mcrt           *apisv1beta2.ManagedCertificate
 		wantCert       *compute.SslCertificate
 		wantErr        error
 		wantErrorEvent bool

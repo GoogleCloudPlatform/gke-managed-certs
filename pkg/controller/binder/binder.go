@@ -29,7 +29,7 @@ import (
 	listers "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/klog"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta1"
+	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
@@ -49,11 +49,11 @@ type binderImpl struct {
 	ingressClient v1beta1.IngressesGetter
 	ingressLister listers.IngressLister
 	metrics       metrics.Metrics
-	mcrtLister    api.ManagedCertificateLister
+	mcrtLister    listersv1beta2.ManagedCertificateLister
 	state         state.State
 }
 
-func New(ingressClient v1beta1.IngressesGetter, ingressLister listers.IngressLister, mcrtLister api.ManagedCertificateLister,
+func New(ingressClient v1beta1.IngressesGetter, ingressLister listers.IngressLister, mcrtLister listersv1beta2.ManagedCertificateLister,
 	metrics metrics.Metrics, state state.State) Binder {
 
 	return binderImpl{

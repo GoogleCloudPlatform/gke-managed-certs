@@ -20,23 +20,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
-	api "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
+	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	clientset "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
+	clientsetv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
+	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 type ManagedCertificate interface {
+	CreateV1beta1(name string, domains []string) error
 	Create(name string, domains []string) error
 	DeleteAll() error
 	Delete(name string) error
-	Get(name string) (*api.ManagedCertificate, error)
-	Update(mcrt *api.ManagedCertificate) error
+	Get(name string) (*apisv1beta2.ManagedCertificate, error)
+	Update(mcrt *apisv1beta2.ManagedCertificate) error
 }
 
 type managedCertificateImpl struct {
+	// clientv1beta1 manages ManagedCertificate v1beta1 custom resources
+	clientv1beta1 clientsetv1beta1.ManagedCertificateInterface
 	// client manages ManagedCertificate custom resources
-	client clientset.ManagedCertificateInterface
+	client clientsetv1beta2.ManagedCertificateInterface
 }
 
 func New(config *rest.Config, namespace string) (ManagedCertificate, error) {
@@ -46,20 +51,37 @@ func New(config *rest.Config, namespace string) (ManagedCertificate, error) {
 	}
 
 	return managedCertificateImpl{
-		client: clientset.NetworkingV1beta1().ManagedCertificates(namespace),
+		clientv1beta1: clientset.NetworkingV1beta1().ManagedCertificates(namespace),
+		client:        clientset.NetworkingV1beta2().ManagedCertificates(namespace),
 	}, nil
 }
 
-func (m managedCertificateImpl) Create(name string, domains []string) error {
-	mcrt := &api.ManagedCertificate{
+func (m managedCertificateImpl) CreateV1beta1(name string, domains []string) error {
+	mcrt := &apisv1beta1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ManagedCertificateSpec{
+		Spec: apisv1beta1.ManagedCertificateSpec{
 			Domains: domains,
 		},
-		Status: api.ManagedCertificateStatus{
-			DomainStatus: []api.DomainStatus{},
+		Status: apisv1beta1.ManagedCertificateStatus{
+			DomainStatus: []apisv1beta1.DomainStatus{},
+		},
+	}
+	_, err := m.clientv1beta1.Create(mcrt)
+	return err
+}
+
+func (m managedCertificateImpl) Create(name string, domains []string) error {
+	mcrt := &apisv1beta2.ManagedCertificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: apisv1beta2.ManagedCertificateSpec{
+			Domains: domains,
+		},
+		Status: apisv1beta2.ManagedCertificateStatus{
+			DomainStatus: []apisv1beta2.DomainStatus{},
 		},
 	}
 	_, err := m.client.Create(mcrt)
@@ -85,11 +107,11 @@ func (m managedCertificateImpl) Delete(name string) error {
 	return http.IgnoreNotFound(m.client.Delete(name, &metav1.DeleteOptions{}))
 }
 
-func (m managedCertificateImpl) Get(name string) (*api.ManagedCertificate, error) {
+func (m managedCertificateImpl) Get(name string) (*apisv1beta2.ManagedCertificate, error) {
 	return m.client.Get(name, metav1.GetOptions{})
 }
 
-func (m managedCertificateImpl) Update(mcrt *api.ManagedCertificate) error {
+func (m managedCertificateImpl) Update(mcrt *apisv1beta2.ManagedCertificate) error {
 	_, err := m.client.Update(mcrt)
 	return err
 }
