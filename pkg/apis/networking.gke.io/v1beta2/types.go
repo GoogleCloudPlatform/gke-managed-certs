@@ -1,5 +1,5 @@
 /*
-Copyright 2018 Google LLC
+Copyright 2020 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ type ManagedCertificateStatus struct {
 	// +optional
 	CertificateStatus string `json:"certificateStatus,omitempty" protobuf:"bytes,2,opt,name=certificateStatus"`
 
-	// Specifies the statuses of certificate provisioning for domains selected by the user.
+	// Specifies the status of certificate provisioning for domains selected by the user.
 	DomainStatus []DomainStatus `json:"domainStatus" protobuf:"bytes,3,rep,name=domainStatus"`
 
 	// Specifies the name of the provisioned managed certificate.

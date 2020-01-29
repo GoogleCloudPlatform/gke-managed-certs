@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ metadata:
 spec:
   group: networking.gke.io
   versions:
+      # (Deprecated)
     - name: v1beta1
       served: true
       storage: false
@@ -28,8 +29,11 @@ spec:
             status:
               properties:
                 certificateStatus:
+                # The status of the managed certificate.
                   type: string
                 domainStatus:
+                # The status of certificate provisioning for domains
+                # selected by the user.
                   type: array
                   items:
                     type: object
@@ -42,13 +46,18 @@ spec:
                       status:
                         type: string
                 certificateName:
+                # The name of the provisioned managed certificate.
                   type: string
                 expireTime:
+                # The expire time of the provisioned managed certificate.
+                # The certificate will be renewed automatically unless
+                # the DNS configuration changes and prevents that.
                   type: string
                   format: date-time
             spec:
               properties:
                 domains:
+                # One non-wildcard domain name up to 63 characters long.
                   type: array
                   maxItems: 1
                   items:
@@ -64,8 +73,11 @@ spec:
             status:
               properties:
                 certificateStatus:
+                # The status of the managed certificate.
                   type: string
                 domainStatus:
+                # The status of certificate provisioning for domains
+                # selected by the user.
                   type: array
                   items:
                     type: object
@@ -78,13 +90,18 @@ spec:
                       status:
                         type: string
                 certificateName:
+                # The name of the provisioned managed certificate.
                   type: string
                 expireTime:
+                # The expire time of the provisioned managed certificate.
+                # The certificate will be renewed automatically unless
+                # the DNS configuration changes and prevents that.
                   type: string
                   format: date-time
             spec:
               properties:
                 domains:
+                # Up to 100 non-wildcard domain names, each up to 63 characters long.
                   type: array
                   maxItems: 100
                   items:
