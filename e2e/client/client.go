@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/oauth2"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
@@ -50,7 +51,7 @@ type Clients struct {
 	ClusterRole        rbacv1beta1.ClusterRoleInterface
 	ClusterRoleBinding rbacv1beta1.ClusterRoleBindingInterface
 	CustomResource     apiextv1beta1.CustomResourceDefinitionInterface
-	Deployment         extv1beta1.DeploymentInterface
+	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Dns
 	Ingress            extv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.ManagedCertificate
@@ -61,6 +62,11 @@ type Clients struct {
 
 func New(namespace string) (*Clients, error) {
 	config, err := getRestConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	appsClient, err := appsv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +121,7 @@ func New(namespace string) (*Clients, error) {
 		ClusterRole:        rbacClient.ClusterRoles(),
 		ClusterRoleBinding: rbacClient.ClusterRoleBindings(),
 		CustomResource:     apiExtClient.CustomResourceDefinitions(),
-		Deployment:         extClient.Deployments(namespace),
+		Deployment:         appsClient.Deployments(namespace),
 		Dns:                dnsClient,
 		Ingress:            extClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
