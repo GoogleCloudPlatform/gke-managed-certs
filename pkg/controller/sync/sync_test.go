@@ -113,19 +113,19 @@ func withEntryAndSslCertificateCreationReported() *fake.FakeState {
 		},
 	})
 }
-func withEntryAndSoftDeletedFails() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
-			SslCertificateName: sslCertificateName,
-			SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
-		},
-	})
-}
 func withEntryAndSoftDeleted() *fake.FakeState {
 	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
 		mcrtId: fake.StateEntry{
 			SslCertificateName: sslCertificateName,
 			SoftDeleted:        true,
+		},
+	})
+}
+func withEntryAndSoftDeletedFails() *fake.FakeState {
+	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
+		mcrtId: fake.StateEntry{
+			SslCertificateName: sslCertificateName,
+			SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
 		},
 	})
 }
@@ -334,7 +334,7 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, state empty, ssl cert exists fails",
+		"Lister success, state empty, SslCertificate exists fails",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
@@ -349,7 +349,7 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, ssl cert exists fails",
+		"Lister success, entry in state, SslCertificate exists fails",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
@@ -364,7 +364,7 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, state empty, ssl cert create fails",
+		"Lister success, state empty, SslCertificate creation fails",
 		in{
 			lister:       listerSuccess,
 			metrics:      fake.NewMetrics(),
@@ -516,6 +516,20 @@ var testCases = []struct {
 		},
 	},
 	{
+		"Lister success, entry in state soft deleted, SslCertificate exists",
+		in{
+			lister:  listerSuccess,
+			metrics: fake.NewMetrics(),
+			random:  randomSuccess,
+			state:   withEntryAndSoftDeleted(),
+			mcrt:    mockMcrt(domainFoo),
+		},
+		out{
+			entryInState:     false,
+			wantUpdateCalled: false,
+		},
+	},
+	{
 		"Lister success, entry in state, certs mismatch",
 		in{
 			lister:  listerSuccess,
@@ -563,22 +577,6 @@ var testCases = []struct {
 			wantSoftDeleted:  true,
 			wantUpdateCalled: false,
 			err:              genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch, soft deleted in state",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSoftDeleted(),
-			mcrt:    mockMcrt(domainBar),
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
 		},
 	},
 	{

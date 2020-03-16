@@ -187,6 +187,13 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 		return err
 	}
 
+	if softDeleted, err := s.state.IsSoftDeleted(id); err != nil {
+		return err
+	} else if softDeleted {
+		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s", id.String(), sslCertificateName)
+		return s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName)
+	}
+
 	sslCert, err := s.ensureSslCertificate(ctx, sslCertificateName, id, mcrt)
 	if err != nil {
 		return err
