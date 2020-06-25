@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package flags defines global controller flags
+// Package flags defines global controller flags.
 package flags
 
 import (
@@ -30,7 +30,7 @@ var (
 	}{}
 )
 
-// Register registers flags with command line parser
+// Register registers flags with command line parser.
 func Register() {
 	flag.StringVar(&F.APIServerHost, "apiserver-host", "",
 		`The address of the Kubernetes Apiserver to connect to in the format of

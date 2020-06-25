@@ -39,33 +39,33 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 )
 
-// Clients are used to communicate with api server and GCLB
+// Clients are used to communicate with api server and GCLB.
 type Clients struct {
-	// ConfigMap manages ConfigMap objects
+	// ConfigMap manages ConfigMap objects.
 	ConfigMap configmap.ConfigMap
 
-	// Coordination is used for electing master
+	// Coordination is used for electing master.
 	Coordination coordinationv1.CoordinationV1Interface
 
-	// Core manages core Kubernetes objects
+	// Core manages core Kubernetes objects.
 	Core corev1.CoreV1Interface
 
-	// Event manages Event objects
+	// Event manages Event objects.
 	Event event.Event
 
-	// IngressClient manages Ingress objects
+	// IngressClient manages Ingress objects.
 	IngressClient v1beta1.IngressesGetter
 
-	// IngressInformerFactory produces informers and listers which handle Ingress objects
+	// IngressInformerFactory produces informers and listers which handle Ingress objects.
 	IngressInformerFactory informers.SharedInformerFactory
 
-	// ManagedCertificateClient manages ManagedCertificate custom resources
+	// ManagedCertificateClient manages ManagedCertificate custom resources.
 	ManagedCertificateClient clientsetv1beta2.NetworkingV1beta2Interface
 
-	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources
+	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources.
 	ManagedCertificateInformerFactory externalversions.SharedInformerFactory
 
-	// Ssl manages SslCertificate GCP resources
+	// Ssl manages SslCertificate GCP resources.
 	Ssl ssl.Ssl
 }
 

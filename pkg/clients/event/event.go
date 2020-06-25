@@ -31,10 +31,10 @@ import (
 const (
 	component                 = "managed-certificate-controller"
 	namespace                 = ""
+	reasonBackendError        = "BackendError"
 	reasonCreate              = "Create"
 	reasonDelete              = "Delete"
 	reasonTooManyCertificates = "TooManyCertificates"
-	reasonBackendError        = "BackendError"
 )
 
 type Event interface {

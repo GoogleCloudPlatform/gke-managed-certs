@@ -68,9 +68,6 @@ spec:
             - name: usrsharecacerts
               mountPath: "/usr/share/ca-certificates"
               readOnly: true
-            - name: logfile
-              mountPath: "/var/log/managed_certificate_controller.log"
-              readOnly: false
       volumes:
         - name: ssl-certs
           hostPath:
@@ -78,7 +75,3 @@ spec:
         - name: usrsharecacerts
           hostPath:
             path: "/usr/share/ca-certificates"
-        - name: logfile
-          hostPath:
-            path: "/var/log/managed_certificate_controller.log"
-            type: FileOrCreate

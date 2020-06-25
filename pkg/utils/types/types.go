@@ -25,7 +25,7 @@ const (
 	separator = ":"
 )
 
-// CertId identifies a ManagedCertificate object within a cluster
+// CertId identifies a ManagedCertificate object within a cluster.
 type CertId struct {
 	Namespace string
 	Name      string
@@ -38,7 +38,7 @@ func NewCertId(namespace, name string) CertId {
 	}
 }
 
-// String converts Id to string
+// String converts CertId to string.
 func (id CertId) String() string {
 	return fmt.Sprintf("%s%s%s", id.Namespace, separator, id.Name)
 }
