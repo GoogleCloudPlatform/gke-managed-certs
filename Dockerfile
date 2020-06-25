@@ -17,10 +17,4 @@ LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 
 ADD managed-certificate-controller /managed-certificate-controller
 
-ENTRYPOINT [ \
-	"./managed-certificate-controller", \
-	"--logtostderr=false", \
-	"--alsologtostderr", \
-	"-v=3", \
-	"-log_file=/var/log/managed_certificate_controller.log" \
-]
+ENTRYPOINT ["/managed-certificate-controller", "-v=3"]
