@@ -79,8 +79,7 @@ e2e:
 
 # Formats go source code with gofmt
 gofmt:
-	gofmt -w main.go
-	find . -mindepth 1 -maxdepth 1 -name vendor -prune -o -type d -print | xargs gofmt -w
+	find . -type f -name '*.go' | grep -v '/vendor/' | xargs gofmt -w
 
 # Builds the managed certs controller binary, then a docker image with this binary, and pushes the image, for dev
 release: release-ci clean
