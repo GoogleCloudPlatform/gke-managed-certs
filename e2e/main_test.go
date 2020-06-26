@@ -35,6 +35,7 @@ import (
 
 const (
 	controllerImageTagEnv = "TAG"
+	controllerRegistryEnv = "REGISTRY"
 	namespace             = "default"
 	platformEnv           = "PLATFORM"
 )
@@ -77,9 +78,11 @@ func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error)
 			return nil, err
 		}
 
+		registry := os.Getenv(controllerRegistryEnv)
 		tag := os.Getenv(controllerImageTagEnv)
-		klog.Infof("Controller image tag=%s", tag)
-		if err := deployController(tag); err != nil {
+		klog.Infof("Controller image registry=%s, tag=%s", registry, tag)
+
+		if err := deployController(registry, tag); err != nil {
 			return nil, err
 		}
 	}

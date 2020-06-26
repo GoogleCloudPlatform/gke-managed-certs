@@ -44,7 +44,7 @@ const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
 	dnsZoneEnv      = "DNS_ZONE"
-	projectIDEnv    = "PROJECT_ID"
+	projectIDEnv    = "PROJECT"
 )
 
 type Clients struct {

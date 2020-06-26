@@ -27,11 +27,13 @@ DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
 PLATFORM=${PLATFORM:-"gcp"}
 PROJECT=${PROJECT:-""}
 PULL_NUMBER=${PULL_NUMBER:-""}
+REGISTRY=${REGISTRY:-""}
 TAG=${TAG:-"ci_latest"}
 
-while getopts "p:t:z:" opt; do
+while getopts "p:r:t:z:" opt; do
   case $opt in
     p) PLATFORM=$OPTARG ;;
+    r) REGISTRY=$OPTARG ;;
     t) TAG=$OPTARG ;;
     z) DNS_ZONE=$OPTARG ;;
     :)
@@ -47,4 +49,4 @@ then
 fi
 
 make -C ${SCRIPT_ROOT} run-e2e-in-docker \
-  DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM PROJECT=$PROJECT TAG=$TAG
+  DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM PROJECT=$PROJECT REGISTRY=$REGISTRY TAG=$TAG

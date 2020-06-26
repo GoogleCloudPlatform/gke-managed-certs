@@ -1,16 +1,16 @@
 all: gofmt vet build-binary-in-docker run-test-in-docker clean cross
 
+override DNS_ZONE := $(or ,$(DNS_ZONE), "managedcertsgke")
+override PLATFORM := $(or ,$(PLATFORM), "gke")
+override PROJECT := $(or ,$(PROJECT), $(shell gcloud config list --format="value(core.project)"))
+override REGISTRY := $(or ,$(REGISTRY), "eu.gcr.io/managed-certs-gke")
+
 TAG ?= $(USER)-dev
-REGISTRY ?= eu.gcr.io/managed-certs-gke
 KUBECONFIG ?= $(HOME)/.kube/config
 KUBERNETES_PROVIDER ?= gke
 ARTIFACTS ?= /tmp/artifacts
 CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
 CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
-PROJECT_ID ?= $(PROJECT)
-PROJECT_ID ?= $(shell gcloud config list --format="value(core.project)")
-DNS_ZONE ?= managedcertsgke
-PLATFORM ?= gke
 
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
@@ -68,10 +68,11 @@ e2e:
 		CLOUD_SDK_ROOT=$(CLOUD_SDK_ROOT) \
 		KUBECONFIG=$(KUBECONFIG) \
 		KUBERNETES_PROVIDER=$(KUBERNETES_PROVIDER) \
-		PROJECT_ID=$(PROJECT_ID) \
+		PROJECT=$(PROJECT) \
 		DNS_ZONE=$(DNS_ZONE) \
 		PLATFORM=$(PLATFORM) \
 		TAG=$(TAG) \
+		REGISTRY=$(REGISTRY) \
 		go test ./e2e/... -test.timeout=60m \
 			-logtostderr=false -alsologtostderr=true -v -log_dir=$${dest} \
 			> $${dest}/e2e.out.txt && exitcode=$${?} || exitcode=$${?} ; \
@@ -95,7 +96,7 @@ run-e2e-in-docker: docker-runner-builder auth-configure-docker
 		-v $(KUBECONFIG):/root/.kube/config \
 		-v $(ARTIFACTS):/tmp/artifacts \
 		$(runner_image):latest bash -c 'cd $(runner_path) && make e2e \
-		DNS_ZONE=$(DNS_ZONE) CLOUD_SDK_ROOT=$(CLOUD_SDK_ROOT) PROJECT_ID=$(PROJECT_ID) PLATFORM=$(PLATFORM) TAG=$(TAG)'
+		DNS_ZONE=$(DNS_ZONE) CLOUD_SDK_ROOT=$(CLOUD_SDK_ROOT) PROJECT=$(PROJECT) PLATFORM=$(PLATFORM) REGISTRY=$(REGISTRY) TAG=$(TAG)'
 
 run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:$(runner_path) $(runner_image):latest bash -c 'cd $(runner_path) && make test'

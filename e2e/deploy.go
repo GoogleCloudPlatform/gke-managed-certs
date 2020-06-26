@@ -186,7 +186,7 @@ func deployCRD() error {
 }
 
 // Deploys Managed Certificate controller with all related objects
-func deployController(tag string) error {
+func deployController(registry, tag string) error {
 	if err := deleteController(); err != nil {
 		return err
 	}
@@ -232,17 +232,13 @@ func deployController(tag string) error {
 	klog.Infof("Created cluster role binding %s", clusterRoleBindingName)
 
 	appCtrl := map[string]string{"app": deploymentName}
-	image := fmt.Sprintf("eu.gcr.io/managed-certs-gke/managed-certificate-controller:%s", tag)
-	fileOrCreate := corev1.HostPathFileOrCreate
+	image := fmt.Sprintf("%s/managed-certificate-controller:%s", registry, tag)
 
 	sslCertsVolume := "ssl-certs"
 	sslCertsVolumePath := "/etc/ssl/certs"
 
 	usrShareCaCertsVolume := "usrsharecacerts"
 	usrShareCaCertsVolumePath := "/usr/share/ca-certificates"
-
-	logFileVolume := "logfile"
-	logFileVolumePath := "/var/log/managed_certificate_controller.log"
 
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
@@ -269,11 +265,6 @@ func deployController(tag string) error {
 									MountPath: usrShareCaCertsVolumePath,
 									ReadOnly:  true,
 								},
-								{
-									Name:      logFileVolume,
-									MountPath: logFileVolumePath,
-									ReadOnly:  false,
-								},
 							},
 						},
 					},
@@ -291,15 +282,6 @@ func deployController(tag string) error {
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: usrShareCaCertsVolumePath,
-								},
-							},
-						},
-						{
-							Name: logFileVolume,
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: logFileVolumePath,
-									Type: &fileOrCreate,
 								},
 							},
 						},
