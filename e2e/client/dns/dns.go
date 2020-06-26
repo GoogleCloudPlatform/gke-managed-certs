@@ -25,9 +25,8 @@ import (
 )
 
 const (
-	projectID    = "certsbridge-dev"
-	recordTypeA  = "A"
-	topLevelZone = "certsbridge.com"
+	projectID   = "certsbridge-dev"
+	recordTypeA = "A"
 )
 
 type Dns interface {
@@ -40,27 +39,34 @@ type dnsImpl struct {
 	service *dns.Service
 	// zone is a DNS zone this client operates on
 	zone string
+	// domain is a DNS name part under which random entries are generated
+	domain string
 }
 
-func New(oauthClient *http.Client, zone string) (Dns, error) {
+func New(oauthClient *http.Client, zone, domain string) (Dns, error) {
 	service, err := dns.New(oauthClient)
 	if err != nil {
 		return nil, err
 	}
 
 	return dnsImpl{
+		domain:  domain,
 		service: service,
 		zone:    zone,
 	}, nil
 }
 
-// Create for each item in randomNames adds A record to DNS zone {d.zone}.{topLevelZone} and returns resulting domain names.
+// Create adds DNS A records pointing `randomNames` at the IP address to the configured DNS zone
+// and returns the resulting domain names.
+//
+// For each item `randomName` in `randomNames` an A record is added to the `d.zone` DNS zone.
+// The record points `randomName`.`d.domain` to the `ip` address.
 func (d dnsImpl) Create(randomNames []string, ip string) ([]string, error) {
 	var domainNames []string
 	var additions []*dns.ResourceRecordSet
 
 	for _, randomName := range randomNames {
-		domainName := fmt.Sprintf("%s.%s.%s", randomName, d.zone, topLevelZone)
+		domainName := fmt.Sprintf("%s.%s", randomName, d.domain)
 		domainNames = append(domainNames, domainName)
 		additions = append(additions, &dns.ResourceRecordSet{
 			Name:    fmt.Sprintf("%s.", domainName),
@@ -95,7 +101,7 @@ func (d dnsImpl) DeleteAll() error {
 		}
 	}
 
-	klog.Infof("Delete all DNS A records in %s.%s; all names: %v; all A names: %v", d.zone, topLevelZone, allNames, allANames)
+	klog.Infof("Delete all DNS A records in %s; all names: %v; all A names: %v", d.zone, allNames, allANames)
 
 	_, err = d.service.Changes.Create(projectID, d.zone, &dns.Change{
 		Deletions: recordsA,

@@ -1,16 +1,9 @@
 all: gofmt vet build-binary-in-docker run-test-in-docker clean cross
 
-override DNS_ZONE := $(or ,$(DNS_ZONE), "managedcertsgke")
-override PLATFORM := $(or ,$(PLATFORM), "gke")
-override PROJECT := $(or ,$(PROJECT), $(shell gcloud config list --format="value(core.project)"))
 override REGISTRY := $(or ,$(REGISTRY), "eu.gcr.io/managed-certs-gke")
 
 TAG ?= $(USER)-dev
-KUBECONFIG ?= $(HOME)/.kube/config
-KUBERNETES_PROVIDER ?= gke
 ARTIFACTS ?= /tmp/artifacts
-CLOUD_CONFIG ?= $(shell gcloud info --format="value(config.paths.global_config_dir)")
-CLOUD_SDK_ROOT ?= $(shell gcloud info --format="value(installation.sdk_root)")
 
 # Latest commit hash for current branch
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
@@ -66,10 +59,11 @@ e2e:
 	rm -rf $${dest}/* && mkdir -p $${dest} && \
 	{ \
 		CLOUD_SDK_ROOT=$(CLOUD_SDK_ROOT) \
-		KUBECONFIG=$(KUBECONFIG) \
+		KUBECONFIG=$(HOME)/.kube/config \
 		KUBERNETES_PROVIDER=$(KUBERNETES_PROVIDER) \
 		PROJECT=$(PROJECT) \
 		DNS_ZONE=$(DNS_ZONE) \
+		DOMAIN=$(DOMAIN) \
 		PLATFORM=$(PLATFORM) \
 		TAG=$(TAG) \
 		REGISTRY=$(REGISTRY) \
@@ -89,14 +83,23 @@ release: release-ci clean
 release-ci: build-binary-in-docker run-test-in-docker docker
 
 run-e2e-in-docker: docker-runner-builder auth-configure-docker
+	$(eval cloud_config := $(or ,$(CLOUD_CONFIG), $(shell gcloud info --format="value(config.paths.global_config_dir)")))
+	$(eval cloud_sdk_root := $(or ,$(CLOUD_SDK_ROOT), $(shell gcloud info --format="value(installation.sdk_root)")))
+	$(eval dns_zone := $(or ,$(DNS_ZONE),"managedcertsgke"))
+	$(eval kubeconfig := $(or ,$(KUBECONFIG),$(HOME)/.kube/config))
+	$(eval kubernetes_provider := $(or ,$(KUBERNETES_PROVIDER),"gke"))
+	$(eval platform := $(or ,$(PLATFORM), "gcp"))
+	$(eval project := $(or ,$(PROJECT), $(shell gcloud config list --format="value(core.project)")))
 	docker run -v `pwd`:$(runner_path) \
-		-v $(CLOUD_SDK_ROOT):$(CLOUD_SDK_ROOT) \
-		-v $(CLOUD_CONFIG):/root/.config/gcloud \
-		-v $(CLOUD_CONFIG):/root/.config/gcloud-staging \
-		-v $(KUBECONFIG):/root/.kube/config \
+		-v $(cloud_sdk_root):$(cloud_sdk_root) \
+		-v $(cloud_config):/root/.config/gcloud \
+		-v $(cloud_config):/root/.config/gcloud-staging \
+		-v $(kubeconfig):/root/.kube/config \
 		-v $(ARTIFACTS):/tmp/artifacts \
 		$(runner_image):latest bash -c 'cd $(runner_path) && make e2e \
-		DNS_ZONE=$(DNS_ZONE) CLOUD_SDK_ROOT=$(CLOUD_SDK_ROOT) PROJECT=$(PROJECT) PLATFORM=$(PLATFORM) REGISTRY=$(REGISTRY) TAG=$(TAG)'
+		DNS_ZONE=$(dns_zone) DOMAIN=$(DOMAIN) CLOUD_SDK_ROOT=$(cloud_sdk_root) \
+		KUBERNETES_PROVIDER=$(kubernetes_provider) PROJECT=$(project) \
+		PLATFORM=$(platform) REGISTRY=$(REGISTRY) TAG=$(TAG)'
 
 run-test-in-docker: docker-runner-builder
 	docker run -v `pwd`:$(runner_path) $(runner_image):latest bash -c 'cd $(runner_path) && make test'

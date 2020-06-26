@@ -24,10 +24,11 @@ set -x
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
+DOMAIN=${DOMAIN:-"${DNS_ZONE}.certsbridge.com"}
 PLATFORM=${PLATFORM:-"gcp"}
 PROJECT=${PROJECT:-""}
 PULL_NUMBER=${PULL_NUMBER:-""}
-REGISTRY=${REGISTRY:-""}
+REGISTRY=${REGISTRY:-"eu.gcr.io/managed-certs-gke"}
 TAG=${TAG:-"ci_latest"}
 
 while getopts "p:r:t:z:" opt; do
@@ -49,4 +50,5 @@ then
 fi
 
 make -C ${SCRIPT_ROOT} run-e2e-in-docker \
-  DNS_ZONE=$DNS_ZONE PLATFORM=$PLATFORM PROJECT=$PROJECT REGISTRY=$REGISTRY TAG=$TAG
+  DNS_ZONE=$DNS_ZONE DOMAIN=$DOMAIN PLATFORM=$PLATFORM \
+  PROJECT=$PROJECT REGISTRY=$REGISTRY TAG=$TAG

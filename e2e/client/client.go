@@ -44,6 +44,7 @@ const (
 	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
 	dnsZoneEnv      = "DNS_ZONE"
+	domainEnv       = "DOMAIN"
 	projectIDEnv    = "PROJECT"
 )
 
@@ -107,7 +108,10 @@ func New(namespace string) (*Clients, error) {
 	dnsZone := os.Getenv(dnsZoneEnv)
 	klog.Infof("dnsZone=%s", dnsZone)
 
-	dnsClient, err := dns.New(oauthClient, dnsZone)
+	domain := os.Getenv(domainEnv)
+	klog.Infof("domain=%s", domain)
+
+	dnsClient, err := dns.New(oauthClient, dnsZone, domain)
 	if err != nil {
 		return nil, err
 	}
