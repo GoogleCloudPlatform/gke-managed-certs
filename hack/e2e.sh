@@ -17,16 +17,19 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
-# Display executed shell commands
 set -x
 
-SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
+SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 
+ARTIFACTS=${ARTIFACTS:-"/tmp/artifacts"}
+CLOUD_CONFIG=${CLOUD_CONFIG:-`gcloud info --format="value(config.paths.global_config_dir)"`}
+CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT:-`gcloud info --format="value(installation.sdk_root)"`}
 DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
 DOMAIN=${DOMAIN:-"${DNS_ZONE}.certsbridge.com"}
+KUBECONFIG=${KUBECONFIG:-"${HOME}/.kube/config"}
+KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gke"}
 PLATFORM=${PLATFORM:-"gcp"}
-PROJECT=${PROJECT:-""}
+PROJECT=${PROJECT:-`gcloud config list --format="value(core.project)"`}
 PULL_NUMBER=${PULL_NUMBER:-""}
 REGISTRY=${REGISTRY:-"eu.gcr.io/managed-certs-gke"}
 TAG=${TAG:-"ci_latest"}
@@ -49,6 +52,37 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-make -C ${SCRIPT_ROOT} run-e2e-in-docker \
-  DNS_ZONE=$DNS_ZONE DOMAIN=$DOMAIN PLATFORM=$PLATFORM \
-  PROJECT=$PROJECT REGISTRY=$REGISTRY TAG=$TAG
+name=managed-certificate-controller
+runner_image=${name}-runner
+runner_path=/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/
+
+until docker build -t ${runner_image} ${SCRIPT_ROOT}/runner; do \
+  echo "Building ${runner_image} image failed, retrying in 10 seconds..." && sleep 10; \
+done
+
+test -f /etc/service-account/service-account.json && \
+  gcloud auth activate-service-account --key-file=/etc/service-account/service-account.json && \
+  gcloud auth configure-docker || true
+
+docker run -v ${SCRIPT_ROOT}:${runner_path} \
+  -v ${CLOUD_SDK_ROOT}:${CLOUD_SDK_ROOT} \
+  -v ${CLOUD_CONFIG}:/root/.config/gcloud \
+  -v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
+  -v ${KUBECONFIG}:/root/.kube/config \
+  -v ${ARTIFACTS}:/tmp/artifacts \
+  ${runner_image}:latest bash -c \
+  "set -ex && cd ${runner_path} && dest=/tmp/artifacts; \
+  rm -rf \${dest}/* && mkdir -p \${dest} && \
+  { \
+    CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
+    KUBECONFIG=\${HOME}/.kube/config \
+    KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
+    PROJECT=${PROJECT} \
+    DNS_ZONE=${DNS_ZONE} \
+    DOMAIN=${DOMAIN} \
+    PLATFORM=${PLATFORM} \
+    TAG=${TAG} \
+    REGISTRY=${REGISTRY} \
+    go test ./e2e/... -test.timeout=60m -logtostderr=false -alsologtostderr=true -v -log_dir=\${dest} \
+      > \${dest}/e2e.out.txt && exitcode=\${?} || exitcode=\${?} ; \
+  } && cat \${dest}/e2e.out.txt | go-junit-report > \${dest}/junit_01.xml && exit \${exitcode}"
