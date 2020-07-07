@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"golang.org/x/oauth2"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -51,7 +51,7 @@ const (
 type Clients struct {
 	ClusterRole        rbacv1beta1.ClusterRoleInterface
 	ClusterRoleBinding rbacv1beta1.ClusterRoleBindingInterface
-	CustomResource     apiextv1beta1.CustomResourceDefinitionInterface
+	CustomResource     apiextv1.CustomResourceDefinitionInterface
 	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Dns
 	Ingress            extv1beta1.IngressInterface
@@ -77,7 +77,7 @@ func New(namespace string) (*Clients, error) {
 		return nil, err
 	}
 
-	apiExtClient, err := apiextv1beta1.NewForConfig(config)
+	apiExtClient, err := apiextv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

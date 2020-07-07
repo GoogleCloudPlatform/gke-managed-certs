@@ -21,6 +21,7 @@ package externalversions
 import (
 	"fmt"
 
+	v1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	v1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	v1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -53,7 +54,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=networking.gke.io, Version=v1beta1
+	// Group=networking.gke.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("managedcertificates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().ManagedCertificates().Informer()}, nil
+
+		// Group=networking.gke.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("managedcertificates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta1().ManagedCertificates().Informer()}, nil
 

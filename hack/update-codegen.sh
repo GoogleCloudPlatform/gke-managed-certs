@@ -18,14 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-
-go get -d k8s.io/code-generator/...
-
-# Checkout code-generator to compatible version
-(cd $GOPATH/src/k8s.io/code-generator && git checkout origin/release-1.14 -B release-1.14)
+SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 
 REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
-$GOPATH/src/k8s.io/code-generator/generate-groups.sh all \
-  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1,v1beta2 \
-  --go-header-file $SCRIPT_ROOT/hack/header.go.txt
+bash ${SCRIPT_ROOT}/vendor/k8s.io/code-generator/generate-groups.sh all \
+  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1,v1beta2,v1 \
+  --output-base ${SCRIPT_ROOT}/../../.. \
+  --go-header-file ${SCRIPT_ROOT}/hack/header.go.txt
