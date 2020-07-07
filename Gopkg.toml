@@ -57,7 +57,7 @@
   name = "k8s.io/klog"
   version = "1.0.0"
 
-[[constraint]]
+[[override]]
   name = "k8s.io/kubernetes"
   branch = "release-1.15"
 

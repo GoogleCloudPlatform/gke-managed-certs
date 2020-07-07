@@ -782,14 +782,6 @@
 
 [[projects]]
   branch = "release-1.15"
-  digest = "1:5257c14ce8a0e2b178f7de41c4c91221dd47175536118db2202f9ffbaa2aeac4"
-  name = "k8s.io/kubernetes"
-  packages = ["pkg/client/metrics/prometheus"]
-  pruneopts = "UT"
-  revision = "54260e2be0c03f933e0fe42cc8e5fcd22a04bc39"
-
-[[projects]]
-  branch = "release-1.15"
   digest = "1:9201a136c5fb16ecbcedd590ddee3ee931f6c7a8fd9a67947c2e4c7a9eb6033c"
   name = "k8s.io/legacy-cloud-providers"
   packages = ["gce"]
@@ -832,6 +824,7 @@
     "google.golang.org/api/dns/v2beta1",
     "google.golang.org/api/googleapi",
     "gopkg.in/gcfg.v1",
+    "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/extensions/v1beta1",
     "k8s.io/api/rbac/v1beta1",
@@ -852,6 +845,7 @@
     "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
+    "k8s.io/client-go/kubernetes/typed/apps/v1",
     "k8s.io/client-go/kubernetes/typed/coordination/v1",
     "k8s.io/client-go/kubernetes/typed/core/v1",
     "k8s.io/client-go/kubernetes/typed/core/v1/fake",
@@ -872,7 +866,6 @@
     "k8s.io/client-go/util/workqueue",
     "k8s.io/component-base/config",
     "k8s.io/klog",
-    "k8s.io/kubernetes/pkg/client/metrics/prometheus",
     "k8s.io/legacy-cloud-providers/gce",
   ]
   solver-name = "gps-cdcl"

@@ -25,7 +25,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client-go metrics registration
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
