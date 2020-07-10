@@ -24,10 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-const (
-	quotaExceeded = "quotaExceeded"
-)
-
 // IsNotFound checks if err is an HTTP Not Found (404) error.
 func IsNotFound(err error) bool {
 	apiErr, ok := err.(*googleapi.Error)
@@ -36,19 +32,6 @@ func IsNotFound(err error) bool {
 	}
 
 	return errors.IsNotFound(err)
-}
-
-// IsQuotaExceeded checks if err is a googleapi error for exceeded quota.
-func IsQuotaExceeded(err error) bool {
-	if apiErr, ok := err.(*googleapi.Error); ok {
-		for _, errItem := range apiErr.Errors {
-			if errItem.Reason == quotaExceeded {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // IgnoreNotFound returns nil if err is HTTP Not Found (404), else err.

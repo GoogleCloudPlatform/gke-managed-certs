@@ -27,6 +27,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -54,6 +55,7 @@ type Clients struct {
 	CustomResource     apiextv1.CustomResourceDefinitionInterface
 	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Dns
+	Event              eventsv1beta1.EventInterface
 	Ingress            extv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.ManagedCertificate
 	Service            corev1.ServiceInterface
@@ -73,6 +75,11 @@ func New(namespace string) (*Clients, error) {
 	}
 
 	coreClient, err := corev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	eventClient, err := eventsv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +134,7 @@ func New(namespace string) (*Clients, error) {
 		CustomResource:     apiExtClient.CustomResourceDefinitions(),
 		Deployment:         appsClient.Deployments(namespace),
 		Dns:                dnsClient,
+		Event:              eventClient.Events(namespace),
 		Ingress:            extClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
 		Service:            coreClient.Services(namespace),

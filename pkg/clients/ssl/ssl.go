@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	compute "google.golang.org/api/compute/v0.beta"
@@ -30,9 +31,35 @@ import (
 )
 
 const (
-	statusDone  = "DONE"
-	typeManaged = "MANAGED"
+	codeQuotaExceeded = "QUOTA_EXCEEDED"
+	statusDone        = "DONE"
+	typeManaged       = "MANAGED"
 )
+
+type Error struct {
+	operation *compute.Operation
+}
+
+func (s *Error) Error() string {
+	var computeErrors []string
+	for _, err := range s.operation.Error.Errors {
+		computeErrors = append(computeErrors, fmt.Sprintf("(%s: %s)", err.Code, err.Message))
+	}
+
+	return fmt.Sprintf("operation %s %s. Status: %s (%d), errors: %s", s.operation.Name,
+		s.operation.Status, s.operation.HttpErrorMessage, s.operation.HttpErrorStatusCode,
+		strings.Join(computeErrors, ", "))
+}
+
+func (s *Error) IsQuotaExceeded() bool {
+	for _, err := range s.operation.Error.Errors {
+		if err.Code == codeQuotaExceeded {
+			return true
+		}
+	}
+
+	return false
+}
 
 type Ssl interface {
 	Create(ctx context.Context, name string, domains []string) error
@@ -125,12 +152,13 @@ func (s sslImpl) waitFor(ctx context.Context, operationName string) error {
 		}
 
 		if operation.Status == statusDone {
-			klog.Infof("Operation %s done, %+v", operationName, operation)
-			if operation.HttpErrorMessage == "" {
+			klog.Infof("Operation %s done", operationName)
+
+			if operation.Error == nil {
 				return nil
 			}
 
-			return fmt.Errorf("operation %s failed: %s", operationName, operation.HttpErrorMessage)
+			return &Error{operation: operation}
 		}
 
 		select {

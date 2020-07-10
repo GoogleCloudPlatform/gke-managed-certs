@@ -26,23 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var generic = errors.New("generic error")
-var googleInternal = &googleapi.Error{
-	Code: 500,
-}
-var googleNotFound = &googleapi.Error{
-	Code: 404,
-}
-var googleQuotaExceeded = &googleapi.Error{
-	Code: 403,
-	Errors: []googleapi.ErrorItem{
-		googleapi.ErrorItem{
-			Reason: "quotaExceeded",
-		},
-	},
-}
-var k8sInternal = k8s_errors.NewInternalError(fmt.Errorf("test_internal_error"))
-var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+var errGeneric = errors.New("generic error")
+var errCompute404 = &googleapi.Error{Code: 404}
+var errCompute500 = &googleapi.Error{Code: 500}
+var errK8sInternal = k8s_errors.NewInternalError(fmt.Errorf("test_internal_error"))
+var errK8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
 	Group:    "test_group",
 	Resource: "test_resource",
 }, "test_name")
@@ -53,12 +41,11 @@ func TestIsNotFound(t *testing.T) {
 		out bool
 	}{
 		{nil, false},
-		{generic, false},
-		{googleInternal, false},
-		{googleNotFound, true},
-		{googleQuotaExceeded, false},
-		{k8sInternal, false},
-		{k8sNotFound, true},
+		{errGeneric, false},
+		{errCompute404, true},
+		{errCompute500, false},
+		{errK8sInternal, false},
+		{errK8sNotFound, true},
 	}
 
 	for _, testCase := range testCases {
@@ -69,40 +56,17 @@ func TestIsNotFound(t *testing.T) {
 	}
 }
 
-func TestIsQuotaExceeded(t *testing.T) {
-	testCases := []struct {
-		in  error
-		out bool
-	}{
-		{nil, false},
-		{generic, false},
-		{googleInternal, false},
-		{googleNotFound, false},
-		{googleQuotaExceeded, true},
-		{k8sInternal, false},
-		{k8sNotFound, false},
-	}
-
-	for _, testCase := range testCases {
-		out := IsQuotaExceeded(testCase.in)
-		if out != testCase.out {
-			t.Errorf("IsQuotaExceeded(%#v) = %t, want %t", testCase.in, out, testCase.out)
-		}
-	}
-}
-
 func TestIgnoreNotFound(t *testing.T) {
 	testCases := []struct {
 		in  error
 		out error
 	}{
 		{nil, nil},
-		{generic, generic},
-		{googleInternal, googleInternal},
-		{googleNotFound, nil},
-		{googleQuotaExceeded, googleQuotaExceeded},
-		{k8sInternal, k8sInternal},
-		{k8sNotFound, nil},
+		{errGeneric, errGeneric},
+		{errCompute404, nil},
+		{errCompute500, errCompute500},
+		{errK8sInternal, errK8sInternal},
+		{errK8sNotFound, nil},
 	}
 
 	for _, testCase := range testCases {

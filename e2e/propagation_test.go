@@ -92,6 +92,7 @@ func TestPropagation(t *testing.T) {
 			if err := clients.ManagedCertificate.Create(name, []string{domain}); err != nil {
 				t.Fatalf("Creation failed: %s", err.Error())
 			}
+			defer clients.ManagedCertificate.Delete(name)
 
 			if err := ensurePropagated(name); err != nil {
 				t.Fatalf("Propagation failed: %s", err.Error())

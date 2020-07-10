@@ -19,6 +19,7 @@ package sslcertificatemanager
 
 import (
 	"context"
+	"errors"
 
 	compute "google.golang.org/api/compute/v0.beta"
 	"k8s.io/klog"
@@ -61,7 +62,8 @@ func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateNam
 	klog.Infof("Creating SslCertificate %s for ManagedCertificate %s:%s", sslCertificateName, mcrt.Namespace, mcrt.Name)
 
 	if err := s.ssl.Create(ctx, sslCertificateName, mcrt.Spec.Domains); err != nil {
-		if http.IsQuotaExceeded(err) {
+		var sslErr *ssl.Error
+		if errors.As(err, &sslErr) && sslErr.IsQuotaExceeded() {
 			s.event.TooManyCertificates(mcrt, err)
 			s.metrics.ObserveSslCertificateQuotaError()
 

@@ -32,8 +32,12 @@ import (
 )
 
 var (
-	domain = "foo.com"
-	certId = types.NewCertId("default", "bar")
+	domain           = "foo.com"
+	cert             = &compute.SslCertificate{}
+	certId           = types.NewCertId("default", "bar")
+	errGeneric       = errors.New("generic error")
+	errQuotaExceeded = ssl.NewFakeQuotaExceededError()
+	errNotFound      = &googleapi.Error{Code: 404}
 )
 
 type fakeSsl struct {
@@ -113,20 +117,6 @@ func (f *fakeEvent) TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err
 	f.tooManyCnt++
 }
 
-var genericErr = errors.New("generic error")
-var quotaExceededErr = &googleapi.Error{
-	Code: 403,
-	Errors: []googleapi.ErrorItem{
-		googleapi.ErrorItem{
-			Reason: "quotaExceeded",
-		},
-	},
-}
-var notFoundErr = &googleapi.Error{
-	Code: 404,
-}
-var cert = &compute.SslCertificate{}
-
 func TestCreate(t *testing.T) {
 	testCases := []struct {
 		ssl                   ssl.Ssl
@@ -142,20 +132,20 @@ func TestCreate(t *testing.T) {
 			wantCreateEvent: true,
 		},
 		{
-			ssl:                   withErr(quotaExceededErr),
-			wantErr:               quotaExceededErr,
+			ssl:                   withErr(errQuotaExceeded),
+			wantErr:               errQuotaExceeded,
 			wantTooManyCertsEvent: true,
 			wantExcludedFromSLO:   true,
 		},
 		{
-			ssl:                   withErr(quotaExceededErr),
-			excludedFromSLOErr:    genericErr,
-			wantErr:               genericErr,
+			ssl:                   withErr(errQuotaExceeded),
+			excludedFromSLOErr:    errGeneric,
+			wantErr:               errGeneric,
 			wantTooManyCertsEvent: true,
 		},
 		{
-			ssl:                   withErr(genericErr),
-			wantErr:               genericErr,
+			ssl:                   withErr(errGeneric),
+			wantErr:               errGeneric,
 			wantBackendErrorEvent: true,
 		},
 	}
@@ -226,20 +216,20 @@ func TestDelete(t *testing.T) {
 			wantDeleteEvent: true,
 		},
 		{
-			ssl:     withErr(genericErr),
-			wantErr: genericErr,
+			ssl:     withErr(errGeneric),
+			wantErr: errGeneric,
 		},
 		{
-			ssl:            withErr(genericErr),
+			ssl:            withErr(errGeneric),
 			mcrt:           fake.NewManagedCertificate(certId, domain),
-			wantErr:        genericErr,
+			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
 		{
-			ssl: withErr(notFoundErr),
+			ssl: withErr(errNotFound),
 		},
 		{
-			ssl:  withErr(notFoundErr),
+			ssl:  withErr(errNotFound),
 			mcrt: fake.NewManagedCertificate(certId, domain),
 		},
 	}
@@ -299,23 +289,23 @@ func TestExists(t *testing.T) {
 			wantExists: true,
 		},
 		{
-			ssl:     withExists(genericErr, false),
-			wantErr: genericErr,
+			ssl:     withExists(errGeneric, false),
+			wantErr: errGeneric,
 		},
 		{
-			ssl:            withExists(genericErr, false),
+			ssl:            withExists(errGeneric, false),
 			mcrt:           fake.NewManagedCertificate(certId, domain),
-			wantErr:        genericErr,
+			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
 		{
-			ssl:     withExists(genericErr, true),
-			wantErr: genericErr,
+			ssl:     withExists(errGeneric, true),
+			wantErr: errGeneric,
 		},
 		{
-			ssl:            withExists(genericErr, true),
+			ssl:            withExists(errGeneric, true),
 			mcrt:           fake.NewManagedCertificate(certId, domain),
-			wantErr:        genericErr,
+			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
 	}
@@ -370,23 +360,23 @@ func TestGet(t *testing.T) {
 			wantCert: cert,
 		},
 		{
-			ssl:     withCert(genericErr, nil),
-			wantErr: genericErr,
+			ssl:     withCert(errGeneric, nil),
+			wantErr: errGeneric,
 		},
 		{
-			ssl:            withCert(genericErr, nil),
+			ssl:            withCert(errGeneric, nil),
 			mcrt:           fake.NewManagedCertificate(certId, domain),
-			wantErr:        genericErr,
+			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
 		{
-			ssl:     withCert(genericErr, cert),
-			wantErr: genericErr,
+			ssl:     withCert(errGeneric, cert),
+			wantErr: errGeneric,
 		},
 		{
-			ssl:            withCert(genericErr, cert),
+			ssl:            withCert(errGeneric, cert),
 			mcrt:           fake.NewManagedCertificate(certId, domain),
-			wantErr:        genericErr,
+			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
 	}

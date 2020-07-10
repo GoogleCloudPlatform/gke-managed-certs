@@ -68,6 +68,7 @@ func TestCRDValidation(t *testing.T) {
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}
+			defer clients.ManagedCertificate.Delete(name)
 
 			if err == nil {
 				return

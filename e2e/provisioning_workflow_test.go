@@ -197,13 +197,14 @@ func TestProvisioningWorkflow(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer clients.ManagedCertificate.Delete(mcrtName)
 	}
 	klog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
 	if err := clients.SslCertificate.Create(ctx, additionalSslCertificateName,
 		[]string{additionalSslCertificateDomain}); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to create additional SslCertificate %s: %v", additionalSslCertificateName, err)
 	}
 	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
 	klog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
