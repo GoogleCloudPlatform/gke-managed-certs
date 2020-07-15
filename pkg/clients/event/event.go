@@ -19,6 +19,7 @@ package event
 
 import (
 	"k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -34,6 +35,7 @@ const (
 	reasonBackendError        = "BackendError"
 	reasonCreate              = "Create"
 	reasonDelete              = "Delete"
+	reasonMissingCertificate  = "MissingCertificate"
 	reasonTooManyCertificates = "TooManyCertificates"
 )
 
@@ -41,6 +43,7 @@ type Event interface {
 	BackendError(mcrt apisv1beta2.ManagedCertificate, err error)
 	Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string)
 	Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string)
+	MissingCertificate(ingress extv1beta1.Ingress, mcrtName string)
 	TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error)
 }
 
@@ -52,15 +55,21 @@ type eventImpl struct {
 func New(client kubernetes.Interface) (Event, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.V(4).Infof)
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{
+		Interface: corev1.New(client.CoreV1().RESTClient()).Events(namespace),
+	})
 
 	eventsScheme := runtime.NewScheme()
 	if err := apisv1beta2.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}
+	if err := extv1beta1.AddToScheme(eventsScheme); err != nil {
+		return nil, err
+	}
 
 	return &eventImpl{
-		recorder: broadcaster.NewRecorder(eventsScheme, v1.EventSource{Component: component}),
+		recorder: broadcaster.NewRecorder(eventsScheme,
+			v1.EventSource{Component: component}),
 	}, nil
 }
 
@@ -71,12 +80,21 @@ func (e eventImpl) BackendError(mcrt apisv1beta2.ManagedCertificate, err error) 
 
 // Create creates an event when an SslCertificate associated with ManagedCertificate is created.
 func (e eventImpl) Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
-	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate, "Create SslCertificate %s", sslCertificateName)
+	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate,
+		"Create SslCertificate %s", sslCertificateName)
 }
 
 // Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
 func (e eventImpl) Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
-	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete, "Delete SslCertificate %s", sslCertificateName)
+	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete,
+		"Delete SslCertificate %s", sslCertificateName)
+}
+
+// MissingCertificate creates an event when a ManagedCertificate attached to Ingress
+// is not found.
+func (e eventImpl) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
+	e.recorder.Eventf(&ingress, v1.EventTypeWarning, reasonMissingCertificate,
+		"ManagedCertificate %s:%s missing", ingress.Namespace, mcrtName)
 }
 
 // TooManyCertificates creates an event when quota for maximum number of SslCertificates per GCP project is exceeded.

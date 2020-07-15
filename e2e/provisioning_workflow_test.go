@@ -24,108 +24,19 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 const (
 	additionalSslCertificateDomain = "example.com"
-	annotation                     = "networking.gke.io/managed-certificates"
 	annotationSeparator            = ","
 	maxNameLength                  = 15
-	port                           = 8080
 	statusActive                   = "Active"
 	statusSuccess                  = 200
 )
-
-func mustCreateBackendService(t *testing.T, name string) {
-	t.Helper()
-
-	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Deleted deployment %s", name)
-
-	appHello := map[string]string{"app": name}
-	args := []string{
-		"-e",
-		fmt.Sprintf("require('http').createServer(function (req, res) { res.end('Hello world!'); }).listen(%d);", port),
-	}
-
-	depl := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: appHello},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: appHello},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyAlways,
-					Containers: []corev1.Container{
-						{
-							Name:    "http-hello",
-							Image:   "node:11-slim",
-							Command: []string{"node"},
-							Args:    args,
-							Ports:   []corev1.ContainerPort{{ContainerPort: port}},
-						},
-					},
-				},
-			},
-		},
-	}
-	if _, err := clients.Deployment.Create(depl); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Created deployment %s", name)
-
-	if err := utilshttp.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Deleted service %s", name)
-
-	serv := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeNodePort,
-			Ports:    []corev1.ServicePort{{Port: port}},
-			Selector: appHello,
-		},
-	}
-	if _, err := clients.Service.Create(serv); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Created service %s", name)
-}
-
-func mustCreateIngress(t *testing.T, name string) {
-	t.Helper()
-
-	if err := utilshttp.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Deleted ingress %s", name)
-
-	ing := &extv1beta1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: extv1beta1.IngressSpec{
-			Backend: &extv1beta1.IngressBackend{
-				ServiceName: "http-hello",
-				ServicePort: intstr.FromInt(port),
-			},
-		},
-	}
-	if _, err := clients.Ingress.Create(ing); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Created ingress %s", name)
-}
 
 func getIngressIP(name string) (string, error) {
 	var ip string
@@ -165,16 +76,14 @@ func generateRandomNames(count int) []string {
 func TestProvisioningWorkflow(t *testing.T) {
 	ctx := context.Background()
 
-	backendServiceName := "http-hello"
-	mustCreateBackendService(t, backendServiceName)
-	defer func() {
-		clients.Deployment.Delete(backendServiceName, &metav1.DeleteOptions{})
-		clients.Service.Delete(backendServiceName, &metav1.DeleteOptions{})
-	}()
+	mcrtCount := 2
+	var mcrtNames []string
+	for i := 0; i < mcrtCount; i++ {
+		mcrtNames = append(mcrtNames, fmt.Sprintf("test-provisioning-workflow-%d", i))
+	}
 
-	ingressName := "test-workflow-ingress"
-	mustCreateIngress(t, ingressName)
-	defer clients.Ingress.Delete(ingressName, &metav1.DeleteOptions{})
+	ingressName := "test-provisioning-workflow"
+	createIngress(t, ingressName, 8080, strings.Join(mcrtNames, annotationSeparator))
 
 	ip, err := getIngressIP(ingressName)
 	if err != nil {
@@ -183,23 +92,19 @@ func TestProvisioningWorkflow(t *testing.T) {
 	klog.Infof("Ingress IP: %s", ip)
 
 	defer clients.Dns.DeleteAll()
-	domains, err := clients.Dns.Create(generateRandomNames(4), ip)
+	domains, err := clients.Dns.Create(generateRandomNames(2*mcrtCount), ip)
 	if err != nil {
 		t.Fatal(err)
 	}
 	klog.Infof("Generated random domains: %v", domains)
 
-	var mcrtNames []string
-	for i := 0; i < len(domains); i += 2 {
-		mcrtName := fmt.Sprintf("provisioning-workflow-%d", i)
-		mcrtNames = append(mcrtNames, mcrtName)
-		err := clients.ManagedCertificate.Create(mcrtName, []string{domains[i], domains[i+1]})
+	for i, mcrtName := range mcrtNames {
+		err := clients.ManagedCertificate.Create(mcrtName, []string{domains[2*i], domains[2*i+1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer clients.ManagedCertificate.Delete(mcrtName)
 	}
-	klog.Infof("Created ManagedCertficate resources: %s", mcrtNames)
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
 	if err := clients.SslCertificate.Create(ctx, additionalSslCertificateName,
@@ -208,16 +113,6 @@ func TestProvisioningWorkflow(t *testing.T) {
 	}
 	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
 	klog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
-
-	ing, err := clients.Ingress.Get(ingressName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ing.Annotations[annotation] = strings.Join(mcrtNames, annotationSeparator)
-	if _, err := clients.Ingress.Update(ing); err != nil {
-		t.Fatal(err)
-	}
-	klog.Infof("Annotated Ingress with %s=%s", annotation, ing.Annotations[annotation])
 
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
 		err := utils.Retry(func() error {

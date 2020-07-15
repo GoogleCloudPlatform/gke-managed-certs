@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
 )
 
 // This test creates more certificates than the quota allows and checks if there is at least one with
@@ -31,11 +32,14 @@ import (
 // Normally every certificate should either receive Created or TooManyCertificates, however rarely BackendError
 // can be reported as well, and events are reported on a best-effort basis, so the test does not require
 // every event to be present.
-func TestEvents(t *testing.T) {
+func TestEvents_ManagedCertificate(t *testing.T) {
 	numCerts := 400 // Should be bigger than allowed quota.
 
 	for i := 0; i < numCerts; i++ {
 		name := fmt.Sprintf("quota-%d", i)
+		if err := http.IgnoreNotFound(clients.ManagedCertificate.Delete(name)); err != nil {
+			t.Fatal(err)
+		}
 		if err := clients.ManagedCertificate.Create(name, []string{"quota.example.com"}); err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +48,7 @@ func TestEvents(t *testing.T) {
 
 	if err := utils.Retry(func() error {
 		foundCreated := false
-		foundQuotaExceeded := false
+		foundTooManyCertificates := false
 
 		eventList, err := clients.Event.List(metav1.ListOptions{})
 		if err != nil {
@@ -62,20 +66,45 @@ func TestEvents(t *testing.T) {
 					foundCreated = true
 				}
 				if event.Reason == "TooManyCertificates" {
-					foundQuotaExceeded = true
+					foundTooManyCertificates = true
 				}
 			}
 
-			if foundCreated && foundQuotaExceeded {
+			if foundCreated && foundTooManyCertificates {
 				break
 			}
 		}
 
-		if !foundCreated || !foundQuotaExceeded {
-			return fmt.Errorf("created event found: %t, quota exceeded event found: %t; want both found", foundCreated, foundQuotaExceeded)
+		if !foundCreated || !foundTooManyCertificates {
+			return fmt.Errorf("Create event found: %t, TooManyCertificates event found: %t; want both found", foundCreated, foundTooManyCertificates)
 		}
 
 		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEvents_Ingress(t *testing.T) {
+	ingressName := "test-events-ingress"
+
+	if err := createIngress(t, ingressName, 8081, "non-existing-certificate"); err != nil {
+		t.Fatalf("createIngress(ingressName=%s): %v", ingressName, err)
+	}
+
+	if err := utils.Retry(func() error {
+		eventList, err := clients.Event.List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+
+		for _, event := range eventList.Items {
+			if event.Regarding.Kind == "Ingress" && event.Regarding.Name == ingressName && event.Reason == "MissingCertificate" {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("MissingCertificate event not found")
 	}); err != nil {
 		t.Fatal(err)
 	}

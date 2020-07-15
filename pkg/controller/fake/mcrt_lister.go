@@ -17,7 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
@@ -42,8 +44,15 @@ func (f fakeLister) List(selector labels.Selector) ([]*apisv1beta2.ManagedCertif
 }
 
 func (f fakeLister) ManagedCertificates(namespace string) listersv1beta2.ManagedCertificateNamespaceLister {
+	var managedCertificates []*apisv1beta2.ManagedCertificate
+	for _, mcrt := range f.managedCertificates {
+		if mcrt.Namespace == namespace {
+			managedCertificates = append(managedCertificates, mcrt)
+		}
+	}
+
 	return fakeNamespaceLister{
-		managedCertificates: f.managedCertificates,
+		managedCertificates: managedCertificates,
 		err:                 f.err,
 	}
 }
@@ -60,11 +69,15 @@ func (f fakeNamespaceLister) List(selector labels.Selector) ([]*apisv1beta2.Mana
 }
 
 func (f fakeNamespaceLister) Get(name string) (*apisv1beta2.ManagedCertificate, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+
 	for _, mcrt := range f.managedCertificates {
 		if mcrt.Name == name {
-			return mcrt, f.err
+			return mcrt, nil
 		}
 	}
 
-	return nil, f.err
+	return nil, errors.NewNotFound(schema.GroupResource{Group: "networking.gke.io", Resource: "ManagedCertificate"}, name)
 }

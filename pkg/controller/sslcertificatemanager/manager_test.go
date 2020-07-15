@@ -92,31 +92,6 @@ func withCert(err error, sslCertificate *compute.SslCertificate) fakeSsl {
 	}
 }
 
-type fakeEvent struct {
-	backendErrorCnt int
-	createCnt       int
-	deleteCnt       int
-	tooManyCnt      int
-}
-
-var _ event.Event = (*fakeEvent)(nil)
-
-func (f *fakeEvent) BackendError(mcrt apisv1beta2.ManagedCertificate, err error) {
-	f.backendErrorCnt++
-}
-
-func (f *fakeEvent) Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
-	f.createCnt++
-}
-
-func (f *fakeEvent) Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
-	f.deleteCnt++
-}
-
-func (f *fakeEvent) TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error) {
-	f.tooManyCnt++
-}
-
 func TestCreate(t *testing.T) {
 	testCases := []struct {
 		ssl                   ssl.Ssl
@@ -153,7 +128,7 @@ func TestCreate(t *testing.T) {
 	for _, tc := range testCases {
 		ctx := context.Background()
 
-		event := &fakeEvent{0, 0, 0, 0}
+		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
 		state := fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
 			certId: fake.StateEntry{SslCertificateName: "", ExcludedFromSLOErr: tc.excludedFromSLOErr},
@@ -166,9 +141,9 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
 		}
 
-		oneTooManyCertsEvent := event.tooManyCnt == 1
+		oneTooManyCertsEvent := event.TooManyCnt == 1
 		if tc.wantTooManyCertsEvent != oneTooManyCertsEvent {
-			t.Fatalf("TooManyCertificates events generated: %d, want event: %t", event.tooManyCnt, tc.wantTooManyCertsEvent)
+			t.Fatalf("TooManyCertificates events generated: %d, want event: %t", event.TooManyCnt, tc.wantTooManyCertsEvent)
 		}
 
 		oneSslCertificateQuotaErrorObserved := metrics.SslCertificateQuotaErrorObserved == 1
@@ -182,9 +157,9 @@ func TestCreate(t *testing.T) {
 				tc.wantExcludedFromSLO, tc.excludedFromSLOErr)
 		}
 
-		oneBackendErrorEvent := event.backendErrorCnt == 1
+		oneBackendErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantBackendErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.backendErrorCnt, tc.wantBackendErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantBackendErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
@@ -192,9 +167,9 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
 		}
 
-		oneCreateEvent := event.createCnt == 1
+		oneCreateEvent := event.CreateCnt == 1
 		if tc.wantCreateEvent != oneCreateEvent {
-			t.Fatalf("Create events generated: %d, want event: %t", event.createCnt, tc.wantCreateEvent)
+			t.Fatalf("Create events generated: %d, want event: %t", event.CreateCnt, tc.wantCreateEvent)
 		}
 	}
 }
@@ -237,7 +212,7 @@ func TestDelete(t *testing.T) {
 	for _, tc := range testCases {
 		ctx := context.Background()
 
-		event := &fakeEvent{0, 0, 0, 0}
+		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
 		sut := New(event, metrics, tc.ssl, fake.NewState())
 
@@ -247,9 +222,9 @@ func TestDelete(t *testing.T) {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
 		}
 
-		oneBackendErrorEvent := event.backendErrorCnt == 1
+		oneBackendErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.backendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
@@ -257,9 +232,9 @@ func TestDelete(t *testing.T) {
 			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
 		}
 
-		oneDeleteEvent := event.deleteCnt == 1
+		oneDeleteEvent := event.DeleteCnt == 1
 		if tc.wantDeleteEvent != oneDeleteEvent {
-			t.Fatalf("Delete events generated: %d, want event: %t", event.deleteCnt, tc.wantDeleteEvent)
+			t.Fatalf("Delete events generated: %d, want event: %t", event.DeleteCnt, tc.wantDeleteEvent)
 		}
 	}
 }
@@ -311,7 +286,7 @@ func TestExists(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		event := &fakeEvent{0, 0, 0, 0}
+		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
 		sut := New(event, metrics, tc.ssl, fake.NewState())
 
@@ -323,9 +298,9 @@ func TestExists(t *testing.T) {
 			t.Fatalf("exists: %t, want %t", exists, tc.wantExists)
 		}
 
-		oneErrorEvent := event.backendErrorCnt == 1
+		oneErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.backendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
@@ -382,7 +357,7 @@ func TestGet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		event := &fakeEvent{0, 0, 0, 0}
+		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
 		sut := New(event, metrics, tc.ssl, fake.NewState())
 
@@ -394,9 +369,9 @@ func TestGet(t *testing.T) {
 			t.Fatalf("cert: %#v, want %#v", sslCert, tc.wantCert)
 		}
 
-		oneErrorEvent := event.backendErrorCnt == 1
+		oneErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.backendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v0.beta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -46,6 +47,8 @@ func TestMain(m *testing.M) {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	ctx := context.Background()
+
 	var err error
 	clients, err = client.New(namespace)
 	if err != nil {
@@ -56,7 +59,7 @@ func TestMain(m *testing.M) {
 	klog.Infof("platform=%s", platform)
 	gke := (strings.ToLower(platform) == "gke")
 
-	sslCertificatesBegin, err := setUp(clients, gke)
+	sslCertificatesBegin, err := setUp(ctx, clients, gke)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -70,7 +73,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
+func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
 	klog.Info("setting up")
 
 	if !gke {
@@ -98,7 +101,7 @@ func setUp(clients *client.Clients, gke bool) ([]*compute.SslCertificate, error)
 		klog.Infof("Found %d SslCertificate resources, attempting clean up", len(sslCertificates))
 		for _, sslCertificate := range sslCertificates {
 			klog.Infof("Trying to delete SslCertificate %s", sslCertificate.Name)
-			if err := clients.SslCertificate.Delete(context.Background(), sslCertificate.Name); err != nil {
+			if err := utilshttp.IgnoreNotFound(clients.SslCertificate.Delete(ctx, sslCertificate.Name)); err != nil {
 				klog.Warningf("Failed to delete %s, err: %v", sslCertificate.Name, err)
 			}
 		}
@@ -126,8 +129,8 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 			return err
 		}
 
-		if added, removed, equal := diff(sslCertificatesBegin, sslCertificatesEnd); !equal {
-			return fmt.Errorf("Waiting for SslCertificates clean up. + %v - %v, want both empty", added, removed)
+		if diff := cmp.Diff(sslCertificatesBegin, sslCertificatesEnd); diff != "" {
+			return fmt.Errorf("Waiting for SslCertificates clean up. (-want, +got): %s", diff)
 		}
 
 		return nil
@@ -149,40 +152,4 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 
 	klog.Infof("tear down success")
 	return nil
-}
-
-func diff(begin, end []*compute.SslCertificate) ([]string, []string, bool) {
-	var added, removed []string
-
-	for _, b := range begin {
-		found := false
-
-		for _, e := range end {
-			if b.Name == e.Name {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			removed = append(removed, b.Name)
-		}
-	}
-
-	for _, e := range end {
-		found := false
-
-		for _, b := range begin {
-			if e.Name == b.Name {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			added = append(added, e.Name)
-		}
-	}
-
-	return added, removed, len(added) == 0 && len(removed) == 0
 }

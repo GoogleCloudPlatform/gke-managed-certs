@@ -18,6 +18,7 @@ package binder
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -30,345 +31,348 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	cntfake "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
+	"github.com/google/go-cmp/cmp"
 )
 
-var (
-	errFake = errors.New("fake error")
-)
-
-// Fake ingress
+// Fake ingress lister
 type fakeIngressLister struct {
-	fails bool
-	item  *api.Ingress
+	err   error
+	items []*api.Ingress
 }
 
 var _ lister.IngressLister = &fakeIngressLister{}
 
-func newFakeIngressLister(fails bool, namespace, annotationManagedCertificates, annotationPreSharedCert string) *fakeIngressLister {
-	ingressLister := &fakeIngressLister{
-		fails: fails,
-		item: &api.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-			},
-		},
-	}
-
-	ingressLister.item.Annotations = map[string]string{
-		annotationManagedCertificatesKey: annotationManagedCertificates,
-		annotationPreSharedCertKey:       annotationPreSharedCert,
-	}
-
-	return ingressLister
+func newFakeIngressLister(err error, items []*api.Ingress) *fakeIngressLister {
+	return &fakeIngressLister{err: err, items: items}
 }
 
 func (f *fakeIngressLister) List(selector labels.Selector) ([]*api.Ingress, error) {
-	if f.fails {
-		return nil, errFake
+	if f.err != nil {
+		return nil, f.err
 	}
 
-	return []*api.Ingress{f.item}, nil
+	return f.items, nil
 }
 
 func (f *fakeIngressLister) Ingresses(namespace string) lister.IngressNamespaceLister {
 	return nil
 }
 
-func TestBindCertificates(t *testing.T) {
+func TestBindCertificates_IngressListerFailing(t *testing.T) {
+	t.Parallel()
+
+	errLister := errors.New("ingress lister test error")
+	mcrtLister := cntfake.NewLister(nil, nil)
 	ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
-	ingressLister := newFakeIngressLister(false, "default", "mcrt1,mcrt2", "sslCert1")
+	ingressLister := newFakeIngressLister(errLister, nil)
 
-	mcrt1 := types.NewCertId("default", "mcrt1")
-	mcrt2 := types.NewCertId("default", "mcrt2")
-	mcrtLister := cntfake.NewLister(nil, []*apisv1beta2.ManagedCertificate{
-		cntfake.NewManagedCertificate(mcrt1, "foo.com"),
-		cntfake.NewManagedCertificate(mcrt2, "bar.com"),
-	})
-	state := cntfake.NewStateWithEntries(map[types.CertId]cntfake.StateEntry{
-		mcrt1: cntfake.StateEntry{SslCertificateName: "sslCert1", SoftDeleted: true},
-		mcrt2: cntfake.StateEntry{SslCertificateName: "sslCert2", SoftDeleted: false},
-	})
+	binder := New(&event.FakeEvent{}, ingressClient, ingressLister,
+		mcrtLister, cntfake.NewMetrics(), cntfake.NewState())
 
-	metrics := cntfake.NewMetrics()
-	sut := New(ingressClient, ingressLister, mcrtLister, metrics, state)
-
-	sut.BindCertificates()
-
-	preSharedCert := ingressLister.item.Annotations[annotationPreSharedCertKey]
-	wantPreSharedCert := "sslCert2"
-	if preSharedCert != wantPreSharedCert {
-		t.Fatalf("Annotation pre-shared-cert: %s, want: %s", preSharedCert, wantPreSharedCert)
-	}
-
-	if metrics.SslCertificateBindingLatencyObserved != 1 {
-		t.Fatalf("SslCertificate binding metric reported %d times, want 1", metrics.SslCertificateBindingLatencyObserved)
-	}
-
-	if reported, err := state.IsSslCertificateBindingReported(mcrt2); err != nil || !reported {
-		t.Fatalf("SslCertificate binding metric for %s set in state err: %v, reported: %t, want true", mcrt2.String(), err,
-			reported)
+	if err := binder.BindCertificates(); err != errLister {
+		t.Fatalf("binder.BindCertificates(): %v, want %v", err, errLister)
 	}
 }
 
-func TestGetCertificatesFromState(t *testing.T) {
-	for _, tc := range []struct {
-		desc                            string
-		stateEntries                    map[types.CertId]cntfake.StateEntry
-		wantManagedCertificatesToAttach map[types.CertId]string
-		wantSslCertificatesToDetach     map[string]bool
+func TestBindCertificates(t *testing.T) {
+	t.Parallel()
+
+	for description, tc := range map[string]struct {
+		state         map[types.CertId]cntfake.StateEntry
+		ingresses     []*api.Ingress
+		wantIngresses []*api.Ingress
+		wantEvent     event.FakeEvent
+		wantMetrics   cntfake.FakeMetrics
 	}{
-		{
-			"Empty entries passed, want empty output",
-			nil,
-			nil,
-			nil,
-		},
-		{
-			"Non-empty failing entries passed, want empty output",
-			map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "a"): cntfake.StateEntry{
-					SslCertificateName: "b",
-					SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
+		"different namespace": {
+			// A ManagedCertificate from in-a-different namespace is attached to an Ingress
+			// from the default namespace. Ingress is not processed.
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("in-a-different-namespace", "in-a-different-namespace"): cntfake.StateEntry{SslCertificateName: "in-a-different-namespace"},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "in-a-different-namespace",
+							annotationPreSharedCertKey:       "",
+						},
+					},
 				},
 			},
-			nil,
-			nil,
-		},
-		{
-			"Empty entries passed, want empty output",
-			nil,
-			nil,
-			nil,
-		},
-		{
-			"Non-empty entries passed, want one to attach",
-			map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "mcrt1"): cntfake.StateEntry{SslCertificateName: "sslCert1"},
-			},
-			map[types.CertId]string{types.NewCertId("default", "mcrt1"): "sslCert1"},
-			nil,
-		},
-		{
-			"Non-empty entries passed, want one to detach",
-			map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "mcrt2"): cntfake.StateEntry{
-					SslCertificateName: "sslCert2",
-					SoftDeleted:        true,
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "in-a-different-namespace",
+							annotationPreSharedCertKey:       "",
+						},
+					},
 				},
 			},
-			nil,
-			map[string]bool{"sslCert2": true},
+			wantEvent: event.FakeEvent{MissingCnt: 1},
 		},
-		{
-			"Non-empty entries passed, want one to attach and one to detach",
-			map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "mcrt1"): cntfake.StateEntry{SslCertificateName: "sslCert1"},
-				types.NewCertId("default", "mcrt2"): cntfake.StateEntry{
-					SslCertificateName: "sslCert2",
-					SoftDeleted:        true,
+		"not existing certificate": {
+			// A not existing ManagedCertificate is attached to an Ingress from the same
+			// namespace. Ingress is not processed.
+			state: map[types.CertId]cntfake.StateEntry{},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "not-existing-certificate",
+							annotationPreSharedCertKey:       "",
+						},
+					},
 				},
 			},
-			map[types.CertId]string{types.NewCertId("default", "mcrt1"): "sslCert1"},
-			map[string]bool{"sslCert2": true},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "not-existing-certificate",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+			},
+			wantEvent: event.FakeEvent{MissingCnt: 1},
+		},
+		"ingresses are processed independently": {
+			// A missing (not existing) ManagedCertificate is attached to the first Ingress,
+			// the namespaces match - processing the first Ingress fails once the certificate
+			// cannot be found. A valid ManagedCertificate is attached to the second Ingress
+			// which is successfully processed.
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "regular"): cntfake.StateEntry{SslCertificateName: "regular"},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "not-existing-certificate",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "regular",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "not-existing-certificate",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "regular",
+							annotationPreSharedCertKey:       "regular",
+						},
+					},
+				},
+			},
+			wantEvent:   event.FakeEvent{MissingCnt: 1},
+			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+		},
+		"happy path": {
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "regular1"):    cntfake.StateEntry{SslCertificateName: "regular1"},
+				types.NewCertId("default", "regular2"):    cntfake.StateEntry{SslCertificateName: "regular2"},
+				types.NewCertId("default", "deleted1"):    cntfake.StateEntry{SslCertificateName: "deleted1", SoftDeleted: true},
+				types.NewCertId("default", "deleted2"):    cntfake.StateEntry{SslCertificateName: "deleted2", SoftDeleted: true},
+				types.NewCertId("default", "deletedErr1"): cntfake.StateEntry{SslCertificateName: "deletedErr1", SoftDeletedErr: cnterrors.ErrManagedCertificateNotFound},
+				types.NewCertId("default", "deletedErr2"): cntfake.StateEntry{SslCertificateName: "deletedErr2", SoftDeletedErr: cnterrors.ErrManagedCertificateNotFound},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2,deletedErr1,deletedErr2",
+							annotationPreSharedCertKey:       "regular1,deleted1,deletedErr1",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2,deletedErr1,deletedErr2",
+							annotationPreSharedCertKey:       "deletedErr1,regular1,regular2",
+						},
+					},
+				},
+			},
+			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 2},
+		},
+		"metrics: excluded from SLO calculation": {
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "excludedSLO1"): cntfake.StateEntry{SslCertificateName: "excludedSLO1", ExcludedFromSLO: true},
+				types.NewCertId("default", "regular"):      cntfake.StateEntry{SslCertificateName: "regular"},
+				types.NewCertId("default", "excludedSLO2"): cntfake.StateEntry{SslCertificateName: "excludedSLO2", ExcludedFromSLO: true},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "excludedSLO1,excludedSLO2,regular",
+							annotationPreSharedCertKey:       "excludedSLO1",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "excludedSLO1,excludedSLO2,regular",
+							annotationPreSharedCertKey:       "excludedSLO1,excludedSLO2,regular",
+						},
+					},
+				},
+			},
+			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+		},
+		"metrics: binding already reported": {
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "bindingReported1"): cntfake.StateEntry{SslCertificateName: "bindingReported1", SslCertificateBindingReported: true},
+				types.NewCertId("default", "regular"):          cntfake.StateEntry{SslCertificateName: "regular"},
+				types.NewCertId("default", "bindingReported2"): cntfake.StateEntry{SslCertificateName: "bindingReported2", SslCertificateBindingReported: true},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "bindingReported1,bindingReported2,regular",
+							annotationPreSharedCertKey:       "bindingReported1",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "bindingReported1,bindingReported2,regular",
+							annotationPreSharedCertKey:       "bindingReported1,bindingReported2,regular",
+						},
+					},
+				},
+			},
+			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+		},
+		"error getting ExcludedFromSLO from status": {
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "excludedSLOErr"): cntfake.StateEntry{SslCertificateName: "excludedSLOErr", ExcludedFromSLOErr: cnterrors.ErrManagedCertificateNotFound},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "excludedSLOErr",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "excludedSLOErr",
+							annotationPreSharedCertKey:       "excludedSLOErr",
+						},
+					},
+				},
+			},
+		},
+		"error getting BindingReported from status": {
+			state: map[types.CertId]cntfake.StateEntry{
+				types.NewCertId("default", "bindingReportedErr"): cntfake.StateEntry{
+					SslCertificateName:       "bindingReportedErr",
+					SslCertificateBindingErr: cnterrors.ErrManagedCertificateNotFound,
+				},
+			},
+			ingresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "bindingReportedErr",
+							annotationPreSharedCertKey:       "",
+						},
+					},
+				},
+			},
+			wantIngresses: []*api.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Annotations: map[string]string{
+							annotationManagedCertificatesKey: "bindingReportedErr",
+							annotationPreSharedCertKey:       "bindingReportedErr",
+						},
+					},
+				},
+			},
 		},
 	} {
-		t.Run(tc.desc, func(t *testing.T) {
-			ingressClient := &fake.FakeExtensionsV1beta1{}
-			sut := binderImpl{
-				ingressClient: ingressClient,
-				ingressLister: newFakeIngressLister(false, "", "", ""),
-				state:         cntfake.NewStateWithEntries(tc.stateEntries),
+		t.Run(description, func(t *testing.T) {
+			event := &event.FakeEvent{}
+			var managedCertificates []*apisv1beta2.ManagedCertificate
+			for id := range tc.state {
+				managedCertificates = append(managedCertificates, cntfake.NewManagedCertificate(id, fmt.Sprintf("mcrt-%s.example.com", id.String())))
 			}
-			mcrtToAttach, sslCertToDetach := sut.getCertificatesFromState()
-
-			if !reflect.DeepEqual(mcrtToAttach, tc.wantManagedCertificatesToAttach) {
-				if len(mcrtToAttach) != 0 || len(tc.wantManagedCertificatesToAttach) != 0 {
-					t.Fatalf("ManagedCertificates to attach: %#v, want: %#v", mcrtToAttach,
-						tc.wantManagedCertificatesToAttach)
-				}
-			}
-
-			if !reflect.DeepEqual(sslCertToDetach, tc.wantSslCertificatesToDetach) {
-				if len(sslCertToDetach) != 0 || len(tc.wantSslCertificatesToDetach) != 0 {
-					t.Fatalf("SslCertificates to detach: %#v, want: %#v", sslCertToDetach,
-						tc.wantSslCertificatesToDetach)
-				}
-			}
-		})
-	}
-}
-
-func TestEnsureCertificatesAttached(t *testing.T) {
-	mcrtId1 := types.NewCertId("default", "mcrt1")
-	mcrtId2 := types.NewCertId("foobar", "mcrt2")
-
-	for _, tc := range []struct {
-		desc                          string
-		ingressFails                  bool
-		ingressNamespace              string
-		annotationManagedCertificates string
-		annotationPreSharedCert       string
-		managedCertificatesToAttach   map[types.CertId]string
-		sslCertificatesToDetach       map[string]bool
-		stateEntries                  map[types.CertId]cntfake.StateEntry
-		wantErr                       bool
-		wantAnnotationPreSharedCert   string
-		wantBindingLatencyObservedFor []types.CertId
-	}{
-		{
-			desc:         "Ingress list fails",
-			ingressFails: true,
-			wantErr:      true,
-		},
-		{
-			desc:                          "Ingress list succeeds, one certificate to attach is already attached",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			annotationPreSharedCert:       "sslCert1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			wantAnnotationPreSharedCert:   "sslCert1",
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
-		},
-		{
-			desc:                    "Ingress list succeeds, detaches one certificate",
-			ingressNamespace:        "default",
-			annotationPreSharedCert: "sslCert2",
-			sslCertificatesToDetach: map[string]bool{"sslCert2": true},
-		},
-		{
-			desc:                          "Ingress list succeeds, fails to attach a certificate - different namespace",
-			ingressNamespace:              "foobar",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate - fails to attach another - different namespace",
-			ingressNamespace:              "foobar",
-			annotationManagedCertificates: "mcrt1,mcrt2",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1", mcrtId2: "sslCert2"},
-			stateEntries: map[types.CertId]cntfake.StateEntry{
-				mcrtId1: cntfake.StateEntry{},
-				mcrtId2: cntfake.StateEntry{},
-			},
-			wantAnnotationPreSharedCert:   "sslCert2",
-			wantBindingLatencyObservedFor: []types.CertId{mcrtId2},
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate, leaves other one intact",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			annotationPreSharedCert:       "sslCertX",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
-			wantAnnotationPreSharedCert:   "sslCertX,sslCert1",
-			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate, detaches one, and leaves additional one intact",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			annotationPreSharedCert:       "sslCertX,sslCert2",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			sslCertificatesToDetach:       map[string]bool{"sslCert2": true},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
-			wantAnnotationPreSharedCert:   "sslCertX,sslCert1",
-			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate failing to determine if excluded from SLO calculation",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{ExcludedFromSLOErr: errFake}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-			wantErr:                       true,
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate excluded from SLO calculation",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{ExcludedFromSLO: true}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-		},
-		{
-			desc:                          "Ingress list succeeds, attaches one certificate not excluded from SLO calculation",
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-			wantBindingLatencyObservedFor: []types.CertId{mcrtId1},
-		},
-		{
-			desc: `Ingress list succeeds, attaches one certificate not excluded from SLO calculation;
-				failure to determine if SslCertificate binding metric has been already reported`,
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{SslCertificateBindingErr: errFake}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-			wantErr:                       true,
-		},
-		{
-			desc: `Ingress list succeeds, attaches one certificate not excluded from SLO calculation;
-				SslCertificate binding metric has been already reported`,
-			ingressNamespace:              "default",
-			annotationManagedCertificates: "mcrt1",
-			managedCertificatesToAttach:   map[types.CertId]string{mcrtId1: "sslCert1"},
-			stateEntries:                  map[types.CertId]cntfake.StateEntry{mcrtId1: cntfake.StateEntry{SslCertificateBindingReported: true}},
-			wantAnnotationPreSharedCert:   "sslCert1",
-		},
-	} {
-		t.Run(tc.desc, func(t *testing.T) {
+			mcrtLister := cntfake.NewLister(nil, managedCertificates)
 			ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
-			ingressLister := newFakeIngressLister(tc.ingressFails, tc.ingressNamespace, tc.annotationManagedCertificates,
-				tc.annotationPreSharedCert)
-			mcrtLister := cntfake.NewLister(nil, []*apisv1beta2.ManagedCertificate{
-				cntfake.NewManagedCertificate(mcrtId1, "foo.com"),
-				cntfake.NewManagedCertificate(mcrtId2, "bar.com"),
-			})
+			ingressLister := newFakeIngressLister(nil, tc.ingresses)
 			metrics := cntfake.NewMetrics()
-			state := cntfake.NewStateWithEntries(tc.stateEntries)
-			sut := binderImpl{
-				ingressClient: ingressClient,
-				ingressLister: ingressLister,
-				mcrtLister:    mcrtLister,
-				metrics:       metrics,
-				state:         state,
-			}
-			err := sut.ensureCertificatesAttached(tc.managedCertificatesToAttach, tc.sslCertificatesToDetach)
 
-			if tc.wantErr == (err == nil) {
-				t.Fatalf("Ensure certificates attached err: %v, want err: %t", err, tc.wantErr)
+			binder := New(event, ingressClient, ingressLister, mcrtLister, metrics, cntfake.NewStateWithEntries(tc.state))
+
+			if err := binder.BindCertificates(); err != nil {
+				t.Fatalf("binder.BindCertificates(): %v, want nil", err)
 			}
 
-			preSharedCert := ingressLister.item.Annotations[annotationPreSharedCertKey]
-			if !reflect.DeepEqual(parse(preSharedCert), parse(tc.wantAnnotationPreSharedCert)) {
-				t.Fatalf("Annotation pre-shared-cert: %s, want: %s", preSharedCert, tc.wantAnnotationPreSharedCert)
+			if diff := cmp.Diff(tc.wantIngresses, ingressLister.items); diff != "" {
+				t.Fatalf("binder.BindCertificates() -> ingress diff (-want, +got): %s", diff)
 			}
-
-			if len(tc.wantBindingLatencyObservedFor) != metrics.SslCertificateBindingLatencyObserved {
-				t.Fatalf("SslCertificate binding latency observed %d times, want %d times",
-					metrics.SslCertificateBindingLatencyObserved, len(tc.wantBindingLatencyObservedFor))
+			if diff := cmp.Diff(&tc.wantEvent, event); diff != "" {
+				t.Fatalf("binder.BindCertificates() -> event diff (-want, +got): %s", diff)
 			}
-
-			for _, id := range tc.wantBindingLatencyObservedFor {
-				if reported, err := state.IsSslCertificateBindingReported(id); err != nil || !reported {
-					t.Fatalf("SslCertificate binding latency metric in state: %t (want true), err: %v (want nil)",
-						reported, err)
-				}
+			if diff := cmp.Diff(&tc.wantMetrics, metrics); diff != "" {
+				t.Fatalf("binder.BindCertificates() -> metrics diff (-want, +got): %s", diff)
 			}
 		})
 	}

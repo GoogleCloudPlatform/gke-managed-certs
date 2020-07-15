@@ -60,7 +60,7 @@ func New(config *config.Config, clients *clients.Clients) *controller {
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
 	controller := &controller{
-		binder:  binder.New(clients.IngressClient, ingressLister, mcrtLister, metrics, state),
+		binder:  binder.New(clients.Event, clients.IngressClient, ingressLister, mcrtLister, metrics, state),
 		clients: clients,
 		lister:  mcrtLister,
 		metrics: metrics,
@@ -104,7 +104,11 @@ func (c *controller) Run(ctx context.Context) error {
 
 	go wait.Until(func() { c.processNextManagedCertificate(ctx) }, time.Second, ctx.Done())
 	go wait.Until(func() { c.synchronizeAllManagedCertificates(ctx) }, time.Minute, ctx.Done())
-	go wait.Until(c.binder.BindCertificates, time.Second, ctx.Done())
+	go wait.Until(func() {
+		if err := c.binder.BindCertificates(); err != nil {
+			runtime.HandleError(err)
+		}
+	}, time.Second, ctx.Done())
 
 	klog.Info("Waiting for stop signal or error")
 
