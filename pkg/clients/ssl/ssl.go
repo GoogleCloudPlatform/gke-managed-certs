@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v0.beta"
+	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 
 	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"

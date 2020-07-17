@@ -19,7 +19,7 @@ package ssl
 import (
 	"testing"
 
-	compute "google.golang.org/api/compute/v0.beta"
+	compute "google.golang.org/api/compute/v1"
 )
 
 func TestError_IsQuotaExceeded(t *testing.T) {

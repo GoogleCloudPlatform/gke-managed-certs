@@ -25,7 +25,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v0.beta"
+	compute "google.golang.org/api/compute/v1"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/gce"
