@@ -24,8 +24,8 @@ SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 ARTIFACTS=${ARTIFACTS:-"/tmp/artifacts"}
 CLOUD_CONFIG=${CLOUD_CONFIG:-`gcloud info --format="value(config.paths.global_config_dir)"`}
 CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT:-`gcloud info --format="value(installation.sdk_root)"`}
-DNS_ZONE=${DNS_ZONE:-"managedcertsgke"}
-DOMAIN=${DOMAIN:-"${DNS_ZONE}.certsbridge.com"}
+DNS_ZONE=${DNS_ZONE:-"gkemanagedcerts-dev"}
+DOMAIN=${DOMAIN:-"dev.gkemanagedcerts.certsbridge.com"}
 KUBECONFIG=${KUBECONFIG:-"${HOME}/.kube/config"}
 KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gke"}
 PLATFORM=${PLATFORM:-"gcp"}
