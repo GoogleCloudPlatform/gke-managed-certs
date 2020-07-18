@@ -42,9 +42,8 @@ func ensurePropagated(name string) error {
 			return err
 		}
 
-		if !certificates.Equal(*mcrt, *sslCert) {
-			return fmt.Errorf("Certificates have different domains, want same; %v, %v",
-				mcrt.Spec.Domains, sslCert.Managed.Domains)
+		if diff := certificates.Diff(*mcrt, *sslCert); diff != "" {
+			return fmt.Errorf("certificates.Diff(ManagedCertificate, SslCertificate): %s", diff)
 		}
 
 		return nil

@@ -19,10 +19,10 @@ package controller
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/util/workqueue"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
@@ -84,32 +84,28 @@ func (f *fakeQueue) Forget(item interface{})          {}
 func (f *fakeQueue) NumRequeues(item interface{}) int { return 0 }
 
 func TestSynchronizeAllManagedCertificates(t *testing.T) {
-	testCases := []struct {
-		desc        string
+	testCases := map[string]struct {
 		listerErr   error
 		listerIds   []types.CertId
 		stateIds    []types.CertId
 		wantQueue   []string
 		wantMetrics map[string]int
 	}{
-		{
-			"State and lister empty",
+		"State and lister empty": {
 			nil,
 			nil,
 			nil,
 			nil,
 			nil,
 		},
-		{
-			"State two elements, lister one element",
+		"State two elements, lister one element": {
 			nil,
 			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
 			[]types.CertId{types.NewCertId("default", "baz")},
 			[]string{"default/foo", "default/bar"},
 			map[string]int{"Active": 2},
 		},
-		{
-			"State two elements, lister one element and fails",
+		"State two elements, lister one element and fails": {
 			errors.New("generic error"),
 			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
 			[]types.CertId{types.NewCertId("default", "baz")},
@@ -118,8 +114,8 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
+	for description, testCase := range testCases {
+		t.Run(description, func(t *testing.T) {
 			ctx := context.Background()
 
 			var mcrts []*apisv1beta2.ManagedCertificate
@@ -141,17 +137,16 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 
 			sut.synchronizeAllManagedCertificates(ctx)
 
-			if !reflect.DeepEqual(testCase.stateIds, sync.ids) {
-				t.Fatalf("Synced %v, want %v", sync.ids, testCase.stateIds)
+			if diff := cmp.Diff(testCase.stateIds, sync.ids); diff != "" {
+				t.Fatalf("Synced ManagedCertificate resources diff (-want, +got): %s", diff)
 			}
 
-			if !reflect.DeepEqual(testCase.wantQueue, queue.items) {
-				t.Fatalf("Enqueued %v, want: %v", queue.items, testCase.wantQueue)
+			if diff := cmp.Diff(testCase.wantQueue, queue.items); diff != "" {
+				t.Fatalf("Enqueued ManagedCertificate resources diff (-want, +got): %s", diff)
 			}
 
-			if !reflect.DeepEqual(metrics.ManagedCertificatesStatuses, testCase.wantMetrics) {
-				t.Fatalf("ManagedCertificate statuses: %v, want: %v",
-					metrics.ManagedCertificatesStatuses, testCase.wantMetrics)
+			if diff := cmp.Diff(testCase.wantMetrics, metrics.ManagedCertificatesStatuses); diff != "" {
+				t.Fatalf("Metrics diff (-want, +got): %s", diff)
 			}
 		})
 	}

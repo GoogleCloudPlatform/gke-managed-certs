@@ -19,7 +19,6 @@ package binder
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"testing"
 
@@ -399,8 +398,8 @@ func TestParse(t *testing.T) {
 		}
 		sort.Strings(items)
 
-		if !reflect.DeepEqual(items, tc.wantItems) {
-			t.Fatalf("parse(%s) = %v, want %v", tc.annotation, items, tc.wantItems)
+		if diff := cmp.Diff(tc.wantItems, items); diff != "" {
+			t.Fatalf("parse(%q): (-want, +got): %s", tc.annotation, diff)
 		}
 	}
 }

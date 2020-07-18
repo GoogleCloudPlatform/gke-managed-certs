@@ -19,9 +19,9 @@ package certificates
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
@@ -57,8 +57,8 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1beta2.ManagedCertifi
 	return nil
 }
 
-// Equal compares ManagedCertificate and SslCertificate for equality, i. e. if their domain sets are equal.
-func Equal(mcrt apisv1beta2.ManagedCertificate, sslCert compute.SslCertificate) bool {
+// Diff returns the diff of the set of domains of ManagedCertificate and SslCertificate.
+func Diff(mcrt apisv1beta2.ManagedCertificate, sslCert compute.SslCertificate) string {
 	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
 	copy(mcrtDomains, mcrt.Spec.Domains)
 	sort.Strings(mcrtDomains)
@@ -67,7 +67,7 @@ func Equal(mcrt apisv1beta2.ManagedCertificate, sslCert compute.SslCertificate) 
 	copy(sslCertDomains, sslCert.Managed.Domains)
 	sort.Strings(sslCertDomains)
 
-	return reflect.DeepEqual(mcrtDomains, sslCertDomains)
+	return cmp.Diff(mcrtDomains, sslCertDomains)
 }
 
 // translateStatus translates status based on statuses mappings.

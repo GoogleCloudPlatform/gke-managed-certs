@@ -152,16 +152,18 @@ func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName s
 		return nil, err
 	}
 
-	if certificates.Equal(*mcrt, *sslCert) {
-		return sslCert, nil
+	if diff := certificates.Diff(*mcrt, *sslCert); diff != "" {
+		klog.Infof(`Certificates out of sync: certificates.Diff(%s, %s): %s,
+			ManagedCertificate: %+v, SslCertificate: %+v. Deleting SslCertificate %s`,
+			id, sslCert.Name, diff, mcrt, sslCert, sslCert.Name)
+		if err := s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName); err != nil {
+			return nil, err
+		}
+
+		return nil, errors.ErrSslCertificateOutOfSyncGotDeleted
 	}
 
-	klog.Infof("ManagedCertificate %v and SslCertificate %v are different", mcrt, sslCert)
-	if err := s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName); err != nil {
-		return nil, err
-	}
-
-	return nil, errors.ErrSslCertificateOutOfSyncGotDeleted
+	return sslCert, nil
 }
 
 func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error {

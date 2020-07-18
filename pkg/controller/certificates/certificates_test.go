@@ -17,9 +17,9 @@ limitations under the License.
 package certificates
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
@@ -54,20 +54,35 @@ func mcrt(status string, domains []apisv1beta2.DomainStatus) *apisv1beta2.Manage
 }
 
 func TestCopyStatus(t *testing.T) {
-	testCases := []struct {
+	testCases := map[string]struct {
 		sslCertIn   compute.SslCertificate
 		wantSuccess bool // translation should succeed
-		mcrtOut     *apisv1beta2.ManagedCertificate
-		desc        string
+		wantMcrt    *apisv1beta2.ManagedCertificate
 	}{
-		{sslCert("bad_status", nil), false, nil, "Wrong certificate status"},
-		{sslCert("ACTIVE", map[string]string{"example.com": "bad_status"}), false, nil, "Wrong domain status"},
-		{sslCert("ACTIVE", nil), true, mcrt("Active", []apisv1beta2.DomainStatus{}), "Nil domain statuses -> []{} domain status"},
-		{sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}), true, mcrt("Active", []apisv1beta2.DomainStatus{apisv1beta2.DomainStatus{Domain: "example.com", Status: "Active"}}), "Correct translation"},
+		"Wrong certificate status": {
+			sslCert("bad_status", nil),
+			false,
+			nil,
+		},
+		"Wrong domain status": {
+			sslCert("ACTIVE", map[string]string{"example.com": "bad_status"}),
+			false,
+			nil,
+		},
+		"Nil domain statuses -> []{} domain status": {
+			sslCert("ACTIVE", nil),
+			true,
+			mcrt("Active", []apisv1beta2.DomainStatus{}),
+		},
+		"Correct translation": {
+			sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}),
+			true,
+			mcrt("Active", []apisv1beta2.DomainStatus{apisv1beta2.DomainStatus{Domain: "example.com", Status: "Active"}}),
+		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
+	for description, testCase := range testCases {
+		t.Run(description, func(t *testing.T) {
 			var mcrt apisv1beta2.ManagedCertificate
 			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFakeCertificateStatusConfig())
 
@@ -79,32 +94,31 @@ func TestCopyStatus(t *testing.T) {
 				return
 			}
 
-			if !reflect.DeepEqual(&mcrt, testCase.mcrtOut) {
-				t.Errorf("ManagedCertificate after Certificate(%#v) = %v, want %v", testCase.sslCertIn, mcrt, testCase.mcrtOut)
+			if diff := cmp.Diff(testCase.wantMcrt, &mcrt); diff != "" {
+				t.Errorf("CopyStatus, diff ManagedCertificate (-want, +got): %s", diff)
 			}
 		})
 	}
 }
 
-func TestEqual(t *testing.T) {
-	var testCases = []struct {
+func TestDiff(t *testing.T) {
+	var testCases = map[string]struct {
 		mcrtDomains    []string
 		sslCertDomains []string
-		expected       bool
-		desc           string
+		wantEmptyDiff  bool
 	}{
-		{nil, nil, true, "nil == nil"},
-		{[]string{}, []string{}, true, "[] == []"},
-		{nil, []string{}, true, "nil == []"},
-		{[]string{}, nil, true, "[] == nil"},
-		{[]string{"a"}, nil, false, "[a] != nil"},
-		{[]string{"a"}, []string{}, false, "[a] != []"},
-		{[]string{"a"}, []string{"b"}, false, "[a] != [b]"},
-		{[]string{"a", "b"}, []string{"b", "a"}, true, "[a, b] == [b, a]"},
+		"nil == nil":       {nil, nil, true},
+		"[] == []":         {[]string{}, []string{}, true},
+		"nil == []":        {nil, []string{}, true},
+		"[] == nil":        {[]string{}, nil, true},
+		"[a] != nil":       {[]string{"a"}, nil, false},
+		"[a] != []":        {[]string{"a"}, []string{}, false},
+		"[a] != [b]":       {[]string{"a"}, []string{"b"}, false},
+		"[a, b] == [b, a]": {[]string{"a", "b"}, []string{"b", "a"}, true},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
+	for description, testCase := range testCases {
+		t.Run(description, func(t *testing.T) {
 			mcrt := apisv1beta2.ManagedCertificate{
 				Spec: apisv1beta2.ManagedCertificateSpec{
 					Domains: testCase.mcrtDomains,
@@ -117,8 +131,8 @@ func TestEqual(t *testing.T) {
 				Type: "MANAGED",
 			}
 
-			if result := Equal(mcrt, sslCert); result != testCase.expected {
-				t.Errorf("Equal(mcrt, sslCert) = %t, want %t. ManagedCertificate: %v, SslCertificate: %v", result, testCase.expected, mcrt, sslCert)
+			if diff := Diff(mcrt, sslCert); (diff == "") != testCase.wantEmptyDiff {
+				t.Errorf("Diff(ManagedCertificate, SslCertificate) = %s, want empty diff: %t", diff, testCase.wantEmptyDiff)
 			}
 		})
 	}
