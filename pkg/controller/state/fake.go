@@ -17,112 +17,104 @@ limitations under the License.
 package state
 
 import (
-	"errors"
-	"testing"
-
-	api "k8s.io/api/core/v1"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type configMap interface {
-	configmap.ConfigMap
-	check(int)
+type fakeState struct {
+	mapping map[types.CertId]Entry
 }
 
-// configMapMock counts the number of calls made to its methods.
-type configMapMock struct {
-	getCount    int
-	changeCount int
-	t           *testing.T
-}
+var _ State = &fakeState{}
 
-func (c *configMapMock) check(change int) {
-	c.t.Helper()
-
-	if c.getCount != 1 {
-		c.t.Fatalf("ConfigMap.Get() called %d times, want 1", c.getCount)
-	}
-	if c.changeCount != change {
-		c.t.Fatalf("ConfigMap.UpdateOrCreate() called %d times, want %d", c.changeCount, change)
+func NewFake() *fakeState {
+	return &fakeState{
+		mapping: make(map[types.CertId]Entry, 0),
 	}
 }
 
-// failConfigMapMock fails Get and UpdateOrCreate with an error.
-type failConfigMapMock struct {
-	configMapMock
-}
-
-var _ configmap.ConfigMap = (*failConfigMapMock)(nil)
-
-func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return nil, errors.New("Fake error - failed to get a config map")
-}
-
-func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
-	return errors.New("Fake error - failed to update or create a config map")
-}
-
-func newFailing(t *testing.T) *failConfigMapMock {
-	return &failConfigMapMock{
-		configMapMock{
-			t: t,
-		},
+func NewFakeWithEntries(data map[types.CertId]Entry) State {
+	state := NewFake()
+	for k, v := range data {
+		state.mapping[k] = v
 	}
+	return state
 }
 
-// emptyConfigMapMock represents a config map that is not initialized with any data.
-type emptyConfigMapMock struct {
-	configMapMock
+func (state *fakeState) Delete(id types.CertId) {
+	delete(state.mapping, id)
 }
 
-var _ configmap.ConfigMap = (*emptyConfigMapMock)(nil)
+func (state *fakeState) Get(id types.CertId) (Entry, error) {
+	entry, exists := state.mapping[id]
+	if !exists {
+		return Entry{}, errors.ErrManagedCertificateNotFound
+	}
 
-func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return &api.ConfigMap{Data: map[string]string{}}, nil
+	return entry, nil
 }
 
-func (c *emptyConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
+func (state *fakeState) Insert(id types.CertId, sslCertificateName string) {
+	v, exists := state.mapping[id]
+	if !exists {
+		v = Entry{}
+	}
+
+	v.SslCertificateName = sslCertificateName
+
+	state.mapping[id] = v
+}
+
+func (state *fakeState) List() map[types.CertId]Entry {
+	data := make(map[types.CertId]Entry, 0)
+
+	for id, entry := range state.mapping {
+		data[id] = entry
+	}
+
+	return data
+}
+
+func (state *fakeState) SetExcludedFromSLO(id types.CertId) error {
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
+	}
+
+	v.ExcludedFromSLO = true
+	state.mapping[id] = v
 	return nil
 }
 
-func newEmpty(t *testing.T) *emptyConfigMapMock {
-	return &emptyConfigMapMock{
-		configMapMock{
-			t: t,
-		},
+func (state *fakeState) SetSoftDeleted(id types.CertId) error {
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
 	}
-}
 
-// filledConfigMapMock represents a config map that is initialized with data.
-type filledConfigMapMock struct {
-	configMapMock
-}
-
-var _ configmap.ConfigMap = (*filledConfigMapMock)(nil)
-
-func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
-	c.getCount++
-	return &api.ConfigMap{
-		Data: map[string]string{
-			"1": "{\"Key\":{\"Namespace\":\"default\",\"Name\":\"cat\"},\"Value\":{\"SslCertificateName\":\"1\",\"SslCertificateCreationReported\":false}}",
-		},
-	}, nil
-}
-
-func (c *filledConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
-	c.changeCount++
+	v.SoftDeleted = true
+	state.mapping[id] = v
 	return nil
 }
 
-func newFilled(t *testing.T) *filledConfigMapMock {
-	return &filledConfigMapMock{
-		configMapMock{
-			t: t,
-		},
+func (state *fakeState) SetSslCertificateBindingReported(id types.CertId) error {
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
 	}
+
+	v.SslCertificateBindingReported = true
+	state.mapping[id] = v
+	return nil
+}
+
+func (state *fakeState) SetSslCertificateCreationReported(id types.CertId) error {
+	v, exists := state.mapping[id]
+	if !exists {
+		return errors.ErrManagedCertificateNotFound
+	}
+
+	v.SslCertificateCreationReported = true
+	state.mapping[id] = v
+	return nil
 }

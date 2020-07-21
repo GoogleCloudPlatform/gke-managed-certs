@@ -24,7 +24,6 @@ import (
 
 	apiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	listers "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/klog"
@@ -99,22 +98,13 @@ func (b binderImpl) getCertificatesFromState() (map[types.CertId]string, map[str
 	managedCertificatesToAttach := make(map[types.CertId]string, 0)
 	sslCertificatesToDetach := make(map[string]bool, 0)
 
-	b.state.ForeachKey(func(id types.CertId) {
-		sslCertificateName, err := b.state.GetSslCertificateName(id)
-		if err != nil {
-			runtime.HandleError(err)
-			return
-		}
-
-		if softDeleted, err := b.state.IsSoftDeleted(id); err != nil {
-			runtime.HandleError(err)
-			return
-		} else if softDeleted {
-			sslCertificatesToDetach[sslCertificateName] = true
+	for id, entry := range b.state.List() {
+		if entry.SoftDeleted {
+			sslCertificatesToDetach[entry.SslCertificateName] = true
 		} else {
-			managedCertificatesToAttach[id] = sslCertificateName
+			managedCertificatesToAttach[id] = entry.SslCertificateName
 		}
-	})
+	}
 
 	return managedCertificatesToAttach, sslCertificatesToDetach
 }
@@ -177,20 +167,18 @@ func (b binderImpl) reportManagedCertificatesAttached(ingressNamespace string,
 			continue
 		}
 
-		excludedFromSLO, err := b.state.IsExcludedFromSLO(id)
+		entry, err := b.state.Get(id)
 		if err != nil {
 			return err
 		}
-		if excludedFromSLO {
+
+		if entry.ExcludedFromSLO {
 			klog.Infof("Skipping reporting SslCertificate binding metric: %s is marked as excluded from SLO calculations.", id.String())
 			continue
 		}
 
-		reported, err := b.state.IsSslCertificateBindingReported(id)
-		if err != nil {
-			return err
-		}
-		if reported {
+		if entry.SslCertificateBindingReported {
+			klog.Infof("Skipping reporting SslCertificate binding metric: already reported for %s.", id.String())
 			continue
 		}
 

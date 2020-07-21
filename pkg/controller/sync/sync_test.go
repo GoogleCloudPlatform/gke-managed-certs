@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -73,59 +74,35 @@ var listerSuccess = fake.NewLister(nil, []*apisv1beta2.ManagedCertificate{mockMc
 var randomFailsGenericErr = newRandom(genericError, "")
 var randomSuccess = newRandom(nil, sslCertificateName)
 
-func empty() *fake.FakeState {
-	return fake.NewState()
+func empty() state.State {
+	return state.NewFake()
 }
-func withEntry() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{SslCertificateName: sslCertificateName},
+func withEntry() state.State {
+	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
+		mcrtId: state.Entry{SslCertificateName: sslCertificateName},
 	})
 }
-func withEntryAndExcludedFromSLOFails() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
-			SslCertificateName: sslCertificateName,
-			ExcludedFromSLOErr: genericError,
-		},
-	})
-}
-func withEntryAndExcludedFromSLOSet() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
+func withEntryAndExcludedFromSLOSet() state.State {
+	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
+		mcrtId: state.Entry{
 			SslCertificateName: sslCertificateName,
 			ExcludedFromSLO:    true,
 		},
 	})
 }
-func withEntryAndSslCertificateCreationFails() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
-			SslCertificateName:        sslCertificateName,
-			SslCertificateCreationErr: cnterrors.ErrManagedCertificateNotFound,
-		},
-	})
-}
-func withEntryAndSslCertificateCreationReported() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
+func withEntryAndSslCertificateCreationReported() state.State {
+	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
+		mcrtId: state.Entry{
 			SslCertificateName:             sslCertificateName,
 			SslCertificateCreationReported: true,
 		},
 	})
 }
-func withEntryAndSoftDeleted() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
+func withEntryAndSoftDeleted() state.State {
+	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
+		mcrtId: state.Entry{
 			SslCertificateName: sslCertificateName,
 			SoftDeleted:        true,
-		},
-	})
-}
-func withEntryAndSoftDeletedFails() *fake.FakeState {
-	return fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-		mcrtId: fake.StateEntry{
-			SslCertificateName: sslCertificateName,
-			SoftDeletedErr:     cnterrors.ErrManagedCertificateNotFound,
 		},
 	})
 }
@@ -134,7 +111,7 @@ type in struct {
 	lister       listersv1beta2.ManagedCertificateLister
 	metrics      *fake.FakeMetrics
 	random       fakeRandom
-	state        *fake.FakeState
+	state        state.State
 	mcrt         *apisv1beta2.ManagedCertificate
 	sslCreateErr error
 	sslDeleteErr error
@@ -211,20 +188,6 @@ var testCases = []struct {
 			wantSoftDeleted:  true,
 			wantUpdateCalled: false,
 			err:              nil,
-		},
-	},
-	{
-		"Lister fails with not found, entry in state, setting soft deleted fails",
-		in{
-			lister:  listerFailsNotFound,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSoftDeletedFails(),
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -394,20 +357,6 @@ var testCases = []struct {
 		},
 	},
 	{
-		"Lister success, entry in state, SslCertificate creation succeeds, excluded from SLO: entry not found",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndExcludedFromSLOFails(),
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
-	{
 		"Lister success, entry in state, SslCertificate creation succeeds, excluded from SLO",
 		in{
 			lister:  listerSuccess,
@@ -420,20 +369,6 @@ var testCases = []struct {
 			createLatencyMetricObserved: false,
 			wantUpdateCalled:            true,
 			err:                         nil,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate creation succeeds, metric reported entry not found",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSslCertificateCreationFails(),
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrManagedCertificateNotFound,
 		},
 	},
 	{
@@ -579,21 +514,6 @@ var testCases = []struct {
 			err:              genericError,
 		},
 	},
-	{
-		"Lister success, entry in state, certs mismatch, setting soft deleted fails",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSoftDeletedFails(),
-			mcrt:    mockMcrt(domainBar),
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrManagedCertificateNotFound,
-		},
-	},
 }
 
 func TestManagedCertificate(t *testing.T) {
@@ -614,21 +534,20 @@ func TestManagedCertificate(t *testing.T) {
 				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
 			}
 
-			if _, err := tc.in.state.GetSslCertificateName(mcrtId); (err == nil) != tc.out.entryInState {
-				t.Errorf("Entry in state %t, want %t, err: %v", err == nil, tc.out.entryInState, err)
-			}
-
-			softDeleted, err := tc.in.state.IsSoftDeleted(mcrtId)
-			if err == nil && tc.out.wantSoftDeleted != softDeleted {
-				t.Errorf("Soft deleted: %t, want: %t", softDeleted, tc.out.wantSoftDeleted)
-			}
-
-			reported, _ := tc.in.state.IsSslCertificateCreationReported(mcrtId)
-			_, err = tc.in.state.GetSslCertificateName(mcrtId)
+			entry, err := tc.in.state.Get(mcrtId)
 			entryExists := err == nil
-			if entryExists != tc.out.entryInState || reported != tc.out.createLatencyMetricObserved {
+
+			if entryExists != tc.out.entryInState {
+				t.Errorf("Entry in state %t, want %t, err: %v", entryExists, tc.out.entryInState, err)
+			}
+
+			if entryExists && tc.out.wantSoftDeleted != entry.SoftDeleted {
+				t.Errorf("Soft deleted: %t, want: %t", entry.SoftDeleted, tc.out.wantSoftDeleted)
+			}
+
+			if entryExists != tc.out.entryInState || entry.SslCertificateCreationReported != tc.out.createLatencyMetricObserved {
 				t.Errorf("Entry in state %t, want %t; CreateSslCertificateLatency metric observed %t, want %t",
-					entryExists, tc.out.entryInState, reported, tc.out.createLatencyMetricObserved)
+					entryExists, tc.out.entryInState, entry.SslCertificateCreationReported, tc.out.createLatencyMetricObserved)
 			}
 			if tc.out.createLatencyMetricObserved && tc.in.metrics.SslCertificateCreationLatencyObserved != 1 {
 				t.Errorf("CreateSslCertificateLatency metric observed %d times, want 1",

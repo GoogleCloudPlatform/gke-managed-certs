@@ -31,8 +31,8 @@ import (
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
-	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	cntfake "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 	"github.com/google/go-cmp/cmp"
 )
@@ -70,7 +70,7 @@ func TestBindCertificates_IngressListerFailing(t *testing.T) {
 	ingressLister := newFakeIngressLister(errLister, nil)
 
 	binder := New(&event.FakeEvent{}, ingressClient, ingressLister,
-		mcrtLister, cntfake.NewMetrics(), cntfake.NewState())
+		mcrtLister, cntfake.NewMetrics(), state.NewFake())
 
 	if err := binder.BindCertificates(); err != errLister {
 		t.Fatalf("binder.BindCertificates(): %v, want %v", err, errLister)
@@ -81,7 +81,7 @@ func TestBindCertificates(t *testing.T) {
 	t.Parallel()
 
 	for description, tc := range map[string]struct {
-		state         map[types.CertId]cntfake.StateEntry
+		state         map[types.CertId]state.Entry
 		ingresses     []*api.Ingress
 		wantIngresses []*api.Ingress
 		wantEvent     event.FakeEvent
@@ -90,8 +90,8 @@ func TestBindCertificates(t *testing.T) {
 		"different namespace": {
 			// A ManagedCertificate from in-a-different namespace is attached to an Ingress
 			// from the default namespace. Ingress is not processed.
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("in-a-different-namespace", "in-a-different-namespace"): cntfake.StateEntry{SslCertificateName: "in-a-different-namespace"},
+			state: map[types.CertId]state.Entry{
+				types.NewCertId("in-a-different-namespace", "in-a-different-namespace"): state.Entry{SslCertificateName: "in-a-different-namespace"},
 			},
 			ingresses: []*api.Ingress{
 				{
@@ -120,7 +120,7 @@ func TestBindCertificates(t *testing.T) {
 		"not existing certificate": {
 			// A not existing ManagedCertificate is attached to an Ingress from the same
 			// namespace. Ingress is not processed.
-			state: map[types.CertId]cntfake.StateEntry{},
+			state: map[types.CertId]state.Entry{},
 			ingresses: []*api.Ingress{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -150,8 +150,8 @@ func TestBindCertificates(t *testing.T) {
 			// the namespaces match - processing the first Ingress fails once the certificate
 			// cannot be found. A valid ManagedCertificate is attached to the second Ingress
 			// which is successfully processed.
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "regular"): cntfake.StateEntry{SslCertificateName: "regular"},
+			state: map[types.CertId]state.Entry{
+				types.NewCertId("default", "regular"): state.Entry{SslCertificateName: "regular"},
 			},
 			ingresses: []*api.Ingress{
 				{
@@ -197,21 +197,19 @@ func TestBindCertificates(t *testing.T) {
 			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
 		},
 		"happy path": {
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "regular1"):    cntfake.StateEntry{SslCertificateName: "regular1"},
-				types.NewCertId("default", "regular2"):    cntfake.StateEntry{SslCertificateName: "regular2"},
-				types.NewCertId("default", "deleted1"):    cntfake.StateEntry{SslCertificateName: "deleted1", SoftDeleted: true},
-				types.NewCertId("default", "deleted2"):    cntfake.StateEntry{SslCertificateName: "deleted2", SoftDeleted: true},
-				types.NewCertId("default", "deletedErr1"): cntfake.StateEntry{SslCertificateName: "deletedErr1", SoftDeletedErr: cnterrors.ErrManagedCertificateNotFound},
-				types.NewCertId("default", "deletedErr2"): cntfake.StateEntry{SslCertificateName: "deletedErr2", SoftDeletedErr: cnterrors.ErrManagedCertificateNotFound},
+			state: map[types.CertId]state.Entry{
+				types.NewCertId("default", "regular1"): state.Entry{SslCertificateName: "regular1"},
+				types.NewCertId("default", "regular2"): state.Entry{SslCertificateName: "regular2"},
+				types.NewCertId("default", "deleted1"): state.Entry{SslCertificateName: "deleted1", SoftDeleted: true},
+				types.NewCertId("default", "deleted2"): state.Entry{SslCertificateName: "deleted2", SoftDeleted: true},
 			},
 			ingresses: []*api.Ingress{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2,deletedErr1,deletedErr2",
-							annotationPreSharedCertKey:       "regular1,deleted1,deletedErr1",
+							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2",
+							annotationPreSharedCertKey:       "regular1,deleted1",
 						},
 					},
 				},
@@ -221,8 +219,8 @@ func TestBindCertificates(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2,deletedErr1,deletedErr2",
-							annotationPreSharedCertKey:       "deletedErr1,regular1,regular2",
+							annotationManagedCertificatesKey: "regular1,regular2,deleted1,deleted2",
+							annotationPreSharedCertKey:       "regular1,regular2",
 						},
 					},
 				},
@@ -230,10 +228,10 @@ func TestBindCertificates(t *testing.T) {
 			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 2},
 		},
 		"metrics: excluded from SLO calculation": {
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "excludedSLO1"): cntfake.StateEntry{SslCertificateName: "excludedSLO1", ExcludedFromSLO: true},
-				types.NewCertId("default", "regular"):      cntfake.StateEntry{SslCertificateName: "regular"},
-				types.NewCertId("default", "excludedSLO2"): cntfake.StateEntry{SslCertificateName: "excludedSLO2", ExcludedFromSLO: true},
+			state: map[types.CertId]state.Entry{
+				types.NewCertId("default", "excludedSLO1"): state.Entry{SslCertificateName: "excludedSLO1", ExcludedFromSLO: true},
+				types.NewCertId("default", "regular"):      state.Entry{SslCertificateName: "regular"},
+				types.NewCertId("default", "excludedSLO2"): state.Entry{SslCertificateName: "excludedSLO2", ExcludedFromSLO: true},
 			},
 			ingresses: []*api.Ingress{
 				{
@@ -260,10 +258,10 @@ func TestBindCertificates(t *testing.T) {
 			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
 		},
 		"metrics: binding already reported": {
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "bindingReported1"): cntfake.StateEntry{SslCertificateName: "bindingReported1", SslCertificateBindingReported: true},
-				types.NewCertId("default", "regular"):          cntfake.StateEntry{SslCertificateName: "regular"},
-				types.NewCertId("default", "bindingReported2"): cntfake.StateEntry{SslCertificateName: "bindingReported2", SslCertificateBindingReported: true},
+			state: map[types.CertId]state.Entry{
+				types.NewCertId("default", "bindingReported1"): state.Entry{SslCertificateName: "bindingReported1", SslCertificateBindingReported: true},
+				types.NewCertId("default", "regular"):          state.Entry{SslCertificateName: "regular"},
+				types.NewCertId("default", "bindingReported2"): state.Entry{SslCertificateName: "bindingReported2", SslCertificateBindingReported: true},
 			},
 			ingresses: []*api.Ingress{
 				{
@@ -289,63 +287,6 @@ func TestBindCertificates(t *testing.T) {
 			},
 			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
 		},
-		"error getting ExcludedFromSLO from status": {
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "excludedSLOErr"): cntfake.StateEntry{SslCertificateName: "excludedSLOErr", ExcludedFromSLOErr: cnterrors.ErrManagedCertificateNotFound},
-			},
-			ingresses: []*api.Ingress{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "excludedSLOErr",
-							annotationPreSharedCertKey:       "",
-						},
-					},
-				},
-			},
-			wantIngresses: []*api.Ingress{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "excludedSLOErr",
-							annotationPreSharedCertKey:       "excludedSLOErr",
-						},
-					},
-				},
-			},
-		},
-		"error getting BindingReported from status": {
-			state: map[types.CertId]cntfake.StateEntry{
-				types.NewCertId("default", "bindingReportedErr"): cntfake.StateEntry{
-					SslCertificateName:       "bindingReportedErr",
-					SslCertificateBindingErr: cnterrors.ErrManagedCertificateNotFound,
-				},
-			},
-			ingresses: []*api.Ingress{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "bindingReportedErr",
-							annotationPreSharedCertKey:       "",
-						},
-					},
-				},
-			},
-			wantIngresses: []*api.Ingress{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Annotations: map[string]string{
-							annotationManagedCertificatesKey: "bindingReportedErr",
-							annotationPreSharedCertKey:       "bindingReportedErr",
-						},
-					},
-				},
-			},
-		},
 	} {
 		t.Run(description, func(t *testing.T) {
 			event := &event.FakeEvent{}
@@ -358,7 +299,7 @@ func TestBindCertificates(t *testing.T) {
 			ingressLister := newFakeIngressLister(nil, tc.ingresses)
 			metrics := cntfake.NewMetrics()
 
-			binder := New(event, ingressClient, ingressLister, mcrtLister, metrics, cntfake.NewStateWithEntries(tc.state))
+			binder := New(event, ingressClient, ingressLister, mcrtLister, metrics, state.NewFakeWithEntries(tc.state))
 
 			if err := binder.BindCertificates(); err != nil {
 				t.Fatalf("binder.BindCertificates(): %v, want nil", err)

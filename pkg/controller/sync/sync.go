@@ -66,8 +66,8 @@ func New(client clientsetv1beta2.NetworkingV1beta2Interface, config *config.Conf
 }
 
 func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
-	if sslCertificateName, err := s.state.GetSslCertificateName(id); err == nil {
-		return sslCertificateName, nil
+	if entry, err := s.state.Get(id); err == nil {
+		return entry.SslCertificateName, nil
 	}
 
 	sslCertificateName, err := s.random.Name()
@@ -76,25 +76,22 @@ func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
 	}
 
 	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s", sslCertificateName, id.String())
-	s.state.SetSslCertificateName(id, sslCertificateName)
+	s.state.Insert(id, sslCertificateName)
 	return sslCertificateName, nil
 }
 
 func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string, id types.CertId, mcrt apisv1beta2.ManagedCertificate) error {
-	excludedFromSLO, err := s.state.IsExcludedFromSLO(id)
+	entry, err := s.state.Get(id)
 	if err != nil {
 		return err
 	}
-	if excludedFromSLO {
+	if entry.ExcludedFromSLO {
 		klog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
 		return nil
 	}
 
-	reported, err := s.state.IsSslCertificateCreationReported(id)
-	if err != nil {
-		return err
-	}
-	if reported {
+	if entry.SslCertificateCreationReported {
+		klog.Infof("Skipping reporting SslCertificate creation metric, already reported for %s.", id.String())
 		return nil
 	}
 
@@ -169,7 +166,7 @@ func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName s
 func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error {
 	mcrt, err := s.lister.ManagedCertificates(id.Namespace).Get(id.Name)
 	if http.IsNotFound(err) {
-		sslCertificateName, err := s.state.GetSslCertificateName(id)
+		entry, err := s.state.Get(id)
 		if err == errors.ErrManagedCertificateNotFound {
 			return nil
 		} else if err != nil {
@@ -177,7 +174,7 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 		}
 
 		klog.Infof("ManagedCertificate %s already deleted", id.String())
-		return s.deleteSslCertificate(ctx, nil, id, sslCertificateName)
+		return s.deleteSslCertificate(ctx, nil, id, entry.SslCertificateName)
 	} else if err != nil {
 		return err
 	}
@@ -189,9 +186,9 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 		return err
 	}
 
-	if softDeleted, err := s.state.IsSoftDeleted(id); err != nil {
+	if entry, err := s.state.Get(id); err != nil {
 		return err
-	} else if softDeleted {
+	} else if entry.SoftDeleted {
 		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s", id.String(), sslCertificateName)
 		return s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName)
 	}

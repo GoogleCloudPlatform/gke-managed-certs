@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -95,7 +96,6 @@ func withCert(err error, sslCertificate *compute.SslCertificate) fakeSsl {
 func TestCreate(t *testing.T) {
 	testCases := []struct {
 		ssl                   ssl.Ssl
-		excludedFromSLOErr    error
 		wantErr               error
 		wantTooManyCertsEvent bool
 		wantExcludedFromSLO   bool
@@ -113,12 +113,6 @@ func TestCreate(t *testing.T) {
 			wantExcludedFromSLO:   true,
 		},
 		{
-			ssl:                   withErr(errQuotaExceeded),
-			excludedFromSLOErr:    errGeneric,
-			wantErr:               errGeneric,
-			wantTooManyCertsEvent: true,
-		},
-		{
 			ssl:                   withErr(errGeneric),
 			wantErr:               errGeneric,
 			wantBackendErrorEvent: true,
@@ -130,8 +124,8 @@ func TestCreate(t *testing.T) {
 
 		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
-		state := fake.NewStateWithEntries(map[types.CertId]fake.StateEntry{
-			certId: fake.StateEntry{SslCertificateName: "", ExcludedFromSLOErr: tc.excludedFromSLOErr},
+		state := state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			certId: state.Entry{SslCertificateName: ""},
 		})
 		sut := New(event, metrics, tc.ssl, state)
 
@@ -151,10 +145,12 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("Metric SslCertificateQuotaError observed %d times", metrics.SslCertificateQuotaErrorObserved)
 		}
 
-		excluded, err := state.IsExcludedFromSLO(certId)
-		if tc.excludedFromSLOErr != err || excluded != tc.wantExcludedFromSLO {
-			t.Fatalf("Excluded from SLO is %t, err %v; want %t, err %v", excluded, err,
-				tc.wantExcludedFromSLO, tc.excludedFromSLOErr)
+		entry, err := state.Get(certId)
+		if err != nil {
+			t.Fatalf("state.Get(%s): %v, want nil", certId.String(), err)
+		}
+		if entry.ExcludedFromSLO != tc.wantExcludedFromSLO {
+			t.Fatalf("Excluded from SLO is %t, want %t", entry.ExcludedFromSLO, tc.wantExcludedFromSLO)
 		}
 
 		oneBackendErrorEvent := event.BackendErrorCnt == 1
@@ -214,7 +210,7 @@ func TestDelete(t *testing.T) {
 
 		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl, fake.NewState())
+		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		err := sut.Delete(ctx, "", tc.mcrt)
 
@@ -288,7 +284,7 @@ func TestExists(t *testing.T) {
 	for _, tc := range testCases {
 		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl, fake.NewState())
+		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		exists, err := sut.Exists("", tc.mcrt)
 
@@ -359,7 +355,7 @@ func TestGet(t *testing.T) {
 	for _, tc := range testCases {
 		event := &event.FakeEvent{}
 		metrics := fake.NewMetrics()
-		sut := New(event, metrics, tc.ssl, fake.NewState())
+		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		sslCert, err := sut.Get("", tc.mcrt)
 

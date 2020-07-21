@@ -17,322 +17,239 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
+	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type tuple struct {
-	Id                 types.CertId
-	SslCertificateName string
+type configMap interface {
+	configmap.ConfigMap
+	check(int)
 }
 
-func (e tuple) empty() bool {
-	return e.Id.Namespace == "" && e.Id.Name == ""
+// configMapMock counts the number of calls made to its methods.
+type configMapMock struct {
+	getCount    int
+	changeCount int
+	t           *testing.T
 }
 
-var (
-	tupleEmpty           = tuple{types.NewCertId("", ""), ""}
-	tupleDefaultCat1     = tuple{types.NewCertId("default", "cat"), "1"}
-	tupleDefaultCatEmpty = tuple{types.NewCertId("default", "cat"), ""}
-	tupleDefaultDogEmpty = tuple{types.NewCertId("default", "dog"), ""}
-	tupleDefaultTea1     = tuple{types.NewCertId("default", "tea"), "1"}
-	tupleSystemCatEmpty  = tuple{types.NewCertId("system", "cat"), ""}
-)
+func (c *configMapMock) check(change int) {
+	c.t.Helper()
 
-func deleteEntry(state State, tuple tuple, configmap configMap, changeCount *int) {
-	state.Delete(tuple.Id)
-	(*changeCount)++
-	configmap.check(*changeCount)
-}
-
-func getSslCertificateName(t *testing.T, state State, tuple tuple, wantExists bool) {
-	t.Helper()
-	sslCertificateName, err := state.GetSslCertificateName(tuple.Id)
-	if err == nil != wantExists {
-		t.Fatalf("Expected %s to exist in state to be %t", tuple.Id.String(), wantExists)
-	} else if wantExists && sslCertificateName != tuple.SslCertificateName {
-		t.Fatalf("%s mapped to %s, want %s", tuple.Id.String(), sslCertificateName, tuple.SslCertificateName)
+	if c.getCount != 1 {
+		c.t.Fatalf("ConfigMap.Get() called %d times, want 1", c.getCount)
+	}
+	if c.changeCount != change {
+		c.t.Fatalf("ConfigMap.UpdateOrCreate() called %d times, want %d", c.changeCount, change)
 	}
 }
 
-func isSoftDeleted(t *testing.T, state State, tuple tuple, wantSoftDeleted bool) {
-	t.Helper()
-	softDeleted, err := state.IsSoftDeleted(tuple.Id)
-	if err != nil && wantSoftDeleted {
-		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
-	} else if softDeleted != wantSoftDeleted {
-		t.Fatalf("Soft deleted for %s is %t, want %t", tuple.Id.String(), softDeleted, wantSoftDeleted)
+// failConfigMapMock fails Get and UpdateOrCreate with an error.
+type failConfigMapMock struct {
+	configMapMock
+}
+
+var _ configmap.ConfigMap = (*failConfigMapMock)(nil)
+
+func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return nil, errors.New("Fake error - failed to get a config map")
+}
+
+func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
+	return errors.New("Fake error - failed to update or create a config map")
+}
+
+func newFailing(t *testing.T) *failConfigMapMock {
+	return &failConfigMapMock{
+		configMapMock{
+			t: t,
+		},
 	}
 }
 
-func isExcludedFromSLO(t *testing.T, state State, tuple tuple, wantExcluded bool) {
-	t.Helper()
-	excluded, err := state.IsExcludedFromSLO(tuple.Id)
-	if err != nil && wantExcluded {
-		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
-	} else if excluded != wantExcluded {
-		t.Fatalf("Excluded from SLO for %s is %t, want %t", tuple.Id.String(), excluded, wantExcluded)
-	}
+// emptyConfigMapMock represents a config map that is not initialized with any data.
+type emptyConfigMapMock struct {
+	configMapMock
 }
 
-func isSslCertificateBindingReported(t *testing.T, state State, tuple tuple, wantReported bool) {
-	t.Helper()
-	reported, err := state.IsSslCertificateBindingReported(tuple.Id)
-	if err != nil && wantReported {
-		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
-	} else if reported != wantReported {
-		t.Fatalf("SslCertificate binding metric reported for %s is %t, want %t", tuple.Id.String(), reported, wantReported)
-	}
+var _ configmap.ConfigMap = (*emptyConfigMapMock)(nil)
+
+func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return &api.ConfigMap{Data: map[string]string{}}, nil
 }
 
-func isSslCertificateCreationReported(t *testing.T, state State, tuple tuple, wantReported bool) {
-	t.Helper()
-	reported, err := state.IsSslCertificateCreationReported(tuple.Id)
-	if err != nil && wantReported {
-		t.Fatalf("Expected %s to exist in state, err: %s", tuple.Id.String(), err.Error())
-	} else if reported != wantReported {
-		t.Fatalf("SslCertificate creation metric reported for %s is %t, want %t", tuple.Id.String(), reported, wantReported)
-	}
-}
-
-func setExcludedFromSLO(state State, tuple tuple, configmap configMap, changeCount *int) error {
-	if err := state.SetExcludedFromSLO(tuple.Id); err != nil {
-		return err
-	}
-
-	(*changeCount)++
-	configmap.check(*changeCount)
+func (c *emptyConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
 	return nil
 }
 
-func setSoftDeleted(state State, tuple tuple, configmap configMap, changeCount *int) error {
-	if err := state.SetSoftDeleted(tuple.Id); err != nil {
-		return err
+func newEmpty(t *testing.T) *emptyConfigMapMock {
+	return &emptyConfigMapMock{
+		configMapMock{
+			t: t,
+		},
 	}
+}
 
-	(*changeCount)++
-	configmap.check(*changeCount)
+// filledConfigMapMock represents a config map that is initialized with data.
+type filledConfigMapMock struct {
+	configMapMock
+}
+
+var _ configmap.ConfigMap = (*filledConfigMapMock)(nil)
+
+func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+	c.getCount++
+	return &api.ConfigMap{
+		Data: map[string]string{
+			"1": "{\"Key\":{\"Namespace\":\"default\",\"Name\":\"cat\"},\"Value\":{\"SslCertificateName\":\"1\",\"SslCertificateCreationReported\":false}}",
+		},
+	}, nil
+}
+
+func (c *filledConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+	c.changeCount++
 	return nil
 }
 
-func setSslCertificateBindingReported(state State, tuple tuple, configmap configMap, changeCount *int) error {
-	if err := state.SetSslCertificateBindingReported(tuple.Id); err != nil {
-		return err
+func newFilled(t *testing.T) *filledConfigMapMock {
+	return &filledConfigMapMock{
+		configMapMock{
+			t: t,
+		},
 	}
-
-	(*changeCount)++
-	configmap.check(*changeCount)
-	return nil
-}
-
-func setSslCertificateCreationReported(state State, tuple tuple, configmap configMap, changeCount *int) error {
-	if err := state.SetSslCertificateCreationReported(tuple.Id); err != nil {
-		return err
-	}
-
-	(*changeCount)++
-	configmap.check(*changeCount)
-	return nil
-}
-
-func setSslCertificateName(state State, tuple tuple, configmap configMap, changeCount *int) {
-	state.SetSslCertificateName(tuple.Id, tuple.SslCertificateName)
-	(*changeCount)++
-	configmap.check(*changeCount)
-}
-
-func contains(expected []tuple, id types.CertId) bool {
-	for _, e := range expected {
-		if e.Id.Namespace == id.Namespace && e.Id.Name == id.Name {
-			return true
-		}
-	}
-
-	return false
 }
 
 func TestState(t *testing.T) {
-	testCases := []struct {
-		desc      string
-		configmap configMap
-		init      tuple
-		test      tuple
-		exists    bool
-		expected  []tuple
-	}{
-		{
-			"Failing configmap - lookup argument in empty state",
-			newFailing(t),
-			tupleEmpty,
-			tupleDefaultCatEmpty,
-			false,
-			nil,
-		},
-		{
-			"Failing configmap - insert and lookup same argument, same namespaces",
-			newFailing(t),
-			tupleDefaultCat1,
-			tupleDefaultCat1,
-			true,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Failing configmap - insert and lookup same argument, different namespaces",
-			newFailing(t),
-			tupleDefaultCat1,
-			tupleSystemCatEmpty,
-			false,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Failing configmap - insert and lookup different arguments, same namespace",
-			newFailing(t),
-			tupleDefaultTea1,
-			tupleDefaultDogEmpty,
-			false,
-			[]tuple{tupleDefaultTea1},
-		},
-		{
-			"Empty configmap - lookup argument in empty state",
-			newEmpty(t),
-			tupleEmpty,
-			tupleDefaultCatEmpty,
-			false,
-			nil,
-		},
-		{
-			"Empty configmap - insert and lookup same argument, same namespaces",
-			newEmpty(t),
-			tupleDefaultCat1,
-			tupleDefaultCat1,
-			true,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Empty configmap - insert and lookup same argument, different namespaces",
-			newEmpty(t),
-			tupleDefaultCat1,
-			tupleSystemCatEmpty,
-			false,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Empty configmap - insert and lookup different arguments, same namespace",
-			newEmpty(t),
-			tupleDefaultTea1,
-			tupleDefaultDogEmpty,
-			false,
-			[]tuple{tupleDefaultTea1},
-		},
-		{
-			"Filled configmap - lookup argument in empty state",
-			newFilled(t),
-			tupleEmpty,
-			tupleDefaultCat1,
-			true,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Filled configmap - insert and lookup same argument, same namespaces",
-			newFilled(t),
-			tupleDefaultCat1,
-			tupleDefaultCat1,
-			true,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Filled configmap - insert and lookup same argument, different namespaces",
-			newFilled(t),
-			tupleDefaultCat1,
-			tupleSystemCatEmpty,
-			false,
-			[]tuple{tupleDefaultCat1},
-		},
-		{
-			"Filled configmap - insert and lookup different arguments, same namespace",
-			newFilled(t),
-			tupleDefaultTea1,
-			tupleDefaultDogEmpty,
-			false,
-			[]tuple{tupleDefaultCat1, tupleDefaultTea1},
-		},
-	}
-
 	runtime.ErrorHandlers = nil
 
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
-			changeCount := 0
+	for description, testCase := range map[string]struct {
+		configmap     configMap
+		wantInitItems int
+	}{
+		"Failing configmap": {
+			configmap:     newFailing(t),
+			wantInitItems: 0,
+		},
+		"Empty configmap": {
+			configmap:     newEmpty(t),
+			wantInitItems: 0,
+		},
+		"Filled configmap": {
+			configmap:     newFilled(t),
+			wantInitItems: 1,
+		},
+	} {
+		t.Run(description, func(t *testing.T) {
+			// Create a state instance.
+			state := New(testCase.configmap)
 
-			sut := New(testCase.configmap)
+			// At the beginning there are wantInitItems items in state.
+			if len(state.List()) != testCase.wantInitItems {
+				t.Fatalf("len(List()) = %d, want %d", len(state.List()), testCase.wantInitItems)
+			}
+
+			changeCount := 0
 			testCase.configmap.check(changeCount)
 
-			if !testCase.init.empty() {
-				setSslCertificateName(sut, testCase.init, testCase.configmap, &changeCount)
+			// Getting a key not present in state fails.
+			missingId := types.NewCertId("default", "missing")
+			entry, err := state.Get(missingId)
+			if err != cnterrors.ErrManagedCertificateNotFound {
+				t.Fatalf("Get(%s): %v, want %v",
+					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
 			}
 
-			getSslCertificateName(t, sut, testCase.test, testCase.exists)
+			// Setting flags on a missing item fails.
+			if err := state.SetExcludedFromSLO(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+				t.Fatalf("SetExcludedFromSLO(%s): %v, want %v",
+					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+			}
+			testCase.configmap.check(changeCount)
 
-			deleteEntry(sut, tuple{types.NewCertId("non existing ns", "non existing name"), ""}, testCase.configmap, &changeCount)
+			if err := state.SetSoftDeleted(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+				t.Fatalf("SetSoftDeleted(%s): %v, want %v",
+					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+			}
+			testCase.configmap.check(changeCount)
 
-			foo := tuple{types.NewCertId("custom", "foo"), "2"}
-			isExcludedFromSLO(t, sut, foo, false)
-			if err := setExcludedFromSLO(sut, foo, testCase.configmap, &changeCount); err == nil {
-				t.Fatalf("Storing excluded from SLO for non-existing entry should fail")
+			if err := state.SetSslCertificateBindingReported(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+				t.Fatalf("SetSslCertificateBindingReported(%s): %v, want %v",
+					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+			}
+			testCase.configmap.check(changeCount)
+
+			if err := state.SetSslCertificateCreationReported(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+				t.Fatalf("SetSslCertificateCreationReported(%s): %v, want %v",
+					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+			}
+			testCase.configmap.check(changeCount)
+
+			// Add an item to state.
+			id := types.NewCertId("default", "foo")
+			state.Insert(id, "foo")
+			changeCount++
+			testCase.configmap.check(changeCount)
+
+			// The new item can be retrieved.
+			entry, err = state.Get(id)
+			if err != nil {
+				t.Fatalf("Get(%s): %v, want nil", id.String(), err)
+			}
+			if diff := cmp.Diff(Entry{SslCertificateName: "foo"}, entry); diff != "" {
+				t.Fatalf("Get(%s): (-want, +got): %s", id.String(), diff)
 			}
 
-			isSslCertificateBindingReported(t, sut, foo, false)
-			if err := setSslCertificateBindingReported(sut, foo, testCase.configmap, &changeCount); err == nil {
-				t.Fatalf("Storing SslCertificate binding for non-existing entry should fail")
+			// There are in total wantInitItems+1 entries in state.
+			if len(state.List()) != testCase.wantInitItems+1 {
+				t.Fatalf("len(List()) = %d, want %d", len(state.List()), testCase.wantInitItems+1)
 			}
 
-			isSslCertificateCreationReported(t, sut, foo, false)
-			if err := setSslCertificateCreationReported(sut, foo, testCase.configmap, &changeCount); err == nil {
-				t.Fatalf("Storing SslCertificate creation for non-existing entry should fail")
+			// Set all the flags one by one.
+			if err := state.SetExcludedFromSLO(id); err != nil {
+				t.Fatalf("SetExcludedFromSLO(%s): %v, want nil", id.String(), err)
 			}
+			changeCount++
+			testCase.configmap.check(changeCount)
 
-			isSoftDeleted(t, sut, foo, false)
-			if err := setSoftDeleted(sut, foo, testCase.configmap, &changeCount); err == nil {
-				t.Fatalf("Setting soft deleted for non-existing entry should fail")
+			if err := state.SetSoftDeleted(id); err != nil {
+				t.Fatalf("SetSoftDeleted(%s): %v, want nil", id.String(), err)
 			}
+			changeCount++
+			testCase.configmap.check(changeCount)
 
-			getSslCertificateName(t, sut, tuple{types.NewCertId("custom", "foo"), ""}, false)
-			setSslCertificateName(sut, foo, testCase.configmap, &changeCount)
-
-			isExcludedFromSLO(t, sut, foo, false)
-			setExcludedFromSLO(sut, foo, testCase.configmap, &changeCount)
-			isExcludedFromSLO(t, sut, foo, true)
-
-			isSslCertificateBindingReported(t, sut, foo, false)
-			setSslCertificateBindingReported(sut, foo, testCase.configmap, &changeCount)
-			isSslCertificateBindingReported(t, sut, foo, true)
-
-			isSslCertificateCreationReported(t, sut, foo, false)
-			setSslCertificateCreationReported(sut, foo, testCase.configmap, &changeCount)
-			isSslCertificateCreationReported(t, sut, foo, true)
-
-			isSoftDeleted(t, sut, foo, false)
-			setSoftDeleted(sut, foo, testCase.configmap, &changeCount)
-			isSoftDeleted(t, sut, foo, true)
-
-			expected := append(testCase.expected, foo)
-			allEntriesCounter := 0
-			sut.ForeachKey(func(id types.CertId) {
-				allEntriesCounter++
-				if !contains(expected, id) {
-					t.Fatalf("%s missing in %v", id.String(), expected)
-				}
-			})
-
-			if allEntriesCounter != len(expected) {
-				t.Fatalf("Found %d entries, want %d", allEntriesCounter, len(expected))
+			if err := state.SetSslCertificateBindingReported(id); err != nil {
+				t.Fatalf("SetSslCertificateBindingReported(%s): %v, want nil", id.String(), err)
 			}
+			changeCount++
+			testCase.configmap.check(changeCount)
 
-			deleteEntry(sut, testCase.init, testCase.configmap, &changeCount)
-			getSslCertificateName(t, sut, testCase.init, false)
+			if err := state.SetSslCertificateCreationReported(id); err != nil {
+				t.Fatalf("SetSslCertificateCreationReported(%s): %v, want nil", id.String(), err)
+			}
+			changeCount++
+			testCase.configmap.check(changeCount)
+
+			// Delete the item
+			state.Delete(id)
+			changeCount++
+			testCase.configmap.check(changeCount)
+
+			// There are wantInitItems items in state.
+			if len(state.List()) != testCase.wantInitItems {
+				t.Fatalf("len(List()) = %d, want %d", len(state.List()), testCase.wantInitItems)
+			}
 		})
 	}
 }
@@ -341,13 +258,13 @@ func TestMarshal(t *testing.T) {
 	mcrt1 := types.NewCertId("default", "mcrt1")
 	mcrt2 := types.NewCertId("system", "mcrt2")
 
-	m1 := map[types.CertId]entry{
-		mcrt1: entry{
+	m1 := map[types.CertId]Entry{
+		mcrt1: Entry{
 			SoftDeleted:                    false,
 			SslCertificateName:             "sslCert1",
 			SslCertificateCreationReported: false,
 		},
-		mcrt2: entry{
+		mcrt2: Entry{
 			SoftDeleted:                    true,
 			SslCertificateName:             "sslCert2",
 			SslCertificateCreationReported: true,

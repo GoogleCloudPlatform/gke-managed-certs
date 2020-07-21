@@ -32,24 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-// Fake state
-type fakeState struct {
-	// Collection of ManagedCertificate ids
-	ids []types.CertId
-}
-
-var _ state.StateIterator = &fakeState{}
-
-func newFakeState(ids []types.CertId) *fakeState {
-	return &fakeState{ids: ids}
-}
-
-func (f *fakeState) ForeachKey(fun func(id types.CertId)) {
-	for _, id := range f.ids {
-		fun(id)
-	}
-}
-
 // Fake sync
 type fakeSync struct {
 	// Collection of ManagedCertificate ids
@@ -127,11 +109,16 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 			queue := &fakeQueue{}
 			sync := &fakeSync{}
 
+			stateEntries := make(map[types.CertId]state.Entry, 0)
+			for _, id := range testCase.stateIds {
+				stateEntries[id] = state.Entry{}
+			}
+
 			sut := &controller{
 				lister:  fake.NewLister(testCase.listerErr, mcrts),
 				metrics: metrics,
 				queue:   queue,
-				state:   newFakeState(testCase.stateIds),
+				state:   state.NewFakeWithEntries(stateEntries),
 				sync:    sync,
 			}
 
