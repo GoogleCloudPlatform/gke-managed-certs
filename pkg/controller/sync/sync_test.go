@@ -18,544 +18,343 @@ package sync
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"google.golang.org/api/googleapi"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	cgotesting "k8s.io/client-go/testing"
+	"github.com/google/go-cmp/cmp"
+	compute "google.golang.org/api/compute/v1"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
-	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2/fake"
-	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
-	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-const (
-	domainBar          = "bar.com"
-	domainFoo          = "foo.com"
-	sslCertificateName = "baz"
-)
+var testCases = map[string]struct {
+	managedCertificate *apisv1beta2.ManagedCertificate
+	state              state.State
+	sslManager         sslcertificatemanager.SslCertificateManager
+	random             random.Random
 
-var (
-	mcrtId = types.NewCertId("foo", "bar")
-)
-
-func buildUpdateFunc(updateCalled *bool) cgotesting.ReactionFunc {
-	return cgotesting.ReactionFunc(func(action cgotesting.Action) (bool, runtime.Object, error) {
-		*updateCalled = true
-		return true, nil, nil
-	})
-}
-
-var genericError = errors.New("generic error")
-var googleNotFound = &googleapi.Error{
-	Code: 404,
-}
-var k8sNotFound = k8serrors.NewNotFound(schema.GroupResource{
-	Group:    "test_group",
-	Resource: "test_resource",
-}, "test_name")
-
-func mockMcrt(domain string) *apisv1beta2.ManagedCertificate {
-	return fake.NewManagedCertificate(mcrtId, domain)
-}
-
-var listerFailsGenericErr = fake.NewLister(genericError, nil)
-var listerFailsNotFound = fake.NewLister(k8sNotFound, nil)
-var listerSuccess = fake.NewLister(nil, []*apisv1beta2.ManagedCertificate{mockMcrt(domainFoo)})
-
-var randomFailsGenericErr = newRandom(genericError, "")
-var randomSuccess = newRandom(nil, sslCertificateName)
-
-func empty() state.State {
-	return state.NewFake()
-}
-func withEntry() state.State {
-	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
-		mcrtId: state.Entry{SslCertificateName: sslCertificateName},
-	})
-}
-func withEntryAndExcludedFromSLOSet() state.State {
-	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
-		mcrtId: state.Entry{
-			SslCertificateName: sslCertificateName,
-			ExcludedFromSLO:    true,
-		},
-	})
-}
-func withEntryAndSslCertificateCreationReported() state.State {
-	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
-		mcrtId: state.Entry{
-			SslCertificateName:             sslCertificateName,
-			SslCertificateCreationReported: true,
-		},
-	})
-}
-func withEntryAndSoftDeleted() state.State {
-	return state.NewFakeWithEntries(map[types.CertId]state.Entry{
-		mcrtId: state.Entry{
-			SslCertificateName: sslCertificateName,
-			SoftDeleted:        true,
-		},
-	})
-}
-
-type in struct {
-	lister       listersv1beta2.ManagedCertificateLister
-	metrics      *fake.FakeMetrics
-	random       fakeRandom
-	state        state.State
-	mcrt         *apisv1beta2.ManagedCertificate
-	sslCreateErr error
-	sslDeleteErr error
-	sslExistsErr error
-	sslGetErr    error
-}
-
-type out struct {
-	entryInState                bool
-	createLatencyMetricObserved bool
-	wantSoftDeleted             bool
-	wantEcludedFromSLO          bool
-	wantUpdateCalled            bool
-	err                         error
-}
-
-var testCases = []struct {
-	desc string
-	in   in
-	out  out
+	wantState              state.State
+	wantSslManager         sslcertificatemanager.SslCertificateManager
+	wantManagedCertificate *apisv1beta2.ManagedCertificate
+	wantMetrics            *metrics.Fake
+	wantError              error
 }{
-	{
-		"Lister fails with generic error, state is empty",
-		in{
-			lister:  listerFailsGenericErr,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   empty(),
-		},
-		out{
-			entryInState:     false,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: not found, state: not found, GCP: not found": {
+		state:      state.NewFake(),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.New(""),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantMetrics:    metrics.NewFake(),
 	},
-	{
-		"Lister fails with generic error, entry in state",
-		in{
-			lister:  listerFailsGenericErr,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntry(),
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: not found, state: found, GCP: not found": {
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{SslCertificateName: "foo"},
+		}),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.New(""),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantMetrics:    metrics.NewFake(),
 	},
-	{
-		"Lister fails with not found, state is empty",
-		in{
-			lister:  listerFailsNotFound,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   empty(),
-		},
-		out{
-			entryInState:     false,
-			wantUpdateCalled: false,
-			err:              nil,
-		},
+	"API server: not found, state: found, GCP: found": {
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+			},
+		}),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.New(""),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantMetrics:    metrics.NewFake(),
 	},
-	{
-		"Lister fails with not found, entry in state, soft deleted in state, success to delete SslCertificate",
-		in{
-			lister:  listerFailsNotFound,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSoftDeleted(),
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              nil,
-		},
+	"API server: not found, state: found soft deleted, GCP: found": {
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+				SoftDeleted:        true,
+			},
+		}),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.New(""),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantMetrics:    metrics.NewFake(),
 	},
-	{
-		"Lister fails with not found, entry in state, success to delete SslCertificate",
-		in{
-			lister:  listerFailsNotFound,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntry(),
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              nil,
-		},
+	"API server: found, state: not found, GCP: not found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state:      state.NewFake(),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		wantSslManager: sslcertificatemanager.NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: &metrics.Fake{SslCertificateCreationLatencyObserved: 1},
 	},
-	{
-		"Lister fails with not found, entry in state, SslCertificate already deleted",
-		in{
-			lister:       listerFailsNotFound,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			sslDeleteErr: googleNotFound,
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              nil,
-		},
+	"API server: found, state: not found, GCP: found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFake(),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{SslCertificateName: "foo"},
+		}),
+		wantSslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithStatus("Active", "Active").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister fails with not found, entry in state, fail to delete SslCertificate",
-		in{
-			lister:       listerFailsNotFound,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			sslDeleteErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: found, state: found soft deleted, GCP: found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+				SoftDeleted:        true,
+			},
+		}),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.NewFake("foo", nil),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister success, state empty",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   empty(),
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            true,
-			err:                         nil,
-		},
+	"API server: found, state: found, GCP: found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		wantSslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "ACTIVE", []string{"ACTIVE"}),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithStatus("Active", "Active").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister success, entry in state",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntry(),
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            true,
-			err:                         nil,
-		},
+	"API server: found, state: found soft deleted, GCP: not found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+				SoftDeleted:        true,
+			},
+		}),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.NewFake("foo", nil),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister success, state empty, random fails",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomFailsGenericErr,
-			state:   empty(),
-		},
-		out{
-			entryInState:     false,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: found, state: found reported, GCP: not found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		wantSslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister success, entry in state, random fails",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomFailsGenericErr,
-			state:   withEntry(),
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            true,
-			err:                         nil,
-		},
+	"API server: found, state: found excluded from SLO, GCP: not found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+				ExcludedFromSLO:    true,
+			},
+		}),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName: "foo",
+				ExcludedFromSLO:    true,
+			},
+		}),
+		wantSslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: metrics.NewFake(),
 	},
-	{
-		"Lister success, state empty, SslCertificate exists fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        empty(),
-			sslExistsErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: found, state: found not reported, GCP: not found": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{SslCertificateName: "foo"},
+		}),
+		sslManager: sslcertificatemanager.NewFake(),
+		random:     random.NewFake("foo", nil),
+
+		wantState: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		wantSslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			WithCertificateName("foo").
+			Build(),
+		wantMetrics: &metrics.Fake{SslCertificateCreationLatencyObserved: 1},
 	},
-	{
-		"Lister success, entry in state, SslCertificate exists fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			sslExistsErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
+	"API server: found, state: found, GCP: found; certificates different": {
+		managedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").Build(),
+		state: state.NewFakeWithEntries(map[types.CertId]state.Entry{
+			types.NewCertId("default", "foo"): state.Entry{
+				SslCertificateName:             "foo",
+				SslCertificateCreationReported: true,
+			},
+		}),
+		sslManager: sslcertificatemanager.
+			NewFakeWithEntry("foo", []string{"different-domain.com"}, "ACTIVE", []string{"ACTIVE"}),
+		random: random.NewFake("foo", nil),
+
+		wantState:      state.NewFake(),
+		wantSslManager: sslcertificatemanager.NewFake(),
+		wantManagedCertificate: managedcertificate.
+			New(types.NewCertId("default", "foo"), "example.com").
+			Build(),
+		wantMetrics: metrics.NewFake(),
+		wantError:   errors.ErrSslCertificateOutOfSyncGotDeleted,
 	},
-	{
-		"Lister success, state empty, SslCertificate creation fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        empty(),
-			sslCreateErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate creation fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			sslCreateErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate creation succeeds, excluded from SLO",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndExcludedFromSLOSet(),
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: false,
-			wantUpdateCalled:            true,
-			err:                         nil,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate creation succeeds, metric already reported",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetricsSslCertificateCreationAlreadyReported(),
-			random:  randomSuccess,
-			state:   withEntryAndSslCertificateCreationReported(),
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            true,
-			err:                         nil,
-		},
-	},
-	{
-		"Lister success, state empty, SslCertificate does not exists - get fails",
-		in{
-			lister:    listerSuccess,
-			metrics:   fake.NewMetrics(),
-			random:    randomSuccess,
-			state:     empty(),
-			sslGetErr: genericError,
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            false,
-			err:                         genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate does not exists - get fails",
-		in{
-			lister:    listerSuccess,
-			metrics:   fake.NewMetrics(),
-			random:    randomSuccess,
-			state:     withEntry(),
-			sslGetErr: genericError,
-		},
-		out{
-			entryInState:                true,
-			createLatencyMetricObserved: true,
-			wantUpdateCalled:            false,
-			err:                         genericError,
-		},
-	},
-	{
-		"Lister success, state empty, SslCertificate exists - get fails",
-		in{
-			lister:    listerSuccess,
-			metrics:   fake.NewMetrics(),
-			random:    randomSuccess,
-			state:     empty(),
-			mcrt:      mockMcrt(domainFoo),
-			sslGetErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
-	{
-		"Lister success, entry in state, SslCertificate exists - get fails",
-		in{
-			lister:    listerSuccess,
-			metrics:   fake.NewMetrics(),
-			random:    randomSuccess,
-			state:     withEntry(),
-			mcrt:      mockMcrt(domainFoo),
-			sslGetErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
-	{
-		"Lister success, entry in state soft deleted, SslCertificate exists",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntryAndSoftDeleted(),
-			mcrt:    mockMcrt(domainFoo),
-		},
-		out{
-			entryInState:     false,
-			wantUpdateCalled: false,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch",
-		in{
-			lister:  listerSuccess,
-			metrics: fake.NewMetrics(),
-			random:  randomSuccess,
-			state:   withEntry(),
-			mcrt:    mockMcrt(domainBar),
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch - SslCertificate already deleted",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			mcrt:         mockMcrt(domainBar),
-			sslDeleteErr: googleNotFound,
-		},
-		out{
-			entryInState:     false,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              cnterrors.ErrSslCertificateOutOfSyncGotDeleted,
-		},
-	},
-	{
-		"Lister success, entry in state, certs mismatch - SslCertificate deletion fails",
-		in{
-			lister:       listerSuccess,
-			metrics:      fake.NewMetrics(),
-			random:       randomSuccess,
-			state:        withEntry(),
-			mcrt:         mockMcrt(domainBar),
-			sslDeleteErr: genericError,
-		},
-		out{
-			entryInState:     true,
-			wantSoftDeleted:  true,
-			wantUpdateCalled: false,
-			err:              genericError,
-		},
-	},
+}
+
+func getSslCertificate(id types.CertId, state state.State, sslManager sslcertificatemanager.SslCertificateManager) (*compute.SslCertificate, error) {
+
+	entry, err := state.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return sslManager.Get(entry.SslCertificateName, nil)
 }
 
 func TestManagedCertificate(t *testing.T) {
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
+	for description, tc := range testCases {
+		t.Run(description, func(t *testing.T) {
 			ctx := context.Background()
 
-			client := &clientsetv1beta2.FakeNetworkingV1beta2{Fake: &cgotesting.Fake{}}
-			updateCalled := false
-			client.AddReactor("update", "*", buildUpdateFunc(&updateCalled))
+			var managedCertificates []*apisv1beta2.ManagedCertificate
+			if tc.managedCertificate != nil {
+				managedCertificates = append(managedCertificates, tc.managedCertificate)
+			}
 
+			clientset := managedcertificate.NewClientset(managedCertificates).NetworkingV1beta2()
+			lister := managedcertificate.NewLister(managedCertificates)
 			config := config.NewFakeCertificateStatusConfig()
-			ssl := newSsl(sslCertificateName, tc.in.mcrt, tc.in.sslCreateErr, tc.in.sslDeleteErr,
-				tc.in.sslExistsErr, tc.in.sslGetErr)
-			sut := New(client, config, tc.in.lister, tc.in.metrics, tc.in.random, ssl, tc.in.state)
+			metrics := metrics.NewFake()
+			sync := New(clientset, config, lister, metrics, tc.random, tc.sslManager, tc.state)
 
-			if err := sut.ManagedCertificate(ctx, mcrtId); err != tc.out.err {
-				t.Errorf("Have error: %v, want: %v", err, tc.out.err)
+			id := types.NewCertId("default", "foo")
+			if err := sync.ManagedCertificate(ctx, id); err != tc.wantError {
+				t.Fatalf("sync.ManagedCertificate(%s): %v, want %v", id, err, tc.wantError)
 			}
 
-			entry, err := tc.in.state.Get(mcrtId)
-			entryExists := err == nil
-
-			if entryExists != tc.out.entryInState {
-				t.Errorf("Entry in state %t, want %t, err: %v", entryExists, tc.out.entryInState, err)
+			if diff := cmp.Diff(tc.wantState.List(), tc.state.List()); diff != "" {
+				t.Fatalf("Diff state (-want, +got): %s", diff)
 			}
 
-			if entryExists && tc.out.wantSoftDeleted != entry.SoftDeleted {
-				t.Errorf("Soft deleted: %t, want: %t", entry.SoftDeleted, tc.out.wantSoftDeleted)
+			wantSslCertificate, wantSslCertificateErr := getSslCertificate(id, tc.wantState, tc.wantSslManager)
+			gotSslCertificate, gotSslCertificateErr := getSslCertificate(id, tc.state, tc.sslManager)
+			sslCertificateDiff := cmp.Diff(wantSslCertificate, gotSslCertificate)
+			if wantSslCertificateErr != gotSslCertificateErr || sslCertificateDiff != "" {
+				t.Fatalf("Diff SslCertificate (-want, +got): %s, got error: %v, want error: %v",
+					sslCertificateDiff, gotSslCertificateErr, wantSslCertificateErr)
 			}
 
-			if entryExists != tc.out.entryInState || entry.SslCertificateCreationReported != tc.out.createLatencyMetricObserved {
-				t.Errorf("Entry in state %t, want %t; CreateSslCertificateLatency metric observed %t, want %t",
-					entryExists, tc.out.entryInState, entry.SslCertificateCreationReported, tc.out.createLatencyMetricObserved)
-			}
-			if tc.out.createLatencyMetricObserved && tc.in.metrics.SslCertificateCreationLatencyObserved != 1 {
-				t.Errorf("CreateSslCertificateLatency metric observed %d times, want 1",
-					tc.in.metrics.SslCertificateCreationLatencyObserved)
+			if tc.wantManagedCertificate != nil && len(managedCertificates) != 1 {
+				t.Fatalf("ManagedCertificate nil, want %+v; total number of certificates: %d, want 1",
+					tc.wantManagedCertificate, len(managedCertificates))
+			} else if tc.wantManagedCertificate == nil && len(managedCertificates) != 0 {
+				t.Fatalf("ManagedCertificate %+v, want nil; total number of certificates: %d, want 0",
+					managedCertificates[0], len(managedCertificates))
+			} else if len(managedCertificates) > 0 {
+				if diff := cmp.Diff(tc.wantManagedCertificate, managedCertificates[0]); diff != "" {
+					t.Fatalf("Diff ManagedCertificates (-want, +got): %s", diff)
+				}
 			}
 
-			if tc.out.wantUpdateCalled != updateCalled {
-				t.Errorf("Update called %t, want %t", updateCalled, tc.out.wantUpdateCalled)
+			if diff := cmp.Diff(tc.wantMetrics, metrics); diff != "" {
+				t.Fatalf("Diff metrics (-want, +got): %s", diff)
 			}
 		})
 	}

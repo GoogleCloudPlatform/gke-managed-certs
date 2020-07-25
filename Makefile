@@ -2,8 +2,9 @@ all: build-image e2e
 
 TAG ?= $(USER)-dev
 
-build-image: gofmt clean cross
+build-image: gofmt clean
 	TAG=$(TAG) ./hack/build-image.sh
+	$(MAKE) cross
 
 e2e:
 	TAG=$(TAG) ./hack/e2e.sh

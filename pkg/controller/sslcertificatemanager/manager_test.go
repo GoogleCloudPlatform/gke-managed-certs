@@ -27,8 +27,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -123,13 +124,13 @@ func TestCreate(t *testing.T) {
 		ctx := context.Background()
 
 		event := &event.FakeEvent{}
-		metrics := fake.NewMetrics()
+		metrics := metrics.NewFake()
 		state := state.NewFakeWithEntries(map[types.CertId]state.Entry{
 			certId: state.Entry{SslCertificateName: ""},
 		})
 		sut := New(event, metrics, tc.ssl, state)
 
-		err := sut.Create(ctx, "", *fake.NewManagedCertificate(certId, domain))
+		err := sut.Create(ctx, "", *managedcertificate.New(certId, domain).Build())
 
 		if err != tc.wantErr {
 			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
@@ -183,7 +184,7 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			ssl:             withErr(nil),
-			mcrt:            fake.NewManagedCertificate(certId, domain),
+			mcrt:            managedcertificate.New(certId, domain).Build(),
 			wantDeleteEvent: true,
 		},
 		{
@@ -192,7 +193,7 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			ssl:            withErr(errGeneric),
-			mcrt:           fake.NewManagedCertificate(certId, domain),
+			mcrt:           managedcertificate.New(certId, domain).Build(),
 			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
@@ -201,7 +202,7 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			ssl:  withErr(errNotFound),
-			mcrt: fake.NewManagedCertificate(certId, domain),
+			mcrt: managedcertificate.New(certId, domain).Build(),
 		},
 	}
 
@@ -209,7 +210,7 @@ func TestDelete(t *testing.T) {
 		ctx := context.Background()
 
 		event := &event.FakeEvent{}
-		metrics := fake.NewMetrics()
+		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		err := sut.Delete(ctx, "", tc.mcrt)
@@ -248,7 +249,7 @@ func TestExists(t *testing.T) {
 		},
 		{
 			ssl:  withExists(nil, false),
-			mcrt: fake.NewManagedCertificate(certId, domain),
+			mcrt: managedcertificate.New(certId, domain).Build(),
 		},
 		{
 			ssl:        withExists(nil, true),
@@ -256,7 +257,7 @@ func TestExists(t *testing.T) {
 		},
 		{
 			ssl:        withExists(nil, true),
-			mcrt:       fake.NewManagedCertificate(certId, domain),
+			mcrt:       managedcertificate.New(certId, domain).Build(),
 			wantExists: true,
 		},
 		{
@@ -265,7 +266,7 @@ func TestExists(t *testing.T) {
 		},
 		{
 			ssl:            withExists(errGeneric, false),
-			mcrt:           fake.NewManagedCertificate(certId, domain),
+			mcrt:           managedcertificate.New(certId, domain).Build(),
 			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
@@ -275,7 +276,7 @@ func TestExists(t *testing.T) {
 		},
 		{
 			ssl:            withExists(errGeneric, true),
-			mcrt:           fake.NewManagedCertificate(certId, domain),
+			mcrt:           managedcertificate.New(certId, domain).Build(),
 			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
@@ -283,7 +284,7 @@ func TestExists(t *testing.T) {
 
 	for _, tc := range testCases {
 		event := &event.FakeEvent{}
-		metrics := fake.NewMetrics()
+		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		exists, err := sut.Exists("", tc.mcrt)
@@ -319,7 +320,7 @@ func TestGet(t *testing.T) {
 		},
 		{
 			ssl:  withCert(nil, nil),
-			mcrt: fake.NewManagedCertificate(certId, domain),
+			mcrt: managedcertificate.New(certId, domain).Build(),
 		},
 		{
 			ssl:      withCert(nil, cert),
@@ -327,7 +328,7 @@ func TestGet(t *testing.T) {
 		},
 		{
 			ssl:      withCert(nil, cert),
-			mcrt:     fake.NewManagedCertificate(certId, domain),
+			mcrt:     managedcertificate.New(certId, domain).Build(),
 			wantCert: cert,
 		},
 		{
@@ -336,7 +337,7 @@ func TestGet(t *testing.T) {
 		},
 		{
 			ssl:            withCert(errGeneric, nil),
-			mcrt:           fake.NewManagedCertificate(certId, domain),
+			mcrt:           managedcertificate.New(certId, domain).Build(),
 			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
@@ -346,7 +347,7 @@ func TestGet(t *testing.T) {
 		},
 		{
 			ssl:            withCert(errGeneric, cert),
-			mcrt:           fake.NewManagedCertificate(certId, domain),
+			mcrt:           managedcertificate.New(certId, domain).Build(),
 			wantErr:        errGeneric,
 			wantErrorEvent: true,
 		},
@@ -354,7 +355,7 @@ func TestGet(t *testing.T) {
 
 	for _, tc := range testCases {
 		event := &event.FakeEvent{}
-		metrics := fake.NewMetrics()
+		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 
 		sslCert, err := sut.Get("", tc.mcrt)

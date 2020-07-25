@@ -85,6 +85,7 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 	if err != nil {
 		return err
 	}
+
 	if entry.ExcludedFromSLO {
 		klog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
 		return nil

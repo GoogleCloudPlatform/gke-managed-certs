@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package metrics
 
 import (
 	"time"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 )
 
-type FakeMetrics struct {
+type Fake struct {
 	ManagedCertificatesStatuses           map[string]int
 	SslCertificateBackendErrorObserved    int
 	SslCertificateQuotaErrorObserved      int
@@ -30,36 +28,30 @@ type FakeMetrics struct {
 	SslCertificateCreationLatencyObserved int
 }
 
-var _ metrics.Metrics = &FakeMetrics{}
+var _ Metrics = &Fake{}
 
-func NewMetrics() *FakeMetrics {
-	return &FakeMetrics{}
+func NewFake() *Fake {
+	return &Fake{}
 }
 
-func NewMetricsSslCertificateCreationAlreadyReported() *FakeMetrics {
-	metrics := NewMetrics()
-	metrics.SslCertificateCreationLatencyObserved++
-	return metrics
-}
+func (f *Fake) Start(address string) {}
 
-func (f *FakeMetrics) Start(address string) {}
-
-func (f *FakeMetrics) ObserveManagedCertificatesStatuses(statuses map[string]int) {
+func (f *Fake) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 	f.ManagedCertificatesStatuses = statuses
 }
 
-func (f *FakeMetrics) ObserveSslCertificateBackendError() {
+func (f *Fake) ObserveSslCertificateBackendError() {
 	f.SslCertificateBackendErrorObserved++
 }
 
-func (f *FakeMetrics) ObserveSslCertificateQuotaError() {
+func (f *Fake) ObserveSslCertificateQuotaError() {
 	f.SslCertificateQuotaErrorObserved++
 }
 
-func (f *FakeMetrics) ObserveSslCertificateBindingLatency(creationTime time.Time) {
+func (f *Fake) ObserveSslCertificateBindingLatency(creationTime time.Time) {
 	f.SslCertificateBindingLatencyObserved++
 }
 
-func (f *FakeMetrics) ObserveSslCertificateCreationLatency(creationTime time.Time) {
+func (f *Fake) ObserveSslCertificateCreationLatency(creationTime time.Time) {
 	f.SslCertificateCreationLatencyObserved++
 }

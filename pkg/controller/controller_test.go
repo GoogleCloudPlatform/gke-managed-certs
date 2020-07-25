@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -26,9 +25,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -67,7 +67,6 @@ func (f *fakeQueue) NumRequeues(item interface{}) int { return 0 }
 
 func TestSynchronizeAllManagedCertificates(t *testing.T) {
 	testCases := map[string]struct {
-		listerErr   error
 		listerIds   []types.CertId
 		stateIds    []types.CertId
 		wantQueue   []string
@@ -78,21 +77,12 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			nil,
 		},
 		"State two elements, lister one element": {
-			nil,
 			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
 			[]types.CertId{types.NewCertId("default", "baz")},
 			[]string{"default/foo", "default/bar"},
 			map[string]int{"Active": 2},
-		},
-		"State two elements, lister one element and fails": {
-			errors.New("generic error"),
-			[]types.CertId{types.NewCertId("default", "foo"), types.NewCertId("default", "bar")},
-			[]types.CertId{types.NewCertId("default", "baz")},
-			nil,
-			nil,
 		},
 	}
 
@@ -102,10 +92,10 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 
 			var mcrts []*apisv1beta2.ManagedCertificate
 			for _, id := range testCase.listerIds {
-				mcrts = append(mcrts, fake.NewManagedCertificate(id, "example.com"))
+				mcrts = append(mcrts, managedcertificate.New(id, "example.com").WithStatus("Active", "Active").Build())
 			}
 
-			metrics := fake.NewMetrics()
+			metrics := metrics.NewFake()
 			queue := &fakeQueue{}
 			sync := &fakeSync{}
 
@@ -114,15 +104,15 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 				stateEntries[id] = state.Entry{}
 			}
 
-			sut := &controller{
-				lister:  fake.NewLister(testCase.listerErr, mcrts),
+			ctrl := &controller{
+				lister:  managedcertificate.NewLister(mcrts),
 				metrics: metrics,
 				queue:   queue,
 				state:   state.NewFakeWithEntries(stateEntries),
 				sync:    sync,
 			}
 
-			sut.synchronizeAllManagedCertificates(ctx)
+			ctrl.synchronizeAllManagedCertificates(ctx)
 
 			if diff := cmp.Diff(testCase.stateIds, sync.ids); diff != "" {
 				t.Fatalf("Synced ManagedCertificate resources diff (-want, +got): %s", diff)

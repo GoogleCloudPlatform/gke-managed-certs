@@ -31,8 +31,9 @@ import (
 
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
-	cntfake "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/fake"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 	"github.com/google/go-cmp/cmp"
 )
@@ -65,12 +66,12 @@ func TestBindCertificates_IngressListerFailing(t *testing.T) {
 	t.Parallel()
 
 	errLister := errors.New("ingress lister test error")
-	mcrtLister := cntfake.NewLister(nil, nil)
+	mcrtLister := managedcertificate.NewLister(nil)
 	ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
 	ingressLister := newFakeIngressLister(errLister, nil)
 
 	binder := New(&event.FakeEvent{}, ingressClient, ingressLister,
-		mcrtLister, cntfake.NewMetrics(), state.NewFake())
+		mcrtLister, metrics.NewFake(), state.NewFake())
 
 	if err := binder.BindCertificates(); err != errLister {
 		t.Fatalf("binder.BindCertificates(): %v, want %v", err, errLister)
@@ -85,7 +86,7 @@ func TestBindCertificates(t *testing.T) {
 		ingresses     []*api.Ingress
 		wantIngresses []*api.Ingress
 		wantEvent     event.FakeEvent
-		wantMetrics   cntfake.FakeMetrics
+		wantMetrics   metrics.Fake
 	}{
 		"different namespace": {
 			// A ManagedCertificate from in-a-different namespace is attached to an Ingress
@@ -194,7 +195,7 @@ func TestBindCertificates(t *testing.T) {
 				},
 			},
 			wantEvent:   event.FakeEvent{MissingCnt: 1},
-			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 1},
 		},
 		"happy path": {
 			state: map[types.CertId]state.Entry{
@@ -225,7 +226,7 @@ func TestBindCertificates(t *testing.T) {
 					},
 				},
 			},
-			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 2},
+			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 2},
 		},
 		"metrics: excluded from SLO calculation": {
 			state: map[types.CertId]state.Entry{
@@ -255,7 +256,7 @@ func TestBindCertificates(t *testing.T) {
 					},
 				},
 			},
-			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 1},
 		},
 		"metrics: binding already reported": {
 			state: map[types.CertId]state.Entry{
@@ -285,19 +286,20 @@ func TestBindCertificates(t *testing.T) {
 					},
 				},
 			},
-			wantMetrics: cntfake.FakeMetrics{SslCertificateBindingLatencyObserved: 1},
+			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 1},
 		},
 	} {
 		t.Run(description, func(t *testing.T) {
 			event := &event.FakeEvent{}
 			var managedCertificates []*apisv1beta2.ManagedCertificate
 			for id := range tc.state {
-				managedCertificates = append(managedCertificates, cntfake.NewManagedCertificate(id, fmt.Sprintf("mcrt-%s.example.com", id.String())))
+				domain := fmt.Sprintf("mcrt-%s.example.com", id.String())
+				managedCertificates = append(managedCertificates, managedcertificate.New(id, domain).Build())
 			}
-			mcrtLister := cntfake.NewLister(nil, managedCertificates)
+			mcrtLister := managedcertificate.NewLister(managedCertificates)
 			ingressClient := &fake.FakeExtensionsV1beta1{Fake: &cgotesting.Fake{}}
 			ingressLister := newFakeIngressLister(nil, tc.ingresses)
-			metrics := cntfake.NewMetrics()
+			metrics := metrics.NewFake()
 
 			binder := New(event, ingressClient, ingressLister, mcrtLister, metrics, state.NewFakeWithEntries(tc.state))
 
