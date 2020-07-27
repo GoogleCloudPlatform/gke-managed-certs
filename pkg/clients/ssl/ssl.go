@@ -148,7 +148,7 @@ func (s sslImpl) waitFor(ctx context.Context, operationName string) error {
 		klog.Infof("Wait for operation %s", operationName)
 		operation, err := s.service.GlobalOperations.Get(s.projectID, operationName).Do()
 		if err != nil {
-			return fmt.Errorf("could not get operation %s: %s", operationName, err.Error())
+			return fmt.Errorf("could not get operation %s: %v", operationName, err)
 		}
 
 		if operation.Status == statusDone {

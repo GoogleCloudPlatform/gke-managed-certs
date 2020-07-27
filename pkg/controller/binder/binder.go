@@ -25,10 +25,10 @@ import (
 	apiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	listers "k8s.io/client-go/listers/extensions/v1beta1"
+	cgolisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/klog"
 
-	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
+	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -49,14 +49,14 @@ type Binder interface {
 type binderImpl struct {
 	eventClient   event.Event
 	ingressClient v1beta1.IngressesGetter
-	ingressLister listers.IngressLister
+	ingressLister cgolisters.IngressLister
 	metrics       metrics.Metrics
-	mcrtLister    listersv1beta2.ManagedCertificateLister
+	mcrtLister    listersv1.ManagedCertificateLister
 	state         state.State
 }
 
 func New(eventClient event.Event, ingressClient v1beta1.IngressesGetter,
-	ingressLister listers.IngressLister, mcrtLister listersv1beta2.ManagedCertificateLister,
+	ingressLister cgolisters.IngressLister, mcrtLister listersv1.ManagedCertificateLister,
 	metrics metrics.Metrics, state state.State) Binder {
 
 	return binderImpl{

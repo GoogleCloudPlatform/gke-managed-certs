@@ -24,9 +24,9 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
-	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2"
-	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
+	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
@@ -43,17 +43,20 @@ type Sync interface {
 }
 
 type syncImpl struct {
-	client  clientsetv1beta2.NetworkingV1beta2Interface
+	client  clientsetv1.NetworkingV1Interface
 	config  *config.Config
-	lister  listersv1beta2.ManagedCertificateLister
+	lister  listersv1.ManagedCertificateLister
 	metrics metrics.Metrics
 	random  random.Random
 	ssl     sslcertificatemanager.SslCertificateManager
 	state   state.State
 }
 
-func New(client clientsetv1beta2.NetworkingV1beta2Interface, config *config.Config, lister listersv1beta2.ManagedCertificateLister,
-	metrics metrics.Metrics, random random.Random, ssl sslcertificatemanager.SslCertificateManager, state state.State) Sync {
+func New(client clientsetv1.NetworkingV1Interface, config *config.Config,
+	lister listersv1.ManagedCertificateLister, metrics metrics.Metrics,
+	random random.Random, ssl sslcertificatemanager.SslCertificateManager,
+	state state.State) Sync {
+
 	return syncImpl{
 		client:  client,
 		config:  config,
@@ -75,24 +78,32 @@ func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
 		return "", err
 	}
 
-	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s", sslCertificateName, id.String())
+	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s",
+		sslCertificateName, id.String())
+
 	s.state.Insert(id, sslCertificateName)
 	return sslCertificateName, nil
 }
 
-func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string, id types.CertId, mcrt apisv1beta2.ManagedCertificate) error {
+func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string,
+	id types.CertId, mcrt apisv1.ManagedCertificate) error {
+
 	entry, err := s.state.Get(id)
 	if err != nil {
 		return err
 	}
 
 	if entry.ExcludedFromSLO {
-		klog.Infof("Skipping reporting SslCertificate creation metric, because %s is marked as excluded from SLO calculations.", id.String())
+		klog.Infof(`Skipping reporting SslCertificate creation metric,
+			because %s is marked as excluded from SLO calculations.`, id.String())
+
 		return nil
 	}
 
 	if entry.SslCertificateCreationReported {
-		klog.Infof("Skipping reporting SslCertificate creation metric, already reported for %s.", id.String())
+		klog.Infof(`Skipping reporting SslCertificate creation metric,
+			already reported for %s.`, id.String())
+
 		return nil
 	}
 
@@ -109,15 +120,17 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 	return nil
 }
 
-func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1beta2.ManagedCertificate, id types.CertId,
-	sslCertificateName string) error {
+func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1.ManagedCertificate,
+	id types.CertId, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
 	if err := s.state.SetSoftDeleted(id); err != nil {
 		return err
 	}
 
-	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s", sslCertificateName, id.String())
+	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s",
+		sslCertificateName, id.String())
+
 	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, mcrt)); err != nil {
 		return err
 	}
@@ -127,8 +140,8 @@ func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1beta2.Ma
 	return nil
 }
 
-func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName string, id types.CertId,
-	mcrt *apisv1beta2.ManagedCertificate) (*compute.SslCertificate, error) {
+func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName string,
+	id types.CertId, mcrt *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
 
 	exists, err := s.ssl.Exists(sslCertificateName, mcrt)
 	if err != nil {
@@ -190,7 +203,8 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 	if entry, err := s.state.Get(id); err != nil {
 		return err
 	} else if entry.SoftDeleted {
-		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s", id.String(), sslCertificateName)
+		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s",
+			id.String(), sslCertificateName)
 		return s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName)
 	}
 

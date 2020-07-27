@@ -29,7 +29,7 @@ import (
 	lister "k8s.io/client-go/listers/extensions/v1beta1"
 	cgotesting "k8s.io/client-go/testing"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -89,8 +89,9 @@ func TestBindCertificates(t *testing.T) {
 		wantMetrics   metrics.Fake
 	}{
 		"different namespace": {
-			// A ManagedCertificate from in-a-different namespace is attached to an Ingress
-			// from the default namespace. Ingress is not processed.
+			// A ManagedCertificate from in-a-different namespace
+			// is attached to an Ingress from the default namespace.
+			// Ingress is not processed.
 			state: map[types.CertId]state.Entry{
 				types.NewCertId("in-a-different-namespace", "in-a-different-namespace"): state.Entry{SslCertificateName: "in-a-different-namespace"},
 			},
@@ -119,8 +120,8 @@ func TestBindCertificates(t *testing.T) {
 			wantEvent: event.FakeEvent{MissingCnt: 1},
 		},
 		"not existing certificate": {
-			// A not existing ManagedCertificate is attached to an Ingress from the same
-			// namespace. Ingress is not processed.
+			// A not existing ManagedCertificate is attached to an Ingress
+			// from the same namespace. Ingress is not processed.
 			state: map[types.CertId]state.Entry{},
 			ingresses: []*api.Ingress{
 				{
@@ -147,10 +148,11 @@ func TestBindCertificates(t *testing.T) {
 			wantEvent: event.FakeEvent{MissingCnt: 1},
 		},
 		"ingresses are processed independently": {
-			// A missing (not existing) ManagedCertificate is attached to the first Ingress,
-			// the namespaces match - processing the first Ingress fails once the certificate
-			// cannot be found. A valid ManagedCertificate is attached to the second Ingress
-			// which is successfully processed.
+			// A missing (not existing) ManagedCertificate is attached
+			// to the first Ingress, the namespaces match - processing
+			// the first Ingress fails once the certificate cannot
+			// be found. A valid ManagedCertificate is attached
+			// to the second Ingress which is successfully processed.
 			state: map[types.CertId]state.Entry{
 				types.NewCertId("default", "regular"): state.Entry{SslCertificateName: "regular"},
 			},
@@ -291,7 +293,7 @@ func TestBindCertificates(t *testing.T) {
 	} {
 		t.Run(description, func(t *testing.T) {
 			event := &event.FakeEvent{}
-			var managedCertificates []*apisv1beta2.ManagedCertificate
+			var managedCertificates []*apisv1.ManagedCertificate
 			for id := range tc.state {
 				domain := fmt.Sprintf("mcrt-%s.example.com", id.String())
 				managedCertificates = append(managedCertificates, managedcertificate.New(id, domain).Build())

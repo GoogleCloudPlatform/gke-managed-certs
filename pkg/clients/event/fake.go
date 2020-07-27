@@ -17,7 +17,7 @@ limitations under the License.
 package event
 
 import (
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
@@ -31,15 +31,15 @@ type FakeEvent struct {
 
 var _ Event = (*FakeEvent)(nil)
 
-func (f *FakeEvent) BackendError(mcrt apisv1beta2.ManagedCertificate, err error) {
+func (f *FakeEvent) BackendError(mcrt apisv1.ManagedCertificate, err error) {
 	f.BackendErrorCnt++
 }
 
-func (f *FakeEvent) Create(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
+func (f *FakeEvent) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	f.CreateCnt++
 }
 
-func (f *FakeEvent) Delete(mcrt apisv1beta2.ManagedCertificate, sslCertificateName string) {
+func (f *FakeEvent) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	f.DeleteCnt++
 }
 
@@ -47,6 +47,6 @@ func (f *FakeEvent) MissingCertificate(ingress extv1beta1.Ingress, mcrtName stri
 	f.MissingCnt++
 }
 
-func (f *FakeEvent) TooManyCertificates(mcrt apisv1beta2.ManagedCertificate, err error) {
+func (f *FakeEvent) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
 	f.TooManyCnt++
 }

@@ -24,27 +24,31 @@ import (
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 // CopyStatus sets ManagedCertificate status based on SslCertificate object.
-func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1beta2.ManagedCertificate, config *config.Config) error {
-	certificateStatus, err := translateStatus(config.CertificateStatus.Certificate, sslCert.Managed.Status)
+func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1.ManagedCertificate,
+	config *config.Config) error {
+
+	certificateStatus, err := translateStatus(config.CertificateStatus.Certificate,
+		sslCert.Managed.Status)
 	if err != nil {
-		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %s", sslCert, err.Error())
+		return fmt.Errorf("Failed to translate status of SslCertificate %v, err: %v",
+			sslCert, err)
 	}
 	mcrt.Status.CertificateStatus = certificateStatus
 
 	// Initialize with non-nil value to avoid ManagedCertificate CRD validation warnings
-	domainStatuses := make([]apisv1beta2.DomainStatus, 0)
+	domainStatuses := make([]apisv1.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
 		domainStatus, err := translateStatus(config.CertificateStatus.Domain, status)
 		if err != nil {
 			return err
 		}
 
-		domainStatuses = append(domainStatuses, apisv1beta2.DomainStatus{
+		domainStatuses = append(domainStatuses, apisv1.DomainStatus{
 			Domain: domain,
 			Status: domainStatus,
 		})
@@ -58,7 +62,7 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1beta2.ManagedCertifi
 }
 
 // Diff returns the diff of the set of domains of ManagedCertificate and SslCertificate.
-func Diff(mcrt apisv1beta2.ManagedCertificate, sslCert compute.SslCertificate) string {
+func Diff(mcrt apisv1.ManagedCertificate, sslCert compute.SslCertificate) string {
 	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
 	copy(mcrtDomains, mcrt.Spec.Domains)
 	sort.Strings(mcrtDomains)

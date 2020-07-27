@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2"
+	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
@@ -60,7 +60,7 @@ type Clients struct {
 	IngressInformerFactory informers.SharedInformerFactory
 
 	// ManagedCertificateClient manages ManagedCertificate custom resources.
-	ManagedCertificateClient clientsetv1beta2.NetworkingV1beta2Interface
+	ManagedCertificateClient clientsetv1.NetworkingV1Interface
 
 	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources.
 	ManagedCertificateInformerFactory externalversions.SharedInformerFactory
@@ -70,7 +70,8 @@ type Clients struct {
 }
 
 func New(config *config.Config) (*Clients, error) {
-	clusterConfig, err := clientcmd.BuildConfigFromFlags(flags.F.APIServerHost, flags.F.KubeConfigFilePath)
+	clusterConfig, err := clientcmd.BuildConfigFromFlags(
+		flags.F.APIServerHost, flags.F.KubeConfigFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
@@ -102,7 +103,7 @@ func New(config *config.Config) (*Clients, error) {
 		Event:                             event,
 		IngressClient:                     ingressClient,
 		IngressInformerFactory:            ingressFactory,
-		ManagedCertificateClient:          managedCertificateClient.NetworkingV1beta2(),
+		ManagedCertificateClient:          managedCertificateClient.NetworkingV1(),
 		ManagedCertificateInformerFactory: managedCertificateFactory,
 		Ssl:                               ssl,
 	}, nil

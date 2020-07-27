@@ -21,7 +21,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 )
 
 const (
@@ -38,14 +38,19 @@ func NewFake() *Fake {
 	return &Fake{mapping: make(map[string]*compute.SslCertificate, 0)}
 }
 
-func NewFakeWithEntry(sslCertificateName string, domains []string, status string, domainStatus []string) *Fake {
+func NewFakeWithEntry(sslCertificateName string, domains []string, status string,
+	domainStatus []string) *Fake {
+
 	manager := NewFake()
-	manager.mapping[sslCertificateName] = newSslCertificate(sslCertificateName, domains, status, domainStatus)
+	manager.mapping[sslCertificateName] = newSslCertificate(sslCertificateName,
+		domains, status, domainStatus)
 
 	return manager
 }
 
-func newSslCertificate(name string, domains []string, status string, domainStatus []string) *compute.SslCertificate {
+func newSslCertificate(name string, domains []string, status string,
+	domainStatus []string) *compute.SslCertificate {
+
 	domainToStatus := make(map[string]string, 0)
 	for i := 0; i < len(domains) && i < len(domainStatus); i++ {
 		domainToStatus[domains[i]] = domainStatus[i]
@@ -62,22 +67,31 @@ func newSslCertificate(name string, domains []string, status string, domainStatu
 	}
 }
 
-func (f *Fake) Create(ctx context.Context, sslCertificateName string, managedCertificate apisv1beta2.ManagedCertificate) error {
-	f.mapping[sslCertificateName] = newSslCertificate(sslCertificateName, managedCertificate.Spec.Domains, "", nil)
+func (f *Fake) Create(ctx context.Context, sslCertificateName string,
+	managedCertificate apisv1.ManagedCertificate) error {
+
+	f.mapping[sslCertificateName] = newSslCertificate(sslCertificateName,
+		managedCertificate.Spec.Domains, "", nil)
 	return nil
 }
 
-func (f *Fake) Delete(ctx context.Context, sslCertificateName string, managedCertificate *apisv1beta2.ManagedCertificate) error {
+func (f *Fake) Delete(ctx context.Context, sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) error {
+
 	delete(f.mapping, sslCertificateName)
 	return nil
 }
 
-func (f *Fake) Exists(sslCertificateName string, managedCertificate *apisv1beta2.ManagedCertificate) (bool, error) {
+func (f *Fake) Exists(sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) (bool, error) {
+
 	_, exists := f.mapping[sslCertificateName]
 	return exists, nil
 }
 
-func (f *Fake) Get(sslCertificateName string, managedCertificate *apisv1beta2.ManagedCertificate) (*compute.SslCertificate, error) {
+func (f *Fake) Get(sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
+
 	sslCert := f.mapping[sslCertificateName]
 	return sslCert, nil
 }

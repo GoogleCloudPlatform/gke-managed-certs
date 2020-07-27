@@ -107,6 +107,55 @@ func deployCRD() error {
 				{
 					Name:    "v1beta2",
 					Served:  true,
+					Storage: false,
+					Schema: &apiextv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextv1.JSONSchemaProps{
+								"status": {
+									Type: "object",
+									Properties: map[string]apiextv1.JSONSchemaProps{
+										"certificateStatus": {Type: "string"},
+										"domainStatus": {
+											Type: "array",
+											Items: &apiextv1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1.JSONSchemaProps{
+													Type:     "object",
+													Required: []string{"domain", "status"},
+													Properties: map[string]apiextv1.JSONSchemaProps{
+														"domain": {Type: "string"},
+														"status": {Type: "string"},
+													},
+												},
+											},
+										},
+										"certificateName": {Type: "string"},
+										"expireTime":      {Type: "string", Format: "date-time"},
+									},
+								},
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextv1.JSONSchemaProps{
+										"domains": {
+											Type:     "array",
+											MaxItems: &maxDomains100,
+											Items: &apiextv1.JSONSchemaPropsOrArray{
+												Schema: &apiextv1.JSONSchemaProps{
+													Type:      "string",
+													MaxLength: &maxDomainLength,
+													Pattern:   domainRegex,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name:    "v1",
+					Served:  true,
 					Storage: true,
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
@@ -150,6 +199,19 @@ func deployCRD() error {
 									},
 								},
 							},
+						},
+					},
+					AdditionalPrinterColumns: []apiextv1.CustomResourceColumnDefinition{
+						{
+							Name:     "Age",
+							Type:     "date",
+							JSONPath: ".metadata.CreationTimestamp",
+						},
+						{
+							Name:        "Status",
+							Type:        "string",
+							Description: "Status of the managed certificate",
+							JSONPath:    ".status.certificateStatus",
 						},
 					},
 				},

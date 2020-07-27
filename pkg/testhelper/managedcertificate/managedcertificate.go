@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/fake"
-	listersv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
+	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -34,24 +34,24 @@ var (
 )
 
 type builder struct {
-	managedCertificate *apisv1beta2.ManagedCertificate
+	managedCertificate *apisv1.ManagedCertificate
 }
 
 // New builds a ManagedCertificate for a given domain and id.
 func New(id types.CertId, domain string) *builder {
 	return &builder{
-		&apisv1beta2.ManagedCertificate{
+		&apisv1.ManagedCertificate{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Now().Rfc3339Copy(),
 				Namespace:         id.Namespace,
 				Name:              id.Name,
 			},
-			Spec: apisv1beta2.ManagedCertificateSpec{
+			Spec: apisv1.ManagedCertificateSpec{
 				Domains: []string{domain},
 			},
-			Status: apisv1beta2.ManagedCertificateStatus{
+			Status: apisv1.ManagedCertificateStatus{
 				CertificateStatus: "",
-				DomainStatus:      []apisv1beta2.DomainStatus{},
+				DomainStatus:      []apisv1.DomainStatus{},
 			},
 		},
 	}
@@ -60,7 +60,7 @@ func New(id types.CertId, domain string) *builder {
 func (b *builder) WithStatus(status string, domainStatus ...string) *builder {
 	b.managedCertificate.Status.CertificateStatus = status
 	for i, domain := range b.managedCertificate.Spec.Domains {
-		b.managedCertificate.Status.DomainStatus = append(b.managedCertificate.Status.DomainStatus, apisv1beta2.DomainStatus{
+		b.managedCertificate.Status.DomainStatus = append(b.managedCertificate.Status.DomainStatus, apisv1.DomainStatus{
 			Domain: domain,
 			Status: domainStatus[i],
 		})
@@ -73,7 +73,7 @@ func (b *builder) WithCertificateName(certificateName string) *builder {
 	return b
 }
 
-func (b *builder) Build() *apisv1beta2.ManagedCertificate {
+func (b *builder) Build() *apisv1.ManagedCertificate {
 	return b.managedCertificate
 }
 
@@ -81,16 +81,18 @@ func (b *builder) Build() *apisv1beta2.ManagedCertificate {
 type Clientset struct {
 	fake.Clientset
 
-	managedCertificates []*apisv1beta2.ManagedCertificate
+	managedCertificates []*apisv1.ManagedCertificate
 }
 
-func NewClientset(managedCertificates []*apisv1beta2.ManagedCertificate) *Clientset {
+func NewClientset(managedCertificates []*apisv1.ManagedCertificate) *Clientset {
 	return &Clientset{managedCertificates: managedCertificates}
 }
 
-func (c *Clientset) Update(managedCertificate *apisv1beta2.ManagedCertificate) (*apisv1beta2.ManagedCertificate, error) {
+func (c *Clientset) Update(managedCertificate *apisv1.ManagedCertificate) (*apisv1.ManagedCertificate, error) {
 	for i, cert := range c.managedCertificates {
-		if cert.Namespace == managedCertificate.Namespace && cert.Name == managedCertificate.Name {
+		if cert.Namespace == managedCertificate.Namespace &&
+			cert.Name == managedCertificate.Name {
+
 			c.managedCertificates[i] = managedCertificate
 			return managedCertificate, nil
 		}
@@ -101,20 +103,20 @@ func (c *Clientset) Update(managedCertificate *apisv1beta2.ManagedCertificate) (
 
 // Lister implements the ManagedCertificate Lister interface.
 type Lister struct {
-	managedCertificates []*apisv1beta2.ManagedCertificate
+	managedCertificates []*apisv1.ManagedCertificate
 }
 
-var _ listersv1beta2.ManagedCertificateLister = &Lister{}
+var _ listersv1.ManagedCertificateLister = &Lister{}
 
-func NewLister(managedCertificates []*apisv1beta2.ManagedCertificate) *Lister {
+func NewLister(managedCertificates []*apisv1.ManagedCertificate) *Lister {
 	return &Lister{managedCertificates: managedCertificates}
 }
 
-func (l *Lister) List(selector labels.Selector) ([]*apisv1beta2.ManagedCertificate, error) {
+func (l *Lister) List(selector labels.Selector) ([]*apisv1.ManagedCertificate, error) {
 	return l.managedCertificates, nil
 }
 
-func (l *Lister) ManagedCertificates(namespace string) listersv1beta2.ManagedCertificateNamespaceLister {
+func (l *Lister) ManagedCertificates(namespace string) listersv1.ManagedCertificateNamespaceLister {
 	return &namespacedLister{
 		managedCertificates: l.managedCertificates,
 		namespace:           namespace,
@@ -123,14 +125,14 @@ func (l *Lister) ManagedCertificates(namespace string) listersv1beta2.ManagedCer
 
 // namespacedLister implements the ManagedCertificate namespaced Lister interface.
 type namespacedLister struct {
-	managedCertificates []*apisv1beta2.ManagedCertificate
+	managedCertificates []*apisv1.ManagedCertificate
 	namespace           string
 }
 
-var _ listersv1beta2.ManagedCertificateNamespaceLister = &namespacedLister{}
+var _ listersv1.ManagedCertificateNamespaceLister = &namespacedLister{}
 
-func (l *namespacedLister) List(selector labels.Selector) ([]*apisv1beta2.ManagedCertificate, error) {
-	var result []*apisv1beta2.ManagedCertificate
+func (l *namespacedLister) List(selector labels.Selector) ([]*apisv1.ManagedCertificate, error) {
+	var result []*apisv1.ManagedCertificate
 
 	for _, cert := range l.managedCertificates {
 		if cert.Namespace == l.namespace {
@@ -142,7 +144,7 @@ func (l *namespacedLister) List(selector labels.Selector) ([]*apisv1beta2.Manage
 
 }
 
-func (l *namespacedLister) Get(name string) (*apisv1beta2.ManagedCertificate, error) {
+func (l *namespacedLister) Get(name string) (*apisv1.ManagedCertificate, error) {
 	for _, cert := range l.managedCertificates {
 		if cert.Namespace == l.namespace && cert.Name == name {
 			return cert, nil

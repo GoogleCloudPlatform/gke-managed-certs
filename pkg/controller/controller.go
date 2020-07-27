@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1beta2"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/binder"
@@ -42,7 +42,7 @@ import (
 type controller struct {
 	binder  binder.Binder
 	clients *clients.Clients
-	lister  v1beta2.ManagedCertificateLister
+	lister  v1.ManagedCertificateLister
 	metrics metrics.Metrics
 	queue   workqueue.RateLimitingInterface
 	state   state.State
@@ -52,7 +52,7 @@ type controller struct {
 
 func New(config *config.Config, clients *clients.Clients) *controller {
 	ingressLister := clients.IngressInformerFactory.Extensions().V1beta1().Ingresses().Lister()
-	managedCertificateInformer := clients.ManagedCertificateInformerFactory.Networking().V1beta2().ManagedCertificates()
+	managedCertificateInformer := clients.ManagedCertificateInformerFactory.Networking().V1().ManagedCertificates()
 	mcrtLister := managedCertificateInformer.Lister()
 	metrics := metrics.New(config)
 	state := state.New(clients.ConfigMap)

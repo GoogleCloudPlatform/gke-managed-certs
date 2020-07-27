@@ -59,7 +59,8 @@ func main() {
 	klog.InitFlags(nil)
 	flags.Register()
 
-	klog.V(1).Infof("managed-certificate-controller %s starting. Latest commit hash: %s", version.Version, version.GitCommit)
+	klog.V(1).Infof("managed-certificate-controller %s starting. Latest commit hash: %s",
+		version.Version, version.GitCommit)
 	for i, a := range os.Args {
 		klog.V(0).Infof("argv[%d]: %q", i, a)
 	}
@@ -120,7 +121,8 @@ func main() {
 				}
 			},
 			OnStoppedLeading: func() {
-				cancel() // Cancel ctx, shut down and wait for being restarted by kubelet.
+				// Cancel ctx, shut down and wait for being restarted by kubelet.
+				cancel()
 			},
 		},
 	})

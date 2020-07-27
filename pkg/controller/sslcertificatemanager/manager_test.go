@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
@@ -138,12 +138,14 @@ func TestCreate(t *testing.T) {
 
 		oneTooManyCertsEvent := event.TooManyCnt == 1
 		if tc.wantTooManyCertsEvent != oneTooManyCertsEvent {
-			t.Fatalf("TooManyCertificates events generated: %d, want event: %t", event.TooManyCnt, tc.wantTooManyCertsEvent)
+			t.Fatalf("TooManyCertificates events generated: %d, want event: %t",
+				event.TooManyCnt, tc.wantTooManyCertsEvent)
 		}
 
 		oneSslCertificateQuotaErrorObserved := metrics.SslCertificateQuotaErrorObserved == 1
 		if tc.wantTooManyCertsEvent != oneSslCertificateQuotaErrorObserved {
-			t.Fatalf("Metric SslCertificateQuotaError observed %d times", metrics.SslCertificateQuotaErrorObserved)
+			t.Fatalf("Metric SslCertificateQuotaError observed %d times",
+				metrics.SslCertificateQuotaErrorObserved)
 		}
 
 		entry, err := state.Get(certId)
@@ -151,22 +153,26 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("state.Get(%s): %v, want nil", certId.String(), err)
 		}
 		if entry.ExcludedFromSLO != tc.wantExcludedFromSLO {
-			t.Fatalf("Excluded from SLO is %t, want %t", entry.ExcludedFromSLO, tc.wantExcludedFromSLO)
+			t.Fatalf("Excluded from SLO is %t, want %t",
+				entry.ExcludedFromSLO, tc.wantExcludedFromSLO)
 		}
 
 		oneBackendErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantBackendErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantBackendErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t",
+				event.BackendErrorCnt, tc.wantBackendErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
 		if tc.wantBackendErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
+			t.Fatalf("Metric SslCertificateBackendError observed %d times",
+				metrics.SslCertificateBackendErrorObserved)
 		}
 
 		oneCreateEvent := event.CreateCnt == 1
 		if tc.wantCreateEvent != oneCreateEvent {
-			t.Fatalf("Create events generated: %d, want event: %t", event.CreateCnt, tc.wantCreateEvent)
+			t.Fatalf("Create events generated: %d, want event: %t",
+				event.CreateCnt, tc.wantCreateEvent)
 		}
 	}
 }
@@ -174,7 +180,7 @@ func TestCreate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	testCases := []struct {
 		ssl             ssl.Ssl
-		mcrt            *apisv1beta2.ManagedCertificate
+		mcrt            *apisv1.ManagedCertificate
 		wantErr         error
 		wantErrorEvent  bool
 		wantDeleteEvent bool
@@ -221,17 +227,20 @@ func TestDelete(t *testing.T) {
 
 		oneBackendErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t",
+				event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
 		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
+			t.Fatalf("Metric SslCertificateBackendError observed %d times",
+				metrics.SslCertificateBackendErrorObserved)
 		}
 
 		oneDeleteEvent := event.DeleteCnt == 1
 		if tc.wantDeleteEvent != oneDeleteEvent {
-			t.Fatalf("Delete events generated: %d, want event: %t", event.DeleteCnt, tc.wantDeleteEvent)
+			t.Fatalf("Delete events generated: %d, want event: %t",
+				event.DeleteCnt, tc.wantDeleteEvent)
 		}
 	}
 }
@@ -239,7 +248,7 @@ func TestDelete(t *testing.T) {
 func TestExists(t *testing.T) {
 	testCases := []struct {
 		ssl            ssl.Ssl
-		mcrt           *apisv1beta2.ManagedCertificate
+		mcrt           *apisv1.ManagedCertificate
 		wantExists     bool
 		wantErr        error
 		wantErrorEvent bool
@@ -297,12 +306,14 @@ func TestExists(t *testing.T) {
 
 		oneErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t",
+				event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
 		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
+			t.Fatalf("Metric SslCertificateBackendError observed %d times",
+				metrics.SslCertificateBackendErrorObserved)
 		}
 	}
 }
@@ -310,7 +321,7 @@ func TestExists(t *testing.T) {
 func TestGet(t *testing.T) {
 	testCases := []struct {
 		ssl            ssl.Ssl
-		mcrt           *apisv1beta2.ManagedCertificate
+		mcrt           *apisv1.ManagedCertificate
 		wantCert       *compute.SslCertificate
 		wantErr        error
 		wantErrorEvent bool
@@ -368,12 +379,14 @@ func TestGet(t *testing.T) {
 
 		oneErrorEvent := event.BackendErrorCnt == 1
 		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t", event.BackendErrorCnt, tc.wantErrorEvent)
+			t.Fatalf("BackendError events generated: %d, want event: %t",
+				event.BackendErrorCnt, tc.wantErrorEvent)
 		}
 
 		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
 		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times", metrics.SslCertificateBackendErrorObserved)
+			t.Fatalf("Metric SslCertificateBackendError observed %d times",
+				metrics.SslCertificateBackendErrorObserved)
 		}
 	}
 }

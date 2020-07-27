@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 
-	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
@@ -42,9 +42,9 @@ func sslCert(status string, domains map[string]string) compute.SslCertificate {
 	}
 }
 
-func mcrt(status string, domains []apisv1beta2.DomainStatus) *apisv1beta2.ManagedCertificate {
-	return &apisv1beta2.ManagedCertificate{
-		Status: apisv1beta2.ManagedCertificateStatus{
+func mcrt(status string, domains []apisv1.DomainStatus) *apisv1.ManagedCertificate {
+	return &apisv1.ManagedCertificate{
+		Status: apisv1.ManagedCertificateStatus{
 			CertificateName:   fakeNameFieldValue,
 			CertificateStatus: status,
 			ExpireTime:        fakeTimeFieldValue,
@@ -57,7 +57,7 @@ func TestCopyStatus(t *testing.T) {
 	testCases := map[string]struct {
 		sslCertIn   compute.SslCertificate
 		wantSuccess bool // translation should succeed
-		wantMcrt    *apisv1beta2.ManagedCertificate
+		wantMcrt    *apisv1.ManagedCertificate
 	}{
 		"Wrong certificate status": {
 			sslCert("bad_status", nil),
@@ -72,22 +72,24 @@ func TestCopyStatus(t *testing.T) {
 		"Nil domain statuses -> []{} domain status": {
 			sslCert("ACTIVE", nil),
 			true,
-			mcrt("Active", []apisv1beta2.DomainStatus{}),
+			mcrt("Active", []apisv1.DomainStatus{}),
 		},
 		"Correct translation": {
 			sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}),
 			true,
-			mcrt("Active", []apisv1beta2.DomainStatus{apisv1beta2.DomainStatus{Domain: "example.com", Status: "Active"}}),
+			mcrt("Active", []apisv1.DomainStatus{apisv1.DomainStatus{Domain: "example.com", Status: "Active"}}),
 		},
 	}
 
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
-			var mcrt apisv1beta2.ManagedCertificate
-			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFakeCertificateStatusConfig())
+			var mcrt apisv1.ManagedCertificate
+			err := CopyStatus(testCase.sslCertIn, &mcrt,
+				config.NewFakeCertificateStatusConfig())
 
 			if (err == nil) != testCase.wantSuccess {
-				t.Errorf("Translation err: %s, want success: %t", err.Error(), testCase.wantSuccess)
+				t.Errorf("Translation err: %v, want success: %t",
+					err, testCase.wantSuccess)
 			}
 
 			if err != nil {
@@ -95,7 +97,8 @@ func TestCopyStatus(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(testCase.wantMcrt, &mcrt); diff != "" {
-				t.Errorf("CopyStatus, diff ManagedCertificate (-want, +got): %s", diff)
+				t.Errorf("CopyStatus, diff ManagedCertificate (-want, +got): %s",
+					diff)
 			}
 		})
 	}
@@ -119,8 +122,8 @@ func TestDiff(t *testing.T) {
 
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
-			mcrt := apisv1beta2.ManagedCertificate{
-				Spec: apisv1beta2.ManagedCertificateSpec{
+			mcrt := apisv1.ManagedCertificate{
+				Spec: apisv1.ManagedCertificateSpec{
 					Domains: testCase.mcrtDomains,
 				},
 			}
@@ -132,7 +135,8 @@ func TestDiff(t *testing.T) {
 			}
 
 			if diff := Diff(mcrt, sslCert); (diff == "") != testCase.wantEmptyDiff {
-				t.Errorf("Diff(ManagedCertificate, SslCertificate) = %s, want empty diff: %t", diff, testCase.wantEmptyDiff)
+				t.Errorf(`Diff(ManagedCertificate, SslCertificate) = %s,
+					want empty diff: %t`, diff, testCase.wantEmptyDiff)
 			}
 		})
 	}

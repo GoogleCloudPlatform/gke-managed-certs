@@ -19,105 +19,159 @@ metadata:
 spec:
   group: networking.gke.io
   versions:
-      # (Deprecated)
-    - name: v1beta1
-      served: true
-      storage: false
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            status:
-              type: object
-              properties:
-                certificateStatus:
-                # The status of the managed certificate.
+  - name: v1beta1  # (Deprecated)
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          status:
+            type: object
+            properties:
+              certificateStatus:
+              # The status of the managed certificate.
+                type: string
+              domainStatus:
+              # The status of certificate provisioning for domains
+              # selected by the user.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - domain
+                  - status
+                  properties:
+                    domain:
+                      type: string
+                    status:
+                      type: string
+              certificateName:
+              # The name of the provisioned managed certificate.
+                type: string
+              expireTime:
+              # The expire time of the provisioned managed certificate.
+              # The certificate will be renewed automatically unless
+              # the DNS configuration changes and prevents that.
+                type: string
+                format: date-time
+          spec:
+            type: object
+            properties:
+              domains:
+              # One non-wildcard domain name up to 63 characters long.
+                type: array
+                maxItems: 1
+                items:
                   type: string
-                domainStatus:
-                # The status of certificate provisioning for domains
-                # selected by the user.
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - domain
-                      - status
-                    properties:
-                      domain:
-                        type: string
-                      status:
-                        type: string
-                certificateName:
-                # The name of the provisioned managed certificate.
+                  maxLength: 63
+                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+  - name: v1beta2  # (Deprecated)
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          status:
+            type: object
+            properties:
+              certificateStatus:
+              # The status of the managed certificate.
+                type: string
+              domainStatus:
+              # The status of certificate provisioning for domains
+              # selected by the user.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - domain
+                  - status
+                  properties:
+                    domain:
+                      type: string
+                    status:
+                      type: string
+              certificateName:
+              # The name of the provisioned managed certificate.
+                type: string
+              expireTime:
+              # The expire time of the provisioned managed certificate.
+              # The certificate will be renewed automatically unless
+              # the DNS configuration changes and prevents that.
+                type: string
+                format: date-time
+          spec:
+            type: object
+            properties:
+              domains:
+              # Up to 100 non-wildcard domain names, each up to 63 characters long.
+                type: array
+                maxItems: 100
+                items:
                   type: string
-                expireTime:
-                # The expire time of the provisioned managed certificate.
-                # The certificate will be renewed automatically unless
-                # the DNS configuration changes and prevents that.
+                  maxLength: 63
+                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          status:
+            type: object
+            properties:
+              certificateStatus:
+              # The status of the managed certificate.
+                type: string
+              domainStatus:
+              # The status of certificate provisioning for domains
+              # selected by the user.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - domain
+                  - status
+                  properties:
+                    domain:
+                      type: string
+                    status:
+                      type: string
+              certificateName:
+              # The name of the provisioned managed certificate.
+                type: string
+              expireTime:
+              # The expire time of the provisioned managed certificate.
+              # The certificate will be renewed automatically unless
+              # the DNS configuration changes and prevents that.
+                type: string
+                format: date-time
+          spec:
+            type: object
+            properties:
+              domains:
+              # Up to 100 non-wildcard domain names, each up to 63 characters long.
+                type: array
+                maxItems: 100
+                items:
                   type: string
-                  format: date-time
-            spec:
-              type: object
-              properties:
-                domains:
-                # One non-wildcard domain name up to 63 characters long.
-                  type: array
-                  maxItems: 1
-                  items:
-                    type: string
-                    maxLength: 63
-                    pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
-    - name: v1beta2
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            status:
-              type: object
-              properties:
-                certificateStatus:
-                # The status of the managed certificate.
-                  type: string
-                domainStatus:
-                # The status of certificate provisioning for domains
-                # selected by the user.
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - domain
-                      - status
-                    properties:
-                      domain:
-                        type: string
-                      status:
-                        type: string
-                certificateName:
-                # The name of the provisioned managed certificate.
-                  type: string
-                expireTime:
-                # The expire time of the provisioned managed certificate.
-                # The certificate will be renewed automatically unless
-                # the DNS configuration changes and prevents that.
-                  type: string
-                  format: date-time
-            spec:
-              type: object
-              properties:
-                domains:
-                # Up to 100 non-wildcard domain names, each up to 63 characters long.
-                  type: array
-                  maxItems: 100
-                  items:
-                    type: string
-                    maxLength: 63
-                    pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+                  maxLength: 63
+                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+    additionalPrinterColumns:
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    - name: Status
+      type: string
+      description: Status of the managed certificate
+      jsonPath: .status.certificateStatus
   scope: Namespaced
   names:
     plural: managedcertificates
     singular: managedcertificate
     kind: ManagedCertificate
     shortNames:
-      - mcrt
+    - mcrt

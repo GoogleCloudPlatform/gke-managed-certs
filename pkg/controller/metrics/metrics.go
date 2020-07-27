@@ -105,7 +105,7 @@ func New(config *config.Config) Metrics {
 func (m metricsImpl) Start(address string) {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(address, nil)
-	klog.Fatalf("Failed to expose metrics: %s", err.Error())
+	klog.Fatalf("Failed to expose metrics: %v", err)
 }
 
 // ObserveManagedCertificatesStatuses accepts a mapping from ManagedCertificate certificate status to number of occurences of this status among ManagedCertificate resources and records the data as a metric.
