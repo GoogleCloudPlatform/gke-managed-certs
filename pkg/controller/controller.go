@@ -27,7 +27,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/binder"
@@ -42,46 +41,27 @@ import (
 type controller struct {
 	binder  binder.Binder
 	clients *clients.Clients
-	lister  v1.ManagedCertificateLister
-	metrics metrics.Metrics
+	metrics metrics.Interface
 	queue   workqueue.RateLimitingInterface
-	state   state.State
-	sync    sync.Sync
-	synced  cache.InformerSynced
+	state   state.Interface
+	sync    sync.Interface
 }
 
 func New(config *config.Config, clients *clients.Clients) *controller {
 	ingressLister := clients.IngressInformerFactory.Extensions().V1beta1().Ingresses().Lister()
-	managedCertificateInformer := clients.ManagedCertificateInformerFactory.Networking().V1().ManagedCertificates()
-	mcrtLister := managedCertificateInformer.Lister()
 	metrics := metrics.New(config)
 	state := state.New(clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
-	controller := &controller{
-		binder:  binder.New(clients.Event, clients.IngressClient, ingressLister, mcrtLister, metrics, state),
+
+	return &controller{
+		binder:  binder.New(clients.Event, clients.IngressClient, ingressLister, clients.ManagedCertificate, metrics, state),
 		clients: clients,
-		lister:  mcrtLister,
 		metrics: metrics,
 		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
 		state:   state,
-		sync:    sync.New(clients.ManagedCertificateClient, config, mcrtLister, metrics, random, ssl, state),
-		synced:  managedCertificateInformer.Informer().HasSynced,
+		sync:    sync.New(config, clients.ManagedCertificate, metrics, random, ssl, state),
 	}
-
-	managedCertificateInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			controller.enqueue(obj)
-		},
-		UpdateFunc: func(old, new interface{}) {
-			controller.enqueue(new)
-		},
-		DeleteFunc: func(obj interface{}) {
-			controller.enqueue(obj)
-		},
-	})
-
-	return controller
 }
 
 func (c *controller) Run(ctx context.Context) error {
@@ -93,10 +73,10 @@ func (c *controller) Run(ctx context.Context) error {
 	klog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
-	c.clients.Run(ctx)
+	c.clients.Run(ctx, c.queue)
 
 	klog.Info("Waiting for ManagedCertificate cache sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.synced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.clients.HasSynced) {
 		return fmt.Errorf("Timed out waiting for ManagedCertificate cache sync")
 	}
 	klog.Info("ManagedCertificate cache synced")

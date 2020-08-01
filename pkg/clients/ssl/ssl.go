@@ -40,19 +40,19 @@ type Error struct {
 	operation *compute.Operation
 }
 
-func (s *Error) Error() string {
+func (e *Error) Error() string {
 	var computeErrors []string
-	for _, err := range s.operation.Error.Errors {
+	for _, err := range e.operation.Error.Errors {
 		computeErrors = append(computeErrors, fmt.Sprintf("(%s: %s)", err.Code, err.Message))
 	}
 
-	return fmt.Sprintf("operation %s %s. Status: %s (%d), errors: %s", s.operation.Name,
-		s.operation.Status, s.operation.HttpErrorMessage, s.operation.HttpErrorStatusCode,
+	return fmt.Sprintf("operation %s %s. Status: %s (%d), errors: %s", e.operation.Name,
+		e.operation.Status, e.operation.HttpErrorMessage, e.operation.HttpErrorStatusCode,
 		strings.Join(computeErrors, ", "))
 }
 
-func (s *Error) IsQuotaExceeded() bool {
-	for _, err := range s.operation.Error.Errors {
+func (e *Error) IsQuotaExceeded() bool {
+	for _, err := range e.operation.Error.Errors {
 		if err.Code == codeQuotaExceeded {
 			return true
 		}
@@ -61,33 +61,40 @@ func (s *Error) IsQuotaExceeded() bool {
 	return false
 }
 
-type Ssl interface {
+// Interface exposes operations for manipulating SslCertificate resources.
+type Interface interface {
+	// Create creates a new SslCertificate resource.
 	Create(ctx context.Context, name string, domains []string) error
+	// Delete deletes an SslCertificate resource.
 	Delete(ctx context.Context, name string) error
+	// Exists returns true if an SslCertificate exists, false if it is deleted.
+	// Error is not nil if an error has occurred.
 	Exists(name string) (bool, error)
+	// Get fetches an SslCertificate resource.
 	Get(name string) (*compute.SslCertificate, error)
+	// List fetches all SslCertificate resources.
 	List() ([]*compute.SslCertificate, error)
 }
 
-type sslImpl struct {
+type impl struct {
 	service   *compute.Service
 	projectID string
 }
 
-func New(client *http.Client, projectID string) (Ssl, error) {
+func New(client *http.Client, projectID string) (Interface, error) {
 	service, err := compute.New(client)
 	if err != nil {
 		return nil, err
 	}
 
-	return &sslImpl{
+	return &impl{
 		service:   service,
 		projectID: projectID,
 	}, nil
 }
 
 // Create creates a new SslCertificate resource.
-func (s sslImpl) Create(ctx context.Context, name string, domains []string) error {
+func (s impl) Create(ctx context.Context, name string, domains []string) error {
 	sslCertificate := &compute.SslCertificate{
 		Managed: &compute.SslCertificateManagedSslCertificate{
 			Domains: domains,
@@ -105,7 +112,7 @@ func (s sslImpl) Create(ctx context.Context, name string, domains []string) erro
 }
 
 // Delete deletes an SslCertificate resource.
-func (s sslImpl) Delete(ctx context.Context, name string) error {
+func (s impl) Delete(ctx context.Context, name string) error {
 	operation, err := s.service.SslCertificates.Delete(s.projectID, name).Do()
 	if err != nil {
 		return err
@@ -114,8 +121,9 @@ func (s sslImpl) Delete(ctx context.Context, name string) error {
 	return s.waitFor(ctx, operation.Name)
 }
 
-// Exists returns true if an SslCertificate exists, false if it is deleted. Error is not nil if an error has occurred.
-func (s sslImpl) Exists(name string) (bool, error) {
+// Exists returns true if an SslCertificate exists, false if it is deleted.
+// Error is not nil if an error has occurred.
+func (s impl) Exists(name string) (bool, error) {
 	_, err := s.Get(name)
 	if err == nil {
 		return true, nil
@@ -129,12 +137,12 @@ func (s sslImpl) Exists(name string) (bool, error) {
 }
 
 // Get fetches an SslCertificate resource.
-func (s sslImpl) Get(name string) (*compute.SslCertificate, error) {
+func (s impl) Get(name string) (*compute.SslCertificate, error) {
 	return s.service.SslCertificates.Get(s.projectID, name).Do()
 }
 
 // List fetches all SslCertificate resources.
-func (s sslImpl) List() ([]*compute.SslCertificate, error) {
+func (s impl) List() ([]*compute.SslCertificate, error) {
 	sslCertificates, err := s.service.SslCertificates.List(s.projectID).Do()
 	if err != nil {
 		return nil, err
@@ -143,7 +151,7 @@ func (s sslImpl) List() ([]*compute.SslCertificate, error) {
 	return sslCertificates.Items, nil
 }
 
-func (s sslImpl) waitFor(ctx context.Context, operationName string) error {
+func (s impl) waitFor(ctx context.Context, operationName string) error {
 	for {
 		klog.Infof("Wait for operation %s", operationName)
 		operation, err := s.service.GlobalOperations.Get(s.projectID, operationName).Do()

@@ -39,20 +39,28 @@ const (
 	reasonTooManyCertificates = "TooManyCertificates"
 )
 
-type Event interface {
+// Interface exposes operations for manipulating Event resources.
+type Interface interface {
+	// BackendError creates an event when a transient error occurrs when calling GCP API.
 	BackendError(mcrt apisv1.ManagedCertificate, err error)
+	// Create creates an event when an SslCertificate associated with ManagedCertificate is created.
 	Create(mcrt apisv1.ManagedCertificate, sslCertificateName string)
+	// Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
 	Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string)
+	// MissingCertificate creates an event when a ManagedCertificate attached to Ingress
+	// is not found.
 	MissingCertificate(ingress extv1beta1.Ingress, mcrtName string)
+	// TooManyCertificates creates an event when quota for maximum
+	// number of SslCertificates per GCP project is exceeded.
 	TooManyCertificates(mcrt apisv1.ManagedCertificate, err error)
 }
 
-type eventImpl struct {
+type impl struct {
 	recorder record.EventRecorder
 }
 
 // New creates an event recorder to send custom events to Kubernetes.
-func New(client kubernetes.Interface) (Event, error) {
+func New(client kubernetes.Interface) (Interface, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.V(4).Infof)
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{
@@ -67,38 +75,38 @@ func New(client kubernetes.Interface) (Event, error) {
 		return nil, err
 	}
 
-	return &eventImpl{
+	return &impl{
 		recorder: broadcaster.NewRecorder(eventsScheme,
 			v1.EventSource{Component: component}),
 	}, nil
 }
 
 // BackendError creates an event when a transient error occurrs when calling GCP API.
-func (e eventImpl) BackendError(mcrt apisv1.ManagedCertificate, err error) {
+func (e impl) BackendError(mcrt apisv1.ManagedCertificate, err error) {
 	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonBackendError, err.Error())
 }
 
 // Create creates an event when an SslCertificate associated with ManagedCertificate is created.
-func (e eventImpl) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (e impl) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonCreate,
 		"Create SslCertificate %s", sslCertificateName)
 }
 
 // Delete creates an event when an SslCertificate associated with ManagedCertificate is deleted.
-func (e eventImpl) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (e impl) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	e.recorder.Eventf(&mcrt, v1.EventTypeNormal, reasonDelete,
 		"Delete SslCertificate %s", sslCertificateName)
 }
 
 // MissingCertificate creates an event when a ManagedCertificate attached to Ingress
 // is not found.
-func (e eventImpl) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
+func (e impl) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
 	e.recorder.Eventf(&ingress, v1.EventTypeWarning, reasonMissingCertificate,
 		"ManagedCertificate %s:%s missing", ingress.Namespace, mcrtName)
 }
 
 // TooManyCertificates creates an event when quota for maximum
 // number of SslCertificates per GCP project is exceeded.
-func (e eventImpl) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
+func (e impl) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
 	e.recorder.Event(&mcrt, v1.EventTypeWarning, reasonTooManyCertificates, err.Error())
 }

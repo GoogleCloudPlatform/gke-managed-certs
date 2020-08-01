@@ -25,6 +25,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
+	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
@@ -38,7 +40,7 @@ type fakeSync struct {
 	ids []types.CertId
 }
 
-var _ sync.Sync = &fakeSync{}
+var _ sync.Interface = &fakeSync{}
 
 func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.CertId) error {
 	f.ids = append(f.ids, id)
@@ -105,7 +107,7 @@ func TestSynchronizeAllManagedCertificates(t *testing.T) {
 			}
 
 			ctrl := &controller{
-				lister:  managedcertificate.NewLister(mcrts),
+				clients: &clients.Clients{ManagedCertificate: clientsmcrt.NewFake(mcrts)},
 				metrics: metrics,
 				queue:   queue,
 				state:   state.NewFakeWithEntries(stateEntries),

@@ -21,7 +21,7 @@ import (
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
-type FakeEvent struct {
+type Fake struct {
 	BackendErrorCnt int
 	CreateCnt       int
 	DeleteCnt       int
@@ -29,24 +29,24 @@ type FakeEvent struct {
 	TooManyCnt      int
 }
 
-var _ Event = (*FakeEvent)(nil)
+var _ Interface = (*Fake)(nil)
 
-func (f *FakeEvent) BackendError(mcrt apisv1.ManagedCertificate, err error) {
+func (f *Fake) BackendError(mcrt apisv1.ManagedCertificate, err error) {
 	f.BackendErrorCnt++
 }
 
-func (f *FakeEvent) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (f *Fake) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	f.CreateCnt++
 }
 
-func (f *FakeEvent) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (f *Fake) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
 	f.DeleteCnt++
 }
 
-func (f *FakeEvent) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
+func (f *Fake) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
 	f.MissingCnt++
 }
 
-func (f *FakeEvent) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
+func (f *Fake) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
 	f.TooManyCnt++
 }

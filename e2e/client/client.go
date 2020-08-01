@@ -60,7 +60,7 @@ type Clients struct {
 	ManagedCertificate managedcertificate.ManagedCertificate
 	Service            corev1.ServiceInterface
 	ServiceAccount     corev1.ServiceAccountInterface
-	SslCertificate     ssl.Ssl
+	SslCertificate     ssl.Interface
 }
 
 func New(namespace string) (*Clients, error) {

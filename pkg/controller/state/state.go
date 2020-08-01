@@ -45,7 +45,7 @@ type Entry struct {
 	SslCertificateCreationReported bool
 }
 
-type State interface {
+type Interface interface {
 	Delete(id types.CertId)
 	Get(id types.CertId) (Entry, error)
 	Insert(id types.CertId, sslCertificateName string)
@@ -56,17 +56,17 @@ type State interface {
 	SetSslCertificateCreationReported(id types.CertId) error
 }
 
-type stateImpl struct {
+type impl struct {
 	sync.RWMutex
 
 	// Maps ManagedCertificate to SslCertificate
 	mapping map[types.CertId]Entry
 
 	// Manages ConfigMap objects
-	configmap configmap.ConfigMap
+	configmap configmap.Interface
 }
 
-func New(configmap configmap.ConfigMap) State {
+func New(configmap configmap.Interface) Interface {
 	mapping := make(map[types.CertId]Entry)
 
 	config, err := configmap.Get(configMapNamespace, configMapName)
@@ -76,14 +76,14 @@ func New(configmap configmap.ConfigMap) State {
 		mapping = unmarshal(config.Data)
 	}
 
-	return &stateImpl{
+	return &impl{
 		mapping:   mapping,
 		configmap: configmap,
 	}
 }
 
 // Delete deletes entry associated with ManagedCertificate id.
-func (state *stateImpl) Delete(id types.CertId) {
+func (state *impl) Delete(id types.CertId) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.mapping, id)
@@ -91,7 +91,7 @@ func (state *stateImpl) Delete(id types.CertId) {
 }
 
 // Get fetches an entry associated with ManagedCertificate id.
-func (state *stateImpl) Get(id types.CertId) (Entry, error) {
+func (state *impl) Get(id types.CertId) (Entry, error) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -105,7 +105,7 @@ func (state *stateImpl) Get(id types.CertId) (Entry, error) {
 
 // Insert adds a new entry with an associated SslCertificate name.
 // If an id already exists in state, it is overwritten.
-func (state *stateImpl) Insert(id types.CertId, sslCertificateName string) {
+func (state *impl) Insert(id types.CertId, sslCertificateName string) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -121,7 +121,7 @@ func (state *stateImpl) Insert(id types.CertId, sslCertificateName string) {
 }
 
 // List fetches all data stored in state.
-func (state *stateImpl) List() map[types.CertId]Entry {
+func (state *impl) List() map[types.CertId]Entry {
 	data := make(map[types.CertId]Entry, 0)
 
 	state.RLock()
@@ -136,7 +136,7 @@ func (state *stateImpl) List() map[types.CertId]Entry {
 // SetExcludedFromSLO sets to true a flag indicating that entry associated
 // with given ManagedCertificate id should not be taken into account
 // for the purposes of SLO calculation.
-func (state *stateImpl) SetExcludedFromSLO(id types.CertId) error {
+func (state *impl) SetExcludedFromSLO(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -155,7 +155,7 @@ func (state *stateImpl) SetExcludedFromSLO(id types.CertId) error {
 
 // SetSoftDeleted sets to true a flag indicating that entry associated
 // with given ManagedCertificate id has been deleted.
-func (state *stateImpl) SetSoftDeleted(id types.CertId) error {
+func (state *impl) SetSoftDeleted(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -175,7 +175,7 @@ func (state *stateImpl) SetSoftDeleted(id types.CertId) error {
 // SetSslCertificateBindingReported sets to true a flag indicating that
 // SslCertificate binding metric has been already reported
 // for this ManagedCertificate id.
-func (state *stateImpl) SetSslCertificateBindingReported(id types.CertId) error {
+func (state *impl) SetSslCertificateBindingReported(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -195,7 +195,7 @@ func (state *stateImpl) SetSslCertificateBindingReported(id types.CertId) error 
 // SetSslCertificateCreationReported sets to true a flag indicating that
 // SslCertificate creation metric has been already reported
 // for this ManagedCertificate id.
-func (state *stateImpl) SetSslCertificateCreationReported(id types.CertId) error {
+func (state *impl) SetSslCertificateCreationReported(id types.CertId) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -212,7 +212,7 @@ func (state *stateImpl) SetSslCertificateCreationReported(id types.CertId) error
 	return nil
 }
 
-func (state *stateImpl) persist() {
+func (state *impl) persist() {
 	config := &api.ConfigMap{
 		Data: marshal(state.mapping),
 		ObjectMeta: metav1.ObjectMeta{

@@ -27,7 +27,7 @@ const (
 	sslCertificateNamePrefix = "test-certificate"
 )
 
-func newName(r Random, t *testing.T) string {
+func newName(r Interface, t *testing.T) string {
 	if name, err := r.Name(); err != nil {
 		t.Errorf("Failed to create random name: %v", err)
 		return ""

@@ -32,7 +32,7 @@ type Fake struct {
 	mapping map[string]*compute.SslCertificate
 }
 
-var _ SslCertificateManager = &Fake{}
+var _ Interface = &Fake{}
 
 func NewFake() *Fake {
 	return &Fake{mapping: make(map[string]*compute.SslCertificate, 0)}

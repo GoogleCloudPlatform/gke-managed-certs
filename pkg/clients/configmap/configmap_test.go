@@ -70,10 +70,10 @@ func TestUpdateOrCreate(t *testing.T) {
 		createCalled := false
 		fakeClient.AddReactor("create", resource, buildCreateFunc(&createCalled))
 
-		sut := configMapImpl{
+		configMap := impl{
 			client: fakeClient,
 		}
-		err := sut.UpdateOrCreate(namespace, &api.ConfigMap{})
+		err := configMap.UpdateOrCreate(namespace, &api.ConfigMap{})
 
 		if err != testCase.returnedError {
 			t.Errorf("UpdateOrCreate returned error %#v, want %#v", err, testCase.returnedError)

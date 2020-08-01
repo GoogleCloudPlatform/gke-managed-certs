@@ -27,22 +27,20 @@ const (
 	maxNameLength = 63
 )
 
-type Random interface {
+type Interface interface {
 	Name() (string, error)
 }
 
-type randomImpl struct {
+type impl struct {
 	sslCertificateNamePrefix string
 }
 
-func New(sslCertificateNamePrefix string) Random {
-	return randomImpl{
-		sslCertificateNamePrefix: sslCertificateNamePrefix,
-	}
+func New(sslCertificateNamePrefix string) Interface {
+	return impl{sslCertificateNamePrefix: sslCertificateNamePrefix}
 }
 
 // Name generates a random name for SslCertificate resource.
-func (r randomImpl) Name() (string, error) {
+func (r impl) Name() (string, error) {
 	if uid, err := uuid.NewRandom(); err != nil {
 		return "", err
 	} else {

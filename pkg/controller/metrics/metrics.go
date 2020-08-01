@@ -35,7 +35,7 @@ const (
 	statusUnknown = "Unknown"
 )
 
-type Metrics interface {
+type Interface interface {
 	Start(address string)
 	ObserveManagedCertificatesStatuses(statuses map[string]int)
 	ObserveSslCertificateBackendError()
@@ -44,7 +44,7 @@ type Metrics interface {
 	ObserveSslCertificateCreationLatency(creationTime time.Time)
 }
 
-type metricsImpl struct {
+type impl struct {
 	config                          *config.Config
 	managedCertificateStatus        *prometheus.GaugeVec
 	sslCertificateBackendErrorTotal prometheus.Counter
@@ -53,8 +53,8 @@ type metricsImpl struct {
 	sslCertificateCreationLatency   prometheus.Histogram
 }
 
-func New(config *config.Config) Metrics {
-	return metricsImpl{
+func New(config *config.Config) Interface {
+	return impl{
 		config: config,
 		managedCertificateStatus: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -102,14 +102,14 @@ func New(config *config.Config) Metrics {
 }
 
 // Start exposes Prometheus metrics on given address
-func (m metricsImpl) Start(address string) {
+func (m impl) Start(address string) {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(address, nil)
 	klog.Fatalf("Failed to expose metrics: %v", err)
 }
 
 // ObserveManagedCertificatesStatuses accepts a mapping from ManagedCertificate certificate status to number of occurences of this status among ManagedCertificate resources and records the data as a metric.
-func (m metricsImpl) ObserveManagedCertificatesStatuses(statuses map[string]int) {
+func (m impl) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 	for mcrtStatus, occurences := range statuses {
 		label := statusUnknown
 		for _, v := range m.config.CertificateStatus.Certificate {
@@ -124,25 +124,25 @@ func (m metricsImpl) ObserveManagedCertificatesStatuses(statuses map[string]int)
 }
 
 // ObserveSslCertificateBackendError observes an error when performing action on SslCertificate resource.
-func (m metricsImpl) ObserveSslCertificateBackendError() {
+func (m impl) ObserveSslCertificateBackendError() {
 	m.sslCertificateBackendErrorTotal.Inc()
 }
 
 // ObserveSslCertificateQuotaError observes an out-of-quota error when performing action on SslCertificate resource.
-func (m metricsImpl) ObserveSslCertificateQuotaError() {
+func (m impl) ObserveSslCertificateQuotaError() {
 	m.sslCertificateQuotaErrorTotal.Inc()
 }
 
 // ObserveSslCertificateBindingLatency observes the time it took to bind an SslCertficate resource with Ingress after
 // a valid ManagedCertficate resource was created.
-func (m metricsImpl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
+func (m impl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
 	m.sslCertificateBindingLatency.Observe(diff)
 }
 
 // ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid
 // ManagedCertficate resource was created.
-func (m metricsImpl) ObserveSslCertificateCreationLatency(creationTime time.Time) {
+func (m impl) ObserveSslCertificateCreationLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
 	m.sslCertificateCreationLatency.Observe(diff)
 }

@@ -48,7 +48,7 @@ type fakeSsl struct {
 	sslCertificate *compute.SslCertificate
 }
 
-var _ ssl.Ssl = (*fakeSsl)(nil)
+var _ ssl.Interface = (*fakeSsl)(nil)
 
 func (f fakeSsl) Create(ctx context.Context, name string, domains []string) error {
 	return f.err
@@ -96,7 +96,7 @@ func withCert(err error, sslCertificate *compute.SslCertificate) fakeSsl {
 
 func TestCreate(t *testing.T) {
 	testCases := []struct {
-		ssl                   ssl.Ssl
+		ssl                   ssl.Interface
 		wantErr               error
 		wantTooManyCertsEvent bool
 		wantExcludedFromSLO   bool
@@ -123,7 +123,7 @@ func TestCreate(t *testing.T) {
 	for _, tc := range testCases {
 		ctx := context.Background()
 
-		event := &event.FakeEvent{}
+		event := &event.Fake{}
 		metrics := metrics.NewFake()
 		state := state.NewFakeWithEntries(map[types.CertId]state.Entry{
 			certId: state.Entry{SslCertificateName: ""},
@@ -179,7 +179,7 @@ func TestCreate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	testCases := []struct {
-		ssl             ssl.Ssl
+		ssl             ssl.Interface
 		mcrt            *apisv1.ManagedCertificate
 		wantErr         error
 		wantErrorEvent  bool
@@ -215,7 +215,7 @@ func TestDelete(t *testing.T) {
 	for _, tc := range testCases {
 		ctx := context.Background()
 
-		event := &event.FakeEvent{}
+		event := &event.Fake{}
 		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 
@@ -247,7 +247,7 @@ func TestDelete(t *testing.T) {
 
 func TestExists(t *testing.T) {
 	testCases := []struct {
-		ssl            ssl.Ssl
+		ssl            ssl.Interface
 		mcrt           *apisv1.ManagedCertificate
 		wantExists     bool
 		wantErr        error
@@ -292,7 +292,7 @@ func TestExists(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		event := &event.FakeEvent{}
+		event := &event.Fake{}
 		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 
@@ -320,7 +320,7 @@ func TestExists(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	testCases := []struct {
-		ssl            ssl.Ssl
+		ssl            ssl.Interface
 		mcrt           *apisv1.ManagedCertificate
 		wantCert       *compute.SslCertificate
 		wantErr        error
@@ -365,7 +365,7 @@ func TestGet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		event := &event.FakeEvent{}
+		event := &event.Fake{}
 		metrics := metrics.NewFake()
 		sut := New(event, metrics, tc.ssl, state.NewFake())
 

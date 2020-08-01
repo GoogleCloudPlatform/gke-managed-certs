@@ -17,20 +17,10 @@ limitations under the License.
 package managedcertificate
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/fake"
-	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
-)
-
-var (
-	groupKind     = schema.GroupKind{Group: "networking.gke.io", Kind: "ManagedCertificate"}
-	groupResource = schema.GroupResource{Group: "networking.gke.io", Resource: "ManagedCertificate"}
 )
 
 type builder struct {
@@ -75,81 +65,4 @@ func (b *builder) WithCertificateName(certificateName string) *builder {
 
 func (b *builder) Build() *apisv1.ManagedCertificate {
 	return b.managedCertificate
-}
-
-// Clientset implements the ManagedCertificate Clientset interface and overrides the Update method,
-type Clientset struct {
-	fake.Clientset
-
-	managedCertificates []*apisv1.ManagedCertificate
-}
-
-func NewClientset(managedCertificates []*apisv1.ManagedCertificate) *Clientset {
-	return &Clientset{managedCertificates: managedCertificates}
-}
-
-func (c *Clientset) Update(managedCertificate *apisv1.ManagedCertificate) (*apisv1.ManagedCertificate, error) {
-	for i, cert := range c.managedCertificates {
-		if cert.Namespace == managedCertificate.Namespace &&
-			cert.Name == managedCertificate.Name {
-
-			c.managedCertificates[i] = managedCertificate
-			return managedCertificate, nil
-		}
-	}
-
-	return nil, errors.NewNotFound(groupResource, managedCertificate.Name)
-}
-
-// Lister implements the ManagedCertificate Lister interface.
-type Lister struct {
-	managedCertificates []*apisv1.ManagedCertificate
-}
-
-var _ listersv1.ManagedCertificateLister = &Lister{}
-
-func NewLister(managedCertificates []*apisv1.ManagedCertificate) *Lister {
-	return &Lister{managedCertificates: managedCertificates}
-}
-
-func (l *Lister) List(selector labels.Selector) ([]*apisv1.ManagedCertificate, error) {
-	return l.managedCertificates, nil
-}
-
-func (l *Lister) ManagedCertificates(namespace string) listersv1.ManagedCertificateNamespaceLister {
-	return &namespacedLister{
-		managedCertificates: l.managedCertificates,
-		namespace:           namespace,
-	}
-}
-
-// namespacedLister implements the ManagedCertificate namespaced Lister interface.
-type namespacedLister struct {
-	managedCertificates []*apisv1.ManagedCertificate
-	namespace           string
-}
-
-var _ listersv1.ManagedCertificateNamespaceLister = &namespacedLister{}
-
-func (l *namespacedLister) List(selector labels.Selector) ([]*apisv1.ManagedCertificate, error) {
-	var result []*apisv1.ManagedCertificate
-
-	for _, cert := range l.managedCertificates {
-		if cert.Namespace == l.namespace {
-			result = append(result, cert)
-		}
-	}
-
-	return result, nil
-
-}
-
-func (l *namespacedLister) Get(name string) (*apisv1.ManagedCertificate, error) {
-	for _, cert := range l.managedCertificates {
-		if cert.Namespace == l.namespace && cert.Name == name {
-			return cert, nil
-		}
-	}
-
-	return nil, errors.NewNotFound(groupResource, name)
 }

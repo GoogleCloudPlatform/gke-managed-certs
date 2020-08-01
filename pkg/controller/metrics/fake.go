@@ -28,7 +28,7 @@ type Fake struct {
 	SslCertificateCreationLatencyObserved int
 }
 
-var _ Metrics = &Fake{}
+var _ Interface = &Fake{}
 
 func NewFake() *Fake {
 	return &Fake{}

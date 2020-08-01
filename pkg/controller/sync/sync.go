@@ -25,8 +25,7 @@ import (
 	"k8s.io/klog"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
-	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
-	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
@@ -38,37 +37,38 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type Sync interface {
+// Interface provides operations for modifying ManagedCertificate resources
+// according to user intent.
+type Interface interface {
+	// ManagedCertificate modifies ManagedCertificate resources
+	// according to user intent.
 	ManagedCertificate(ctx context.Context, id types.CertId) error
 }
 
-type syncImpl struct {
-	client  clientsetv1.NetworkingV1Interface
-	config  *config.Config
-	lister  listersv1.ManagedCertificateLister
-	metrics metrics.Metrics
-	random  random.Random
-	ssl     sslcertificatemanager.SslCertificateManager
-	state   state.State
+type impl struct {
+	config             *config.Config
+	managedCertificate managedcertificate.Interface
+	metrics            metrics.Interface
+	random             random.Interface
+	ssl                sslcertificatemanager.Interface
+	state              state.Interface
 }
 
-func New(client clientsetv1.NetworkingV1Interface, config *config.Config,
-	lister listersv1.ManagedCertificateLister, metrics metrics.Metrics,
-	random random.Random, ssl sslcertificatemanager.SslCertificateManager,
-	state state.State) Sync {
+func New(config *config.Config, managedCertificate managedcertificate.Interface,
+	metrics metrics.Interface, random random.Interface,
+	ssl sslcertificatemanager.Interface, state state.Interface) Interface {
 
-	return syncImpl{
-		client:  client,
-		config:  config,
-		lister:  lister,
-		metrics: metrics,
-		random:  random,
-		ssl:     ssl,
-		state:   state,
+	return impl{
+		config:             config,
+		managedCertificate: managedCertificate,
+		metrics:            metrics,
+		random:             random,
+		ssl:                ssl,
+		state:              state,
 	}
 }
 
-func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
+func (s impl) ensureSslCertificateName(id types.CertId) (string, error) {
 	if entry, err := s.state.Get(id); err == nil {
 		return entry.SslCertificateName, nil
 	}
@@ -85,8 +85,8 @@ func (s syncImpl) ensureSslCertificateName(id types.CertId) (string, error) {
 	return sslCertificateName, nil
 }
 
-func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string,
-	id types.CertId, mcrt apisv1.ManagedCertificate) error {
+func (s impl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string,
+	id types.CertId, managedCertificate apisv1.ManagedCertificate) error {
 
 	entry, err := s.state.Get(id)
 	if err != nil {
@@ -107,7 +107,8 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 		return nil
 	}
 
-	creationTime, err := time.Parse(time.RFC3339, mcrt.CreationTimestamp.Format(time.RFC3339))
+	creationTime, err := time.Parse(time.RFC3339,
+		managedCertificate.CreationTimestamp.Format(time.RFC3339))
 	if err != nil {
 		return err
 	}
@@ -120,7 +121,8 @@ func (s syncImpl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateNam
 	return nil
 }
 
-func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1.ManagedCertificate,
+func (s impl) deleteSslCertificate(ctx context.Context,
+	managedCertificate *apisv1.ManagedCertificate,
 	id types.CertId, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
@@ -131,7 +133,7 @@ func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1.Managed
 	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s",
 		sslCertificateName, id.String())
 
-	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, mcrt)); err != nil {
+	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, managedCertificate)); err != nil {
 		return err
 	}
 
@@ -140,34 +142,35 @@ func (s syncImpl) deleteSslCertificate(ctx context.Context, mcrt *apisv1.Managed
 	return nil
 }
 
-func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName string,
-	id types.CertId, mcrt *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
+func (s impl) ensureSslCertificate(ctx context.Context, sslCertificateName string,
+	id types.CertId, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
 
-	exists, err := s.ssl.Exists(sslCertificateName, mcrt)
+	exists, err := s.ssl.Exists(sslCertificateName, managedCertificate)
 	if err != nil {
 		return nil, err
 	}
 
 	if !exists {
-		if err := s.ssl.Create(ctx, sslCertificateName, *mcrt); err != nil {
+		if err := s.ssl.Create(ctx, sslCertificateName, *managedCertificate); err != nil {
 			return nil, err
 		}
 
-		if err := s.observeSslCertificateCreationLatencyIfNeeded(sslCertificateName, id, *mcrt); err != nil {
+		if err := s.observeSslCertificateCreationLatencyIfNeeded(sslCertificateName,
+			id, *managedCertificate); err != nil {
 			return nil, err
 		}
 	}
 
-	sslCert, err := s.ssl.Get(sslCertificateName, mcrt)
+	sslCert, err := s.ssl.Get(sslCertificateName, managedCertificate)
 	if err != nil {
 		return nil, err
 	}
 
-	if diff := certificates.Diff(*mcrt, *sslCert); diff != "" {
+	if diff := certificates.Diff(*managedCertificate, *sslCert); diff != "" {
 		klog.Infof(`Certificates out of sync: certificates.Diff(%s, %s): %s,
 			ManagedCertificate: %+v, SslCertificate: %+v. Deleting SslCertificate %s`,
-			id, sslCert.Name, diff, mcrt, sslCert, sslCert.Name)
-		if err := s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName); err != nil {
+			id, sslCert.Name, diff, managedCertificate, sslCert, sslCert.Name)
+		if err := s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName); err != nil {
 			return nil, err
 		}
 
@@ -177,8 +180,8 @@ func (s syncImpl) ensureSslCertificate(ctx context.Context, sslCertificateName s
 	return sslCert, nil
 }
 
-func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error {
-	mcrt, err := s.lister.ManagedCertificates(id.Namespace).Get(id.Name)
+func (s impl) ManagedCertificate(ctx context.Context, id types.CertId) error {
+	managedCertificate, err := s.managedCertificate.Get(id)
 	if http.IsNotFound(err) {
 		entry, err := s.state.Get(id)
 		if err == errors.ErrManagedCertificateNotFound {
@@ -205,18 +208,17 @@ func (s syncImpl) ManagedCertificate(ctx context.Context, id types.CertId) error
 	} else if entry.SoftDeleted {
 		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s",
 			id.String(), sslCertificateName)
-		return s.deleteSslCertificate(ctx, mcrt, id, sslCertificateName)
+		return s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName)
 	}
 
-	sslCert, err := s.ensureSslCertificate(ctx, sslCertificateName, id, mcrt)
+	sslCert, err := s.ensureSslCertificate(ctx, sslCertificateName, id, managedCertificate)
 	if err != nil {
 		return err
 	}
 
-	if err := certificates.CopyStatus(*sslCert, mcrt, s.config); err != nil {
+	if err := certificates.CopyStatus(*sslCert, managedCertificate, s.config); err != nil {
 		return err
 	}
 
-	_, err = s.client.ManagedCertificates(mcrt.Namespace).Update(mcrt)
-	return err
+	return s.managedCertificate.Update(managedCertificate)
 }

@@ -28,8 +28,8 @@ import (
 	cgolisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/klog"
 
-	listersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/listers/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
@@ -47,25 +47,25 @@ type Binder interface {
 }
 
 type binderImpl struct {
-	eventClient   event.Event
-	ingressClient v1beta1.IngressesGetter
-	ingressLister cgolisters.IngressLister
-	metrics       metrics.Metrics
-	mcrtLister    listersv1.ManagedCertificateLister
-	state         state.State
+	eventClient        event.Interface
+	ingressClient      v1beta1.IngressesGetter
+	ingressLister      cgolisters.IngressLister
+	metrics            metrics.Interface
+	managedCertificate managedcertificate.Interface
+	state              state.Interface
 }
 
-func New(eventClient event.Event, ingressClient v1beta1.IngressesGetter,
-	ingressLister cgolisters.IngressLister, mcrtLister listersv1.ManagedCertificateLister,
-	metrics metrics.Metrics, state state.State) Binder {
+func New(eventClient event.Interface, ingressClient v1beta1.IngressesGetter,
+	ingressLister cgolisters.IngressLister, managedCertificate managedcertificate.Interface,
+	metrics metrics.Interface, state state.Interface) Binder {
 
 	return binderImpl{
-		eventClient:   eventClient,
-		ingressClient: ingressClient,
-		ingressLister: ingressLister,
-		mcrtLister:    mcrtLister,
-		metrics:       metrics,
-		state:         state,
+		eventClient:        eventClient,
+		ingressClient:      ingressClient,
+		ingressLister:      ingressLister,
+		managedCertificate: managedCertificate,
+		metrics:            metrics,
+		state:              state,
 	}
 }
 
@@ -139,7 +139,7 @@ func (b binderImpl) validateAttachedManagedCertificates(
 	ingress *apiv1beta1.Ingress, managedCertificates map[string]bool) error {
 
 	for mcrtName := range managedCertificates {
-		_, err := b.mcrtLister.ManagedCertificates(ingress.Namespace).Get(mcrtName)
+		_, err := b.managedCertificate.Get(types.NewCertId(ingress.Namespace, mcrtName))
 
 		if err == nil {
 			continue
@@ -182,7 +182,7 @@ func (b binderImpl) reportManagedCertificatesAttached(ingressNamespace string,
 			continue
 		}
 
-		mcrt, err := b.mcrtLister.ManagedCertificates(id.Namespace).Get(id.Name)
+		mcrt, err := b.managedCertificate.Get(id)
 		if err != nil {
 			return err
 		}

@@ -28,12 +28,12 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
-	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
@@ -42,7 +42,7 @@ import (
 // Clients are used to communicate with api server and GCLB.
 type Clients struct {
 	// ConfigMap manages ConfigMap objects.
-	ConfigMap configmap.ConfigMap
+	ConfigMap configmap.Interface
 
 	// Coordination is used for electing master.
 	Coordination coordinationv1.CoordinationV1Interface
@@ -51,7 +51,7 @@ type Clients struct {
 	Core corev1.CoreV1Interface
 
 	// Event manages Event objects.
-	Event event.Event
+	Event event.Interface
 
 	// IngressClient manages Ingress objects.
 	IngressClient v1beta1.IngressesGetter
@@ -59,14 +59,11 @@ type Clients struct {
 	// IngressInformerFactory produces informers and listers which handle Ingress objects.
 	IngressInformerFactory informers.SharedInformerFactory
 
-	// ManagedCertificateClient manages ManagedCertificate custom resources.
-	ManagedCertificateClient clientsetv1.NetworkingV1Interface
-
-	// ManagedCertificateInfomerFactory produces informers and listers which handle ManagedCertificate custom resources.
-	ManagedCertificateInformerFactory externalversions.SharedInformerFactory
+	// ManagedCertificate manages ManagedCertificate custom resources.
+	ManagedCertificate managedcertificate.Interface
 
 	// Ssl manages SslCertificate GCP resources.
-	Ssl ssl.Ssl
+	Ssl ssl.Interface
 }
 
 func New(config *config.Config) (*Clients, error) {
@@ -82,7 +79,6 @@ func New(config *config.Config) (*Clients, error) {
 	ingressFactory := informers.NewSharedInformerFactory(kubernetesClient, 0)
 
 	managedCertificateClient := versioned.NewForConfigOrDie(clusterConfig)
-	managedCertificateFactory := externalversions.NewSharedInformerFactory(managedCertificateClient, 0)
 
 	oauthClient := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
 	oauthClient.Timeout = config.Compute.Timeout
@@ -97,19 +93,22 @@ func New(config *config.Config) (*Clients, error) {
 	}
 
 	return &Clients{
-		ConfigMap:                         configmap.New(clusterConfig),
-		Coordination:                      kubernetesClient.CoordinationV1(),
-		Core:                              kubernetesClient.CoreV1(),
-		Event:                             event,
-		IngressClient:                     ingressClient,
-		IngressInformerFactory:            ingressFactory,
-		ManagedCertificateClient:          managedCertificateClient.NetworkingV1(),
-		ManagedCertificateInformerFactory: managedCertificateFactory,
-		Ssl:                               ssl,
+		ConfigMap:              configmap.New(clusterConfig),
+		Coordination:           kubernetesClient.CoordinationV1(),
+		Core:                   kubernetesClient.CoreV1(),
+		Event:                  event,
+		IngressClient:          ingressClient,
+		IngressInformerFactory: ingressFactory,
+		ManagedCertificate:     managedcertificate.New(managedCertificateClient),
+		Ssl:                    ssl,
 	}, nil
 }
 
-func (c *Clients) Run(ctx context.Context) {
+func (c *Clients) HasSynced() bool {
+	return c.ManagedCertificate.HasSynced()
+}
+
+func (c *Clients) Run(ctx context.Context, queue workqueue.RateLimitingInterface) {
 	go c.IngressInformerFactory.Start(ctx.Done())
-	go c.ManagedCertificateInformerFactory.Start(ctx.Done())
+	go c.ManagedCertificate.Run(ctx, queue)
 }

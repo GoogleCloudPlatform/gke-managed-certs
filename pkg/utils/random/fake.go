@@ -21,9 +21,9 @@ type Fake struct {
 	err  error
 }
 
-var _ Random = &Fake{}
+var _ Interface = &Fake{}
 
-func NewFake(name string, err error) Fake {
+func NewFake(name string, err error) Interface {
 	return Fake{
 		name: name,
 		err:  err,

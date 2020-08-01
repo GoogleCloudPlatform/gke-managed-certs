@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package sslcertificatemanager manipulates SslCertificate objects and communicates GCE API errors with Events.
+// Package sslcertificatemanager manipulates SslCertificate resources
+// and communicates GCE API errors with Events.
 package sslcertificatemanager
 
 import (
@@ -33,22 +34,34 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type SslCertificateManager interface {
-	Create(ctx context.Context, sslCertificateName string, mcrt apisv1.ManagedCertificate) error
-	Delete(ctx context.Context, sslCertificateName string, mcrt *apisv1.ManagedCertificate) error
-	Exists(sslCertificateName string, mcrt *apisv1.ManagedCertificate) (bool, error)
-	Get(sslCertificateName string, mcrt *apisv1.ManagedCertificate) (*compute.SslCertificate, error)
+// Interface provides operations for manipulating SslCertificate resources
+// and communicates GCE API errors with Events.
+type Interface interface {
+	// Create creates an SslCertificate object. It generates a TooManyCertificates event
+	// if SslCertificate quota is exceeded or BackendError event if another
+	// generic error occurs. On success it generates a Create event.
+	Create(ctx context.Context, sslCertificateName string, managedCertificate apisv1.ManagedCertificate) error
+	// Delete deletes an SslCertificate object, existing or not. If a generic error occurs,
+	// it generates a BackendError event. If the SslCertificate object exists
+	// and is successfully deleted, a Delete event is generated.
+	Delete(ctx context.Context, sslCertificateName string, managedCertificate *apisv1.ManagedCertificate) error
+	// Exists returns true if an SslCertificate exists, false if it is deleted.
+	// Error is not nil if an error has occurred and in such case
+	// a BackendError event is generated.
+	Exists(sslCertificateName string, managedCertificate *apisv1.ManagedCertificate) (bool, error)
+	// Get fetches an SslCertificate object. On error a BackendError event is generated.
+	Get(sslCertificateName string, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error)
 }
 
-type sslCertificateManagerImpl struct {
-	event   event.Event
-	metrics metrics.Metrics
-	ssl     ssl.Ssl
-	state   state.State
+type impl struct {
+	event   event.Interface
+	metrics metrics.Interface
+	ssl     ssl.Interface
+	state   state.Interface
 }
 
-func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl, state state.State) SslCertificateManager {
-	return sslCertificateManagerImpl{
+func New(event event.Interface, metrics metrics.Interface, ssl ssl.Interface, state state.Interface) Interface {
+	return impl{
 		event:   event,
 		metrics: metrics,
 		ssl:     ssl,
@@ -59,19 +72,19 @@ func New(event event.Event, metrics metrics.Metrics, ssl ssl.Ssl, state state.St
 // Create creates an SslCertificate object. It generates a TooManyCertificates event
 // if SslCertificate quota is exceeded or BackendError event if another
 // generic error occurs. On success it generates a Create event.
-func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateName string,
-	mcrt apisv1.ManagedCertificate) error {
+func (s impl) Create(ctx context.Context, sslCertificateName string,
+	managedCertificate apisv1.ManagedCertificate) error {
 
 	klog.Infof("Creating SslCertificate %s for ManagedCertificate %s:%s",
-		sslCertificateName, mcrt.Namespace, mcrt.Name)
+		sslCertificateName, managedCertificate.Namespace, managedCertificate.Name)
 
-	if err := s.ssl.Create(ctx, sslCertificateName, mcrt.Spec.Domains); err != nil {
+	if err := s.ssl.Create(ctx, sslCertificateName, managedCertificate.Spec.Domains); err != nil {
 		var sslErr *ssl.Error
 		if errors.As(err, &sslErr) && sslErr.IsQuotaExceeded() {
-			s.event.TooManyCertificates(mcrt, err)
+			s.event.TooManyCertificates(managedCertificate, err)
 			s.metrics.ObserveSslCertificateQuotaError()
 
-			id := types.NewCertId(mcrt.Namespace, mcrt.Name)
+			id := types.NewCertId(managedCertificate.Namespace, managedCertificate.Name)
 			if err := s.state.SetExcludedFromSLO(id); err != nil {
 				return err
 			}
@@ -79,15 +92,15 @@ func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateNam
 			return err
 		}
 
-		s.event.BackendError(mcrt, err)
+		s.event.BackendError(managedCertificate, err)
 		s.metrics.ObserveSslCertificateBackendError()
 		return err
 	}
 
-	s.event.Create(mcrt, sslCertificateName)
+	s.event.Create(managedCertificate, sslCertificateName)
 
 	klog.Infof("Created SslCertificate %s for ManagedCertificate %s:%s",
-		sslCertificateName, mcrt.Namespace, mcrt.Name)
+		sslCertificateName, managedCertificate.Namespace, managedCertificate.Name)
 
 	return nil
 }
@@ -95,20 +108,20 @@ func (s sslCertificateManagerImpl) Create(ctx context.Context, sslCertificateNam
 // Delete deletes an SslCertificate object, existing or not. If a generic error occurs,
 // it generates a BackendError event. If the SslCertificate object exists
 // and is successfully deleted, a Delete event is generated.
-func (s sslCertificateManagerImpl) Delete(ctx context.Context, sslCertificateName string,
-	mcrt *apisv1.ManagedCertificate) error {
+func (s impl) Delete(ctx context.Context, sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) error {
 
 	klog.Infof("Deleting SslCertificate %s", sslCertificateName)
 
 	err := s.ssl.Delete(ctx, sslCertificateName)
 
-	if err == nil && mcrt != nil {
-		s.event.Delete(*mcrt, sslCertificateName)
+	if err == nil && managedCertificate != nil {
+		s.event.Delete(*managedCertificate, sslCertificateName)
 	}
 
 	if http.IgnoreNotFound(err) != nil {
-		if mcrt != nil {
-			s.event.BackendError(*mcrt, err)
+		if managedCertificate != nil {
+			s.event.BackendError(*managedCertificate, err)
 			s.metrics.ObserveSslCertificateBackendError()
 		}
 
@@ -122,13 +135,13 @@ func (s sslCertificateManagerImpl) Delete(ctx context.Context, sslCertificateNam
 // Exists returns true if an SslCertificate exists, false if it is deleted.
 // Error is not nil if an error has occurred and in such case
 // a BackendError event is generated.
-func (s sslCertificateManagerImpl) Exists(sslCertificateName string,
-	mcrt *apisv1.ManagedCertificate) (bool, error) {
+func (s impl) Exists(sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) (bool, error) {
 
 	exists, err := s.ssl.Exists(sslCertificateName)
 	if err != nil {
-		if mcrt != nil {
-			s.event.BackendError(*mcrt, err)
+		if managedCertificate != nil {
+			s.event.BackendError(*managedCertificate, err)
 			s.metrics.ObserveSslCertificateBackendError()
 		}
 		return false, err
@@ -138,13 +151,13 @@ func (s sslCertificateManagerImpl) Exists(sslCertificateName string,
 }
 
 // Get fetches an SslCertificate object. On error a BackendError event is generated.
-func (s sslCertificateManagerImpl) Get(sslCertificateName string,
-	mcrt *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
+func (s impl) Get(sslCertificateName string,
+	managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
 
 	sslCert, err := s.ssl.Get(sslCertificateName)
 	if err != nil {
-		if mcrt != nil {
-			s.event.BackendError(*mcrt, err)
+		if managedCertificate != nil {
+			s.event.BackendError(*managedCertificate, err)
 			s.metrics.ObserveSslCertificateBackendError()
 		}
 		return nil, err

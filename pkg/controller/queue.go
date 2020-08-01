@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -41,7 +40,7 @@ func (c *controller) enqueue(obj interface{}) {
 }
 
 func (c *controller) enqueueAll() {
-	mcrts, err := c.lister.List(labels.Everything())
+	mcrts, err := c.clients.ManagedCertificate.List()
 	if err != nil {
 		runtime.HandleError(err)
 		return
@@ -72,11 +71,7 @@ func (c *controller) handle(ctx context.Context, key string) error {
 		return err
 	}
 
-	if err := c.sync.ManagedCertificate(ctx, types.NewCertId(namespace, name)); err != nil {
-		return err
-	}
-
-	return err
+	return c.sync.ManagedCertificate(ctx, types.NewCertId(namespace, name))
 }
 
 func (c *controller) processNextManagedCertificate(ctx context.Context) {

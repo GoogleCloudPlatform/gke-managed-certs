@@ -24,6 +24,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
@@ -36,12 +37,12 @@ import (
 
 var testCases = map[string]struct {
 	managedCertificate *apisv1.ManagedCertificate
-	state              state.State
-	sslManager         sslcertificatemanager.SslCertificateManager
-	random             random.Random
+	state              state.Interface
+	sslManager         sslcertificatemanager.Interface
+	random             random.Interface
 
-	wantState              state.State
-	wantSslManager         sslcertificatemanager.SslCertificateManager
+	wantState              state.Interface
+	wantSslManager         sslcertificatemanager.Interface
 	wantManagedCertificate *apisv1.ManagedCertificate
 	wantMetrics            *metrics.Fake
 	wantError              error
@@ -307,8 +308,8 @@ var testCases = map[string]struct {
 	},
 }
 
-func getSslCertificate(id types.CertId, state state.State,
-	sslManager sslcertificatemanager.SslCertificateManager) (*compute.SslCertificate, error) {
+func getSslCertificate(id types.CertId, state state.Interface,
+	sslManager sslcertificatemanager.Interface) (*compute.SslCertificate, error) {
 
 	entry, err := state.Get(id)
 	if err != nil {
@@ -329,12 +330,10 @@ func TestManagedCertificate(t *testing.T) {
 					tc.managedCertificate)
 			}
 
-			clientset := managedcertificate.NewClientset(managedCertificates).
-				NetworkingV1()
-			lister := managedcertificate.NewLister(managedCertificates)
 			config := config.NewFakeCertificateStatusConfig()
+			managedCertificate := clientsmcrt.NewFake(managedCertificates)
 			metrics := metrics.NewFake()
-			sync := New(clientset, config, lister, metrics, tc.random,
+			sync := New(config, managedCertificate, metrics, tc.random,
 				tc.sslManager, tc.state)
 
 			id := types.NewCertId("default", "foo")
