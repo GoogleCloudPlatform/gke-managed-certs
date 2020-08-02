@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 // This test creates more certificates than the quota allows and checks if there is at least one with
@@ -37,7 +37,7 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 
 	for i := 0; i < numCerts; i++ {
 		name := fmt.Sprintf("quota-%d", i)
-		if err := http.IgnoreNotFound(clients.ManagedCertificate.Delete(name)); err != nil {
+		if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(name)); err != nil {
 			t.Fatal(err)
 		}
 		if err := clients.ManagedCertificate.Create(name, []string{"quota.example.com"}); err != nil {

@@ -14,27 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package http provides utility functions for manipulating HTTP errors.
-package http
+// Package errors provides utility functions for manipulating errors.
+package errors
 
 import (
+	"errors"
 	"net/http"
 
 	"google.golang.org/api/googleapi"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-// IsNotFound checks if err is an HTTP Not Found (404) error.
+var (
+	NotFound  = errors.New("Not found")
+	OutOfSync = errors.New("SslCertificate got out of sync with ManagedCertificate")
+)
+
+// IsNotFound checks if err is a not found error.
 func IsNotFound(err error) bool {
+	if errors.Is(err, NotFound) {
+		return true
+	}
+
 	apiErr, ok := err.(*googleapi.Error)
 	if ok && apiErr.Code == http.StatusNotFound {
 		return true
 	}
 
-	return errors.IsNotFound(err)
+	return k8serrors.IsNotFound(err)
 }
 
-// IgnoreNotFound returns nil if err is HTTP Not Found (404), else err.
+// IgnoreNotFound returns nil if err is a not found error, else err.
 func IgnoreNotFound(err error) error {
 	if err == nil {
 		return nil

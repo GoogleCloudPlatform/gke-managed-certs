@@ -27,7 +27,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 
-	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 const (
@@ -129,7 +129,7 @@ func (s impl) Exists(name string) (bool, error) {
 		return true, nil
 	}
 
-	if utilshttp.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		return false, nil
 	}
 

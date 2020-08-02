@@ -23,7 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 func ensurePropagated(name string) error {
@@ -129,7 +129,7 @@ func TestPropagation(t *testing.T) {
 
 		err = utils.Retry(func() error {
 			_, err := clients.SslCertificate.Get(mcrt.Status.CertificateName)
-			if http.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				return nil
 			}
 

@@ -17,21 +17,21 @@ limitations under the License.
 package state
 
 import (
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type fake struct {
-	mapping map[types.CertId]Entry
+	mapping map[types.Id]Entry
 }
 
 var _ Interface = &fake{}
 
 func NewFake() *fake {
-	return &fake{mapping: make(map[types.CertId]Entry, 0)}
+	return &fake{mapping: make(map[types.Id]Entry, 0)}
 }
 
-func NewFakeWithEntries(data map[types.CertId]Entry) Interface {
+func NewFakeWithEntries(data map[types.Id]Entry) Interface {
 	state := NewFake()
 	for k, v := range data {
 		state.mapping[k] = v
@@ -39,20 +39,20 @@ func NewFakeWithEntries(data map[types.CertId]Entry) Interface {
 	return state
 }
 
-func (state *fake) Delete(id types.CertId) {
+func (state *fake) Delete(id types.Id) {
 	delete(state.mapping, id)
 }
 
-func (state *fake) Get(id types.CertId) (Entry, error) {
+func (state *fake) Get(id types.Id) (Entry, error) {
 	entry, exists := state.mapping[id]
 	if !exists {
-		return Entry{}, errors.ErrManagedCertificateNotFound
+		return Entry{}, errors.NotFound
 	}
 
 	return entry, nil
 }
 
-func (state *fake) Insert(id types.CertId, sslCertificateName string) {
+func (state *fake) Insert(id types.Id, sslCertificateName string) {
 	v, exists := state.mapping[id]
 	if !exists {
 		v = Entry{}
@@ -63,8 +63,8 @@ func (state *fake) Insert(id types.CertId, sslCertificateName string) {
 	state.mapping[id] = v
 }
 
-func (state *fake) List() map[types.CertId]Entry {
-	data := make(map[types.CertId]Entry, 0)
+func (state *fake) List() map[types.Id]Entry {
+	data := make(map[types.Id]Entry, 0)
 
 	for id, entry := range state.mapping {
 		data[id] = entry
@@ -73,10 +73,10 @@ func (state *fake) List() map[types.CertId]Entry {
 	return data
 }
 
-func (state *fake) SetExcludedFromSLO(id types.CertId) error {
+func (state *fake) SetExcludedFromSLO(id types.Id) error {
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.ExcludedFromSLO = true
@@ -84,10 +84,10 @@ func (state *fake) SetExcludedFromSLO(id types.CertId) error {
 	return nil
 }
 
-func (state *fake) SetSoftDeleted(id types.CertId) error {
+func (state *fake) SetSoftDeleted(id types.Id) error {
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SoftDeleted = true
@@ -95,10 +95,10 @@ func (state *fake) SetSoftDeleted(id types.CertId) error {
 	return nil
 }
 
-func (state *fake) SetSslCertificateBindingReported(id types.CertId) error {
+func (state *fake) SetSslCertificateBindingReported(id types.Id) error {
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SslCertificateBindingReported = true
@@ -106,10 +106,10 @@ func (state *fake) SetSslCertificateBindingReported(id types.CertId) error {
 	return nil
 }
 
-func (state *fake) SetSslCertificateCreationReported(id types.CertId) error {
+func (state *fake) SetSslCertificateCreationReported(id types.Id) error {
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SslCertificateCreationReported = true

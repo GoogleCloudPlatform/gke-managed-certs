@@ -31,7 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/client"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 const (
@@ -101,7 +101,7 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 		klog.Infof("Found %d SslCertificate resources, attempting clean up", len(sslCertificates))
 		for _, sslCertificate := range sslCertificates {
 			klog.Infof("Trying to delete SslCertificate %s", sslCertificate.Name)
-			if err := utilshttp.IgnoreNotFound(clients.SslCertificate.Delete(ctx, sslCertificate.Name)); err != nil {
+			if err := errors.IgnoreNotFound(clients.SslCertificate.Delete(ctx, sslCertificate.Name)); err != nil {
 				klog.Warningf("Failed to delete %s, err: %v", sslCertificate.Name, err)
 			}
 		}
@@ -140,7 +140,7 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 
 	if !gke {
 		name := "managedcertificates.networking.gke.io"
-		if err := utilshttp.IgnoreNotFound(clients.CustomResource.Delete(name, &metav1.DeleteOptions{})); err != nil {
+		if err := errors.IgnoreNotFound(clients.CustomResource.Delete(name, &metav1.DeleteOptions{})); err != nil {
 			return err
 		}
 		klog.Infof("Deleted custom resource definition %s", name)

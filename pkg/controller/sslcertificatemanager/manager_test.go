@@ -36,7 +36,7 @@ import (
 var (
 	domain           = "foo.com"
 	cert             = &compute.SslCertificate{}
-	certId           = types.NewCertId("default", "bar")
+	certId           = types.NewId("default", "bar")
 	errGeneric       = errors.New("generic error")
 	errQuotaExceeded = ssl.NewFakeQuotaExceededError()
 	errNotFound      = &googleapi.Error{Code: 404}
@@ -125,7 +125,7 @@ func TestCreate(t *testing.T) {
 
 		event := &event.Fake{}
 		metrics := metrics.NewFake()
-		state := state.NewFakeWithEntries(map[types.CertId]state.Entry{
+		state := state.NewFakeWithEntries(map[types.Id]state.Entry{
 			certId: state.Entry{SslCertificateName: ""},
 		})
 		sut := New(event, metrics, tc.ssl, state)

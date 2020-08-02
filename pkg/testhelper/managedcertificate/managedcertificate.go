@@ -28,7 +28,7 @@ type builder struct {
 }
 
 // New builds a ManagedCertificate for a given domain and id.
-func New(id types.CertId, domain string) *builder {
+func New(id types.Id, domain string) *builder {
 	return &builder{
 		&apisv1.ManagedCertificate{
 			ObjectMeta: metav1.ObjectMeta{

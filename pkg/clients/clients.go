@@ -22,17 +22,16 @@ import (
 	"fmt"
 
 	"golang.org/x/oauth2"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
@@ -41,25 +40,22 @@ import (
 
 // Clients are used to communicate with api server and GCLB.
 type Clients struct {
-	// ConfigMap manages ConfigMap objects.
+	// ConfigMap manages ConfigMap resources.
 	ConfigMap configmap.Interface
 
 	// Coordination is used for electing master.
 	Coordination coordinationv1.CoordinationV1Interface
 
-	// Core manages core Kubernetes objects.
+	// Core manages core Kubernetes resources.
 	Core corev1.CoreV1Interface
 
-	// Event manages Event objects.
+	// Event manages Event resources.
 	Event event.Interface
 
-	// IngressClient manages Ingress objects.
-	IngressClient v1beta1.IngressesGetter
+	// Ingress manages Ingress resources.
+	Ingress ingress.Interface
 
-	// IngressInformerFactory produces informers and listers which handle Ingress objects.
-	IngressInformerFactory informers.SharedInformerFactory
-
-	// ManagedCertificate manages ManagedCertificate custom resources.
+	// ManagedCertificate manages ManagedCertificate resources.
 	ManagedCertificate managedcertificate.Interface
 
 	// Ssl manages SslCertificate GCP resources.
@@ -73,11 +69,7 @@ func New(config *config.Config) (*Clients, error) {
 		return nil, fmt.Errorf("Could not fetch cluster config, err: %v", err)
 	}
 
-	ingressClient := v1beta1.NewForConfigOrDie(clusterConfig)
-
 	kubernetesClient := kubernetes.NewForConfigOrDie(clusterConfig)
-	ingressFactory := informers.NewSharedInformerFactory(kubernetesClient, 0)
-
 	managedCertificateClient := versioned.NewForConfigOrDie(clusterConfig)
 
 	oauthClient := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
@@ -93,22 +85,21 @@ func New(config *config.Config) (*Clients, error) {
 	}
 
 	return &Clients{
-		ConfigMap:              configmap.New(clusterConfig),
-		Coordination:           kubernetesClient.CoordinationV1(),
-		Core:                   kubernetesClient.CoreV1(),
-		Event:                  event,
-		IngressClient:          ingressClient,
-		IngressInformerFactory: ingressFactory,
-		ManagedCertificate:     managedcertificate.New(managedCertificateClient),
-		Ssl:                    ssl,
+		ConfigMap:          configmap.New(clusterConfig),
+		Coordination:       kubernetesClient.CoordinationV1(),
+		Core:               kubernetesClient.CoreV1(),
+		Event:              event,
+		Ingress:            ingress.New(kubernetesClient),
+		ManagedCertificate: managedcertificate.New(managedCertificateClient),
+		Ssl:                ssl,
 	}, nil
 }
 
 func (c *Clients) HasSynced() bool {
-	return c.ManagedCertificate.HasSynced()
+	return c.Ingress.HasSynced() && c.ManagedCertificate.HasSynced()
 }
 
-func (c *Clients) Run(ctx context.Context, queue workqueue.RateLimitingInterface) {
-	go c.IngressInformerFactory.Start(ctx.Done())
-	go c.ManagedCertificate.Run(ctx, queue)
+func (c *Clients) Run(ctx context.Context, ingressQueue, managedCertificateQueue workqueue.RateLimitingInterface) {
+	go c.Ingress.Run(ctx, ingressQueue)
+	go c.ManagedCertificate.Run(ctx, managedCertificateQueue)
 }

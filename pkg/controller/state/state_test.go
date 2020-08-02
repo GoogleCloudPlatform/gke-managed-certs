@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
-	cnterrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -164,40 +164,40 @@ func TestState(t *testing.T) {
 			testCase.configmap.check(changeCount)
 
 			// Getting a key not present in state fails.
-			missingId := types.NewCertId("default", "missing")
+			missingId := types.NewId("default", "missing")
 			entry, err := state.Get(missingId)
-			if err != cnterrors.ErrManagedCertificateNotFound {
+			if !utilserrors.IsNotFound(err) {
 				t.Fatalf("Get(%s): %v, want %v",
-					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+					missingId.String(), err, utilserrors.NotFound)
 			}
 
 			// Setting flags on a missing item fails.
-			if err := state.SetExcludedFromSLO(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+			if err := state.SetExcludedFromSLO(missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetExcludedFromSLO(%s): %v, want %v",
-					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSoftDeleted(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+			if err := state.SetSoftDeleted(missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSoftDeleted(%s): %v, want %v",
-					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateBindingReported(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+			if err := state.SetSslCertificateBindingReported(missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSslCertificateBindingReported(%s): %v, want %v",
-					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateCreationReported(missingId); err != cnterrors.ErrManagedCertificateNotFound {
+			if err := state.SetSslCertificateCreationReported(missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSslCertificateCreationReported(%s): %v, want %v",
-					missingId.String(), err, cnterrors.ErrManagedCertificateNotFound)
+					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
 			// Add an item to state.
-			id := types.NewCertId("default", "foo")
+			id := types.NewId("default", "foo")
 			state.Insert(id, "foo")
 			changeCount++
 			testCase.configmap.check(changeCount)
@@ -255,10 +255,10 @@ func TestState(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
-	mcrt1 := types.NewCertId("default", "mcrt1")
-	mcrt2 := types.NewCertId("system", "mcrt2")
+	mcrt1 := types.NewId("default", "mcrt1")
+	mcrt2 := types.NewId("system", "mcrt2")
 
-	m1 := map[types.CertId]Entry{
+	m1 := map[types.Id]Entry{
 		mcrt1: Entry{
 			SoftDeleted:                    false,
 			SslCertificateName:             "sslCert1",

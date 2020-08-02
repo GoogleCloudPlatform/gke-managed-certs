@@ -14,32 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package managedcertificate
+package ingress
 
 import (
 	"context"
 
+	apiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type Fake struct {
-	managedCertificates []*apisv1.ManagedCertificate
+	ingresses []*apiv1beta1.Ingress
 }
 
 var _ Interface = (*Fake)(nil)
 
-func NewFake(managedCertificates []*apisv1.ManagedCertificate) *Fake {
-	return &Fake{managedCertificates: managedCertificates}
+func NewFake(ingresses []*apiv1beta1.Ingress) *Fake {
+	return &Fake{ingresses: ingresses}
 }
 
-func (f *Fake) Get(id types.Id) (*apisv1.ManagedCertificate, error) {
-	for _, cert := range f.managedCertificates {
-		if cert.Namespace == id.Namespace && cert.Name == id.Name {
-			return cert, nil
+func (f *Fake) Get(id types.Id) (*apiv1beta1.Ingress, error) {
+	for _, ingress := range f.ingresses {
+		if ingress.Namespace == id.Namespace && ingress.Name == id.Name {
+			return ingress, nil
 		}
 	}
 
@@ -50,16 +50,14 @@ func (f *Fake) HasSynced() bool {
 	return true
 }
 
-func (f *Fake) List() ([]*apisv1.ManagedCertificate, error) {
-	return f.managedCertificates, nil
+func (f *Fake) List() ([]*apiv1beta1.Ingress, error) {
+	return f.ingresses, nil
 }
 
-func (f *Fake) Update(managedCertificate *apisv1.ManagedCertificate) error {
-	for i, cert := range f.managedCertificates {
-		if cert.Namespace == managedCertificate.Namespace &&
-			cert.Name == managedCertificate.Name {
-
-			f.managedCertificates[i] = managedCertificate
+func (f *Fake) Update(ingress *apiv1beta1.Ingress) error {
+	for i, ing := range f.ingresses {
+		if ing.Namespace == ingress.Namespace && ing.Name == ingress.Name {
+			f.ingresses[i] = ingress
 			return nil
 		}
 	}

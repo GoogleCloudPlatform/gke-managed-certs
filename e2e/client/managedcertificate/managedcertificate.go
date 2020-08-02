@@ -27,7 +27,7 @@ import (
 	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
 	clientsetv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta1"
 	clientsetv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1beta2"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 type ManagedCertificate interface {
@@ -126,7 +126,7 @@ func (m managedCertificateImpl) DeleteAll() error {
 }
 
 func (m managedCertificateImpl) Delete(name string) error {
-	return http.IgnoreNotFound(m.client.Delete(name, &metav1.DeleteOptions{}))
+	return errors.IgnoreNotFound(m.client.Delete(name, &metav1.DeleteOptions{}))
 }
 
 func (m managedCertificateImpl) Get(name string) (*apisv1.ManagedCertificate, error) {

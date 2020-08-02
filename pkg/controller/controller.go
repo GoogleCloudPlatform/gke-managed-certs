@@ -29,65 +29,67 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/binder"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/queue"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type controller struct {
-	binder  binder.Binder
-	clients *clients.Clients
-	metrics metrics.Interface
-	queue   workqueue.RateLimitingInterface
-	state   state.Interface
-	sync    sync.Interface
+	clients                 *clients.Clients
+	metrics                 metrics.Interface
+	ingressQueue            workqueue.RateLimitingInterface
+	managedCertificateQueue workqueue.RateLimitingInterface
+	state                   state.Interface
+	sync                    sync.Interface
 }
 
 func New(config *config.Config, clients *clients.Clients) *controller {
-	ingressLister := clients.IngressInformerFactory.Extensions().V1beta1().Ingresses().Lister()
 	metrics := metrics.New(config)
 	state := state.New(clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
 
 	return &controller{
-		binder:  binder.New(clients.Event, clients.IngressClient, ingressLister, clients.ManagedCertificate, metrics, state),
-		clients: clients,
-		metrics: metrics,
-		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "queue"),
-		state:   state,
-		sync:    sync.New(config, clients.ManagedCertificate, metrics, random, ssl, state),
+		clients:                 clients,
+		metrics:                 metrics,
+		ingressQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+		managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
+		state:                   state,
+		sync:                    sync.New(config, clients.Event, clients.Ingress, clients.ManagedCertificate, metrics, random, ssl, state),
 	}
 }
 
 func (c *controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer c.ingressQueue.ShutDown()
+	defer c.managedCertificateQueue.ShutDown()
 
 	klog.Info("Controller.Run()")
 
 	klog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
-	c.clients.Run(ctx, c.queue)
+	c.clients.Run(ctx, c.ingressQueue, c.managedCertificateQueue)
 
-	klog.Info("Waiting for ManagedCertificate cache sync")
+	klog.Info("Waiting for cache sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.clients.HasSynced) {
-		return fmt.Errorf("Timed out waiting for ManagedCertificate cache sync")
+		return fmt.Errorf("Timed out waiting for cache sync")
 	}
-	klog.Info("ManagedCertificate cache synced")
+	klog.Info("Cache synced")
 
-	go wait.Until(func() { c.processNextManagedCertificate(ctx) }, time.Second, ctx.Done())
-	go wait.Until(func() { c.synchronizeAllManagedCertificates(ctx) }, time.Minute, ctx.Done())
-	go wait.Until(func() {
-		if err := c.binder.BindCertificates(); err != nil {
-			runtime.HandleError(err)
-		}
-	}, time.Second, ctx.Done())
+	go wait.Until(
+		func() { processNext(ctx, c.ingressQueue, c.sync.Ingress) },
+		time.Second, ctx.Done())
+	go wait.Until(
+		func() { processNext(ctx, c.managedCertificateQueue, c.sync.ManagedCertificate) },
+		time.Second, ctx.Done())
+	go wait.Until(func() { c.synchronizeAll(ctx) }, time.Minute, ctx.Done())
+	go wait.Until(func() { c.reportStatuses() }, time.Minute, ctx.Done())
 
 	klog.Info("Waiting for stop signal or error")
 
@@ -96,16 +98,78 @@ func (c *controller) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *controller) synchronizeAllManagedCertificates(ctx context.Context) {
-	for id := range c.state.List() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if err := c.sync.ManagedCertificate(ctx, id); err != nil {
-				runtime.HandleError(err)
-			}
+func (c *controller) synchronizeAll(ctx context.Context) {
+	if ingresses, err := c.clients.Ingress.List(); err != nil {
+		runtime.HandleError(err)
+	} else {
+		for _, ingress := range ingresses {
+			queue.Add(c.ingressQueue, ingress)
 		}
 	}
-	c.enqueueAll()
+
+	if managedCertificates, err := c.clients.ManagedCertificate.List(); err != nil {
+		runtime.HandleError(err)
+	} else {
+		for _, managedCertificate := range managedCertificates {
+			queue.Add(c.managedCertificateQueue, managedCertificate)
+		}
+	}
+
+	for id := range c.state.List() {
+		queue.AddId(c.managedCertificateQueue, id)
+	}
+}
+
+func (c *controller) reportStatuses() {
+	managedCertificates, err := c.clients.ManagedCertificate.List()
+	if err != nil {
+		runtime.HandleError(err)
+		return
+	}
+
+	statuses := make(map[string]int, 0)
+	for _, mcrt := range managedCertificates {
+		statuses[mcrt.Status.CertificateStatus]++
+	}
+
+	c.metrics.ObserveManagedCertificatesStatuses(statuses)
+}
+
+func processNext(ctx context.Context, queue workqueue.RateLimitingInterface,
+	handle func(ctx context.Context, id types.Id) error) {
+
+	obj, shutdown := queue.Get()
+
+	if shutdown {
+		return
+	}
+
+	go func() {
+		defer queue.Done(obj)
+
+		key, ok := obj.(string)
+		if !ok {
+			queue.Forget(obj)
+			runtime.HandleError(fmt.Errorf("Expected string in queue but got %T", obj))
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+
+		namespace, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			runtime.HandleError(err)
+			return
+		}
+
+		err = handle(ctx, types.NewId(namespace, name))
+		if err == nil {
+			queue.Forget(obj)
+			return
+		}
+
+		queue.AddRateLimited(obj)
+		runtime.HandleError(err)
+	}()
 }

@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -46,28 +46,28 @@ type Entry struct {
 }
 
 type Interface interface {
-	Delete(id types.CertId)
-	Get(id types.CertId) (Entry, error)
-	Insert(id types.CertId, sslCertificateName string)
-	List() map[types.CertId]Entry
-	SetExcludedFromSLO(id types.CertId) error
-	SetSoftDeleted(id types.CertId) error
-	SetSslCertificateBindingReported(id types.CertId) error
-	SetSslCertificateCreationReported(id types.CertId) error
+	Delete(id types.Id)
+	Get(id types.Id) (Entry, error)
+	Insert(id types.Id, sslCertificateName string)
+	List() map[types.Id]Entry
+	SetExcludedFromSLO(id types.Id) error
+	SetSoftDeleted(id types.Id) error
+	SetSslCertificateBindingReported(id types.Id) error
+	SetSslCertificateCreationReported(id types.Id) error
 }
 
 type impl struct {
 	sync.RWMutex
 
 	// Maps ManagedCertificate to SslCertificate
-	mapping map[types.CertId]Entry
+	mapping map[types.Id]Entry
 
 	// Manages ConfigMap objects
 	configmap configmap.Interface
 }
 
 func New(configmap configmap.Interface) Interface {
-	mapping := make(map[types.CertId]Entry)
+	mapping := make(map[types.Id]Entry)
 
 	config, err := configmap.Get(configMapNamespace, configMapName)
 	if err != nil {
@@ -83,7 +83,7 @@ func New(configmap configmap.Interface) Interface {
 }
 
 // Delete deletes entry associated with ManagedCertificate id.
-func (state *impl) Delete(id types.CertId) {
+func (state *impl) Delete(id types.Id) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.mapping, id)
@@ -91,13 +91,13 @@ func (state *impl) Delete(id types.CertId) {
 }
 
 // Get fetches an entry associated with ManagedCertificate id.
-func (state *impl) Get(id types.CertId) (Entry, error) {
+func (state *impl) Get(id types.Id) (Entry, error) {
 	state.Lock()
 	defer state.Unlock()
 
 	entry, exists := state.mapping[id]
 	if !exists {
-		return Entry{}, errors.ErrManagedCertificateNotFound
+		return Entry{}, errors.NotFound
 	}
 
 	return entry, nil
@@ -105,7 +105,7 @@ func (state *impl) Get(id types.CertId) (Entry, error) {
 
 // Insert adds a new entry with an associated SslCertificate name.
 // If an id already exists in state, it is overwritten.
-func (state *impl) Insert(id types.CertId, sslCertificateName string) {
+func (state *impl) Insert(id types.Id, sslCertificateName string) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -121,8 +121,8 @@ func (state *impl) Insert(id types.CertId, sslCertificateName string) {
 }
 
 // List fetches all data stored in state.
-func (state *impl) List() map[types.CertId]Entry {
-	data := make(map[types.CertId]Entry, 0)
+func (state *impl) List() map[types.Id]Entry {
+	data := make(map[types.Id]Entry, 0)
 
 	state.RLock()
 	defer state.RUnlock()
@@ -136,13 +136,13 @@ func (state *impl) List() map[types.CertId]Entry {
 // SetExcludedFromSLO sets to true a flag indicating that entry associated
 // with given ManagedCertificate id should not be taken into account
 // for the purposes of SLO calculation.
-func (state *impl) SetExcludedFromSLO(id types.CertId) error {
+func (state *impl) SetExcludedFromSLO(id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.ExcludedFromSLO = true
@@ -155,13 +155,13 @@ func (state *impl) SetExcludedFromSLO(id types.CertId) error {
 
 // SetSoftDeleted sets to true a flag indicating that entry associated
 // with given ManagedCertificate id has been deleted.
-func (state *impl) SetSoftDeleted(id types.CertId) error {
+func (state *impl) SetSoftDeleted(id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SoftDeleted = true
@@ -175,13 +175,13 @@ func (state *impl) SetSoftDeleted(id types.CertId) error {
 // SetSslCertificateBindingReported sets to true a flag indicating that
 // SslCertificate binding metric has been already reported
 // for this ManagedCertificate id.
-func (state *impl) SetSslCertificateBindingReported(id types.CertId) error {
+func (state *impl) SetSslCertificateBindingReported(id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SslCertificateBindingReported = true
@@ -195,13 +195,13 @@ func (state *impl) SetSslCertificateBindingReported(id types.CertId) error {
 // SetSslCertificateCreationReported sets to true a flag indicating that
 // SslCertificate creation metric has been already reported
 // for this ManagedCertificate id.
-func (state *impl) SetSslCertificateCreationReported(id types.CertId) error {
+func (state *impl) SetSslCertificateCreationReported(id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
 	v, exists := state.mapping[id]
 	if !exists {
-		return errors.ErrManagedCertificateNotFound
+		return errors.NotFound
 	}
 
 	v.SslCertificateCreationReported = true
@@ -226,13 +226,13 @@ func (state *impl) persist() {
 
 // jsonMapEntry stores an entry in a map being marshalled to JSON.
 type jsonMapEntry struct {
-	Key   types.CertId
+	Key   types.Id
 	Value Entry
 }
 
 // Transforms input map m into a new map which can be stored in a ConfigMap.
 // Values in new map encode entries of m.
-func marshal(m map[types.CertId]Entry) map[string]string {
+func marshal(m map[types.Id]Entry) map[string]string {
 	result := make(map[string]string)
 	i := 0
 	for k, v := range m {
@@ -249,8 +249,8 @@ func marshal(m map[types.CertId]Entry) map[string]string {
 }
 
 // Transforms an encoded map back into initial map.
-func unmarshal(m map[string]string) map[types.CertId]Entry {
-	result := make(map[types.CertId]Entry)
+func unmarshal(m map[string]string) map[types.Id]Entry {
+	result := make(map[types.Id]Entry)
 	for _, v := range m {
 		var entry jsonMapEntry
 		_ = json.Unmarshal([]byte(v), &entry)

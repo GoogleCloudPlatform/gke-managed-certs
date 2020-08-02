@@ -43,8 +43,6 @@ const (
 	managedProvisioningFailedPermanently = "ProvisioningFailedPermanently"
 	managedRenewalFailed                 = "RenewalFailed"
 
-	SslCertificateNamePrefix = "mcrt-"
-
 	sslActive                              = "ACTIVE"
 	sslEmpty                               = ""
 	sslFailedCaaChecking                   = "FAILED_CAA_CHECKING"
@@ -56,6 +54,10 @@ const (
 	sslProvisioningFailed                  = "PROVISIONING_FAILED"
 	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
 	sslRenewalFailed                       = "RENEWAL_FAILED"
+
+	AnnotationManagedCertificatesKey = "networking.gke.io/managed-certificates"
+	AnnotationPreSharedCertKey       = "ingress.gcp.kubernetes.io/pre-shared-cert"
+	SslCertificateNamePrefix         = "mcrt-"
 )
 
 type computeConfig struct {

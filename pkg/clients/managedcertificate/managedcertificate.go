@@ -22,16 +22,15 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
 	informersv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions/networking.gke.io/v1"
+	queueutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/queue"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -39,7 +38,7 @@ import (
 // on ManagedCertificate resources.
 type Interface interface {
 	// Get fetches the resource identified by id.
-	Get(id types.CertId) (*apisv1.ManagedCertificate, error)
+	Get(id types.Id) (*apisv1.ManagedCertificate, error)
 	// HasSynced is true after first batch of ManagedCertificate
 	// resources defined in the cluster has been synchronized with
 	// the local storage.
@@ -69,7 +68,7 @@ func New(clientset *versioned.Clientset) Interface {
 	}
 }
 
-func (m impl) Get(id types.CertId) (*apisv1.ManagedCertificate, error) {
+func (m impl) Get(id types.Id) (*apisv1.ManagedCertificate, error) {
 	return m.informer.Lister().ManagedCertificates(id.Namespace).Get(id.Name)
 }
 
@@ -90,19 +89,8 @@ func (m impl) Run(ctx context.Context, queue workqueue.RateLimitingInterface) {
 	go m.factory.Start(ctx.Done())
 
 	m.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { add(queue, obj) },
-		UpdateFunc: func(old, new interface{}) { add(queue, new) },
-		DeleteFunc: func(obj interface{}) { add(queue, obj) },
+		AddFunc:    func(obj interface{}) { queueutils.Add(queue, obj) },
+		UpdateFunc: func(old, new interface{}) { queueutils.Add(queue, new) },
+		DeleteFunc: func(obj interface{}) { queueutils.Add(queue, obj) },
 	})
-}
-
-func add(queue workqueue.RateLimitingInterface, obj interface{}) {
-	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err != nil {
-		runtime.HandleError(err)
-		return
-	}
-
-	klog.Infof("Enqueuing ManagedCertificate: %+v", obj)
-	queue.AddRateLimited(key)
 }

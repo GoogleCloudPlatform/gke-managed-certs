@@ -30,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
@@ -84,7 +84,7 @@ func (s impl) Create(ctx context.Context, sslCertificateName string,
 			s.event.TooManyCertificates(managedCertificate, err)
 			s.metrics.ObserveSslCertificateQuotaError()
 
-			id := types.NewCertId(managedCertificate.Namespace, managedCertificate.Name)
+			id := types.NewId(managedCertificate.Namespace, managedCertificate.Name)
 			if err := s.state.SetExcludedFromSLO(id); err != nil {
 				return err
 			}
@@ -119,7 +119,7 @@ func (s impl) Delete(ctx context.Context, sslCertificateName string,
 		s.event.Delete(*managedCertificate, sslCertificateName)
 	}
 
-	if http.IgnoreNotFound(err) != nil {
+	if utilserrors.IgnoreNotFound(err) != nil {
 		if managedCertificate != nil {
 			s.event.BackendError(*managedCertificate, err)
 			s.metrics.ObserveSslCertificateBackendError()

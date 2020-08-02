@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package http
+package errors
 
 import (
 	"errors"
@@ -22,15 +22,15 @@ import (
 	"testing"
 
 	"google.golang.org/api/googleapi"
-	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var errGeneric = errors.New("generic error")
 var errCompute404 = &googleapi.Error{Code: 404}
 var errCompute500 = &googleapi.Error{Code: 500}
-var errK8sInternal = k8s_errors.NewInternalError(fmt.Errorf("test_internal_error"))
-var errK8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+var errK8sInternal = k8serrors.NewInternalError(fmt.Errorf("test_internal_error"))
+var errK8sNotFound = k8serrors.NewNotFound(schema.GroupResource{
 	Group:    "test_group",
 	Resource: "test_resource",
 }, "test_name")
@@ -42,6 +42,7 @@ func TestIsNotFound(t *testing.T) {
 	}{
 		{nil, false},
 		{errGeneric, false},
+		{NotFound, true},
 		{errCompute404, true},
 		{errCompute500, false},
 		{errK8sInternal, false},
@@ -63,6 +64,7 @@ func TestIgnoreNotFound(t *testing.T) {
 	}{
 		{nil, nil},
 		{errGeneric, errGeneric},
+		{NotFound, nil},
 		{errCompute404, nil},
 		{errCompute500, errCompute500},
 		{errK8sInternal, errK8sInternal},

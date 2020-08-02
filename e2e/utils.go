@@ -26,13 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 func createIngress(t *testing.T, name string, port int32, annotationManagedCertificatesValue string) error {
 	t.Helper()
 
-	if err := http.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 
@@ -68,7 +68,7 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 	}
 	t.Cleanup(func() { clients.Deployment.Delete(name, &metav1.DeleteOptions{}) })
 
-	if err := http.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 
@@ -85,7 +85,7 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 	}
 	t.Cleanup(func() { clients.Service.Delete(name, &metav1.DeleteOptions{}) })
 
-	if err := http.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 

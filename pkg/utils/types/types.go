@@ -25,20 +25,20 @@ const (
 	separator = ":"
 )
 
-// CertId identifies a ManagedCertificate object within a cluster.
-type CertId struct {
+// Id identifies a Kubernetes resource within a cluster.
+type Id struct {
 	Namespace string
 	Name      string
 }
 
-func NewCertId(namespace, name string) CertId {
-	return CertId{
+func NewId(namespace, name string) Id {
+	return Id{
 		Namespace: namespace,
 		Name:      name,
 	}
 }
 
-// String converts CertId to string.
-func (id CertId) String() string {
+// String converts Id to string.
+func (id Id) String() string {
 	return fmt.Sprintf("%s%s%s", id.Namespace, separator, id.Name)
 }

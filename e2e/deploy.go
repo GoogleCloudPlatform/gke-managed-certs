@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	utilshttp "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 const (
@@ -225,7 +225,7 @@ func deployCRD() error {
 			Scope: apiextv1.NamespaceScoped,
 		},
 	}
-	if err := utilshttp.IgnoreNotFound(clients.CustomResource.Delete(crd.Name, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.CustomResource.Delete(crd.Name, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	if _, err := clients.CustomResource.Create(&crd); err != nil {
@@ -391,22 +391,22 @@ func deployController(registry, tag string) error {
 
 // Deletes Managed Certificate controller and all related objects
 func deleteController() error {
-	if err := utilshttp.IgnoreNotFound(clients.ServiceAccount.Delete(serviceAccountName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(serviceAccountName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted service account %s", serviceAccountName)
 
-	if err := utilshttp.IgnoreNotFound(clients.ClusterRole.Delete(clusterRoleName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(clusterRoleName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role %s", clusterRoleName)
 
-	if err := utilshttp.IgnoreNotFound(clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
 
-	if err := utilshttp.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted deployment %s", deploymentName)

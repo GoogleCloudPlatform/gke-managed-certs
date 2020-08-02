@@ -14,39 +14,53 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package sync contains logic for transitioning ManagedCertificate between states, depending on the state of the cluster.
+// Package sync contains logic for synchronizing Ingress and ManagedCertificate resources
+// with user intent.
 package sync
 
 import (
 	"context"
+	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
+	apiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/klog"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/certificates"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-// Interface provides operations for modifying ManagedCertificate resources
-// according to user intent.
+const (
+	separator = ","
+)
+
+// Interface provides operations for synchronizing resources with user intent.
 type Interface interface {
-	// ManagedCertificate modifies ManagedCertificate resources
-	// according to user intent.
-	ManagedCertificate(ctx context.Context, id types.CertId) error
+	// ManagedCertificate synchronizes ManagedCertificate resources
+	// with user intent.
+	ManagedCertificate(ctx context.Context, id types.Id) error
+	// Ingress synchronizes ManagedCertificate resources
+	// with user intent.
+	Ingress(ctx context.Context, id types.Id) error
 }
 
 type impl struct {
 	config             *config.Config
+	event              event.Interface
+	ingress            ingress.Interface
 	managedCertificate managedcertificate.Interface
 	metrics            metrics.Interface
 	random             random.Interface
@@ -54,12 +68,15 @@ type impl struct {
 	state              state.Interface
 }
 
-func New(config *config.Config, managedCertificate managedcertificate.Interface,
-	metrics metrics.Interface, random random.Interface,
-	ssl sslcertificatemanager.Interface, state state.Interface) Interface {
+func New(config *config.Config, event event.Interface, ingress ingress.Interface,
+	managedCertificate managedcertificate.Interface, metrics metrics.Interface,
+	random random.Interface, ssl sslcertificatemanager.Interface,
+	state state.Interface) Interface {
 
 	return impl{
 		config:             config,
+		event:              event,
+		ingress:            ingress,
 		managedCertificate: managedCertificate,
 		metrics:            metrics,
 		random:             random,
@@ -68,7 +85,161 @@ func New(config *config.Config, managedCertificate managedcertificate.Interface,
 	}
 }
 
-func (s impl) ensureSslCertificateName(id types.CertId) (string, error) {
+// Splits given comma separated string into a set of non-empty items
+func parse(annotation string) map[string]bool {
+	result := make(map[string]bool, 0)
+	for _, item := range strings.Split(annotation, separator) {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" {
+			result[trimmed] = true
+		}
+	}
+	return result
+}
+
+// Returns:
+// 1. a set of SslCertificate resources that should be attached to Ingress
+// via annotation pre-shared-cert.
+// 2. a slice of ManagedCertificate ids that are attached to Ingress
+// via annotation managed-certificates.
+// 3. an error on failure.
+func (s impl) getCertificatesToAttach(ingress *apiv1beta1.Ingress) (map[string]bool, []types.Id, error) {
+	// If a ManagedCertificate attached to Ingress does not exist, add an event to Ingress
+	// and return an error.
+	boundManagedCertificates := parse(ingress.Annotations[config.AnnotationManagedCertificatesKey])
+	for mcrtName := range boundManagedCertificates {
+		id := types.NewId(ingress.Namespace, mcrtName)
+		_, err := s.managedCertificate.Get(id)
+
+		if err == nil {
+			continue
+		}
+
+		if errors.IsNotFound(err) {
+			s.event.MissingCertificate(*ingress, mcrtName)
+		}
+
+		return nil, nil, fmt.Errorf("managedCertificate.Get(%s): %w", id.String(), err)
+	}
+
+	// Take already bound SslCertificate resources.
+	sslCertificates := make(map[string]bool, 0)
+	for sslCertificateName := range parse(ingress.Annotations[config.AnnotationPreSharedCertKey]) {
+		sslCertificates[sslCertificateName] = true
+	}
+
+	// Slice of ManagedCertificate ids that are attached to Ingress via annotation
+	// managed-certificates.
+	var managedCertificates []types.Id
+
+	for id, entry := range s.state.List() {
+		if id.Namespace != ingress.Namespace {
+			continue
+		}
+
+		if entry.SoftDeleted {
+			delete(sslCertificates, entry.SslCertificateName)
+		} else if _, e := boundManagedCertificates[id.Name]; e {
+			sslCertificates[entry.SslCertificateName] = true
+			managedCertificates = append(managedCertificates, id)
+		}
+	}
+
+	return sslCertificates, managedCertificates, nil
+}
+
+// Builds the value of pre-shared-cert annotation
+// out of a set of SslCertificate resources' names.
+func buildPreSharedCertAnnotation(sslCertificates map[string]bool) string {
+	var result []string
+	for sslCertificate := range sslCertificates {
+		result = append(result, sslCertificate)
+	}
+
+	sort.Strings(result)
+	return strings.Join(result, separator)
+}
+
+func (s impl) reportManagedCertificatesAttached(managedCertificates []types.Id) error {
+	for _, id := range managedCertificates {
+		entry, err := s.state.Get(id)
+		if err != nil {
+			return err
+		}
+
+		if entry.ExcludedFromSLO {
+			klog.Infof("Skipping reporting SslCertificate binding metric: %s is marked as excluded from SLO calculations.", id.String())
+			continue
+		}
+
+		if entry.SslCertificateBindingReported {
+			klog.Infof("Skipping reporting SslCertificate binding metric: already reported for %s.", id.String())
+			continue
+		}
+
+		mcrt, err := s.managedCertificate.Get(id)
+		if err != nil {
+			return err
+		}
+
+		creationTime, err := time.Parse(time.RFC3339,
+			mcrt.CreationTimestamp.Format(time.RFC3339))
+		if err != nil {
+			return err
+		}
+
+		s.metrics.ObserveSslCertificateBindingLatency(creationTime)
+
+		if err := s.state.SetSslCertificateBindingReported(id); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s impl) Ingress(ctx context.Context, id types.Id) error {
+	ingress, err := s.ingress.Get(id)
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	klog.Infof("Syncing Ingress %s", id.String())
+
+	sslCertificates, managedCertificates, err := s.getCertificatesToAttach(ingress)
+	if err != nil {
+		return fmt.Errorf("getCertificatesToAttach(): %w", err)
+	}
+
+	preSharedCertValue := buildPreSharedCertAnnotation(sslCertificates)
+
+	if preSharedCertValue == ingress.Annotations[config.AnnotationPreSharedCertKey] {
+		return nil
+	}
+
+	klog.Infof("Annotation %s on Ingress %s was %s, set to %s",
+		config.AnnotationPreSharedCertKey, id.String(),
+		ingress.Annotations[config.AnnotationPreSharedCertKey], preSharedCertValue)
+
+	if ingress.Annotations == nil {
+		ingress.Annotations = make(map[string]string, 0)
+	}
+	ingress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
+
+	if err := s.ingress.Update(ingress); err != nil {
+		return fmt.Errorf("Failed to update Ingress %s: %v", id.String(), err)
+	}
+
+	if err := s.reportManagedCertificatesAttached(managedCertificates); err != nil {
+		return fmt.Errorf("reportManagedCertificatesAttached(): %w", err)
+	}
+
+	return nil
+}
+
+func (s impl) insertSslCertificateName(id types.Id) (string, error) {
 	if entry, err := s.state.Get(id); err == nil {
 		return entry.SslCertificateName, nil
 	}
@@ -85,8 +256,8 @@ func (s impl) ensureSslCertificateName(id types.CertId) (string, error) {
 	return sslCertificateName, nil
 }
 
-func (s impl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName string,
-	id types.CertId, managedCertificate apisv1.ManagedCertificate) error {
+func (s impl) observeSslCertificateCreationLatency(sslCertificateName string,
+	id types.Id, managedCertificate apisv1.ManagedCertificate) error {
 
 	entry, err := s.state.Get(id)
 	if err != nil {
@@ -123,7 +294,7 @@ func (s impl) observeSslCertificateCreationLatencyIfNeeded(sslCertificateName st
 
 func (s impl) deleteSslCertificate(ctx context.Context,
 	managedCertificate *apisv1.ManagedCertificate,
-	id types.CertId, sslCertificateName string) error {
+	id types.Id, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
 	if err := s.state.SetSoftDeleted(id); err != nil {
@@ -133,7 +304,7 @@ func (s impl) deleteSslCertificate(ctx context.Context,
 	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s",
 		sslCertificateName, id.String())
 
-	if err := http.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, managedCertificate)); err != nil {
+	if err := errors.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, managedCertificate)); err != nil {
 		return err
 	}
 
@@ -142,8 +313,8 @@ func (s impl) deleteSslCertificate(ctx context.Context,
 	return nil
 }
 
-func (s impl) ensureSslCertificate(ctx context.Context, sslCertificateName string,
-	id types.CertId, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
+func (s impl) createSslCertificate(ctx context.Context, sslCertificateName string,
+	id types.Id, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
 
 	exists, err := s.ssl.Exists(sslCertificateName, managedCertificate)
 	if err != nil {
@@ -155,7 +326,7 @@ func (s impl) ensureSslCertificate(ctx context.Context, sslCertificateName strin
 			return nil, err
 		}
 
-		if err := s.observeSslCertificateCreationLatencyIfNeeded(sslCertificateName,
+		if err := s.observeSslCertificateCreationLatency(sslCertificateName,
 			id, *managedCertificate); err != nil {
 			return nil, err
 		}
@@ -174,17 +345,17 @@ func (s impl) ensureSslCertificate(ctx context.Context, sslCertificateName strin
 			return nil, err
 		}
 
-		return nil, errors.ErrSslCertificateOutOfSyncGotDeleted
+		return nil, errors.OutOfSync
 	}
 
 	return sslCert, nil
 }
 
-func (s impl) ManagedCertificate(ctx context.Context, id types.CertId) error {
+func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
 	managedCertificate, err := s.managedCertificate.Get(id)
-	if http.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		entry, err := s.state.Get(id)
-		if err == errors.ErrManagedCertificateNotFound {
+		if errors.IsNotFound(err) {
 			return nil
 		} else if err != nil {
 			return err
@@ -198,7 +369,7 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.CertId) error {
 
 	klog.Infof("Syncing ManagedCertificate %s", id.String())
 
-	sslCertificateName, err := s.ensureSslCertificateName(id)
+	sslCertificateName, err := s.insertSslCertificateName(id)
 	if err != nil {
 		return err
 	}
@@ -211,7 +382,7 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.CertId) error {
 		return s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName)
 	}
 
-	sslCert, err := s.ensureSslCertificate(ctx, sslCertificateName, id, managedCertificate)
+	sslCert, err := s.createSslCertificate(ctx, sslCertificateName, id, managedCertificate)
 	if err != nil {
 		return err
 	}

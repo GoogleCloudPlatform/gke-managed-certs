@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/http"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 // Interface exposes operations for manipulating ConfigMap resources.
@@ -54,7 +54,7 @@ func (c impl) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
 	configmaps := c.client.ConfigMaps(namespace)
 
 	_, err := configmaps.Update(configmap)
-	if !http.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		return err
 	}
 
