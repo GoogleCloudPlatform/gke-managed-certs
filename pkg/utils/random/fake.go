@@ -18,18 +18,14 @@ package random
 
 type Fake struct {
 	name string
-	err  error
 }
 
 var _ Interface = &Fake{}
 
-func NewFake(name string, err error) Interface {
-	return Fake{
-		name: name,
-		err:  err,
-	}
+func NewFake(name string) Interface {
+	return Fake{name: name}
 }
 
 func (f Fake) Name() (string, error) {
-	return f.name, f.err
+	return f.name, nil
 }

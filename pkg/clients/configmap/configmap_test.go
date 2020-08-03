@@ -21,11 +21,11 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes/typed/core/v1/fake"
-	cgo_testing "k8s.io/client-go/testing"
+	fakev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	cgotesting "k8s.io/client-go/testing"
 )
 
 const (
@@ -34,19 +34,19 @@ const (
 )
 
 var generic = errors.New("generic error")
-var k8sNotFound = k8s_errors.NewNotFound(schema.GroupResource{
+var k8sNotFound = k8serrors.NewNotFound(schema.GroupResource{
 	Group:    "test_group",
 	Resource: "test_resource",
 }, "test_name")
 
-func buildUpdateFunc(err error) cgo_testing.ReactionFunc {
-	return cgo_testing.ReactionFunc(func(action cgo_testing.Action) (bool, runtime.Object, error) {
+func buildUpdateFunc(err error) cgotesting.ReactionFunc {
+	return cgotesting.ReactionFunc(func(action cgotesting.Action) (bool, runtime.Object, error) {
 		return true, nil, err
 	})
 }
 
-func buildCreateFunc(called *bool) cgo_testing.ReactionFunc {
-	return cgo_testing.ReactionFunc(func(action cgo_testing.Action) (bool, runtime.Object, error) {
+func buildCreateFunc(called *bool) cgotesting.ReactionFunc {
+	return cgotesting.ReactionFunc(func(action cgotesting.Action) (bool, runtime.Object, error) {
 		*called = true
 		return true, nil, nil
 	})
@@ -65,7 +65,7 @@ func TestUpdateOrCreate(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		fakeClient := &fake.FakeCoreV1{Fake: &cgo_testing.Fake{}}
+		fakeClient := &fakev1.FakeCoreV1{Fake: &cgotesting.Fake{}}
 		fakeClient.AddReactor("update", resource, buildUpdateFunc(testCase.updateError))
 		createCalled := false
 		fakeClient.AddReactor("create", resource, buildCreateFunc(&createCalled))

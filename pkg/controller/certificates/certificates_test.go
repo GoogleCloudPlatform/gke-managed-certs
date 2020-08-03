@@ -84,8 +84,7 @@ func TestCopyStatus(t *testing.T) {
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
 			var mcrt apisv1.ManagedCertificate
-			err := CopyStatus(testCase.sslCertIn, &mcrt,
-				config.NewFakeCertificateStatusConfig())
+			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFake())
 
 			if (err == nil) != testCase.wantSuccess {
 				t.Errorf("Translation err: %v, want success: %t",

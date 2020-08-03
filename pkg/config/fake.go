@@ -16,7 +16,7 @@ limitations under the License.
 
 package config
 
-func NewFakeCertificateStatusConfig() *Config {
+func NewFake() *Config {
 	return &Config{
 		CertificateStatus: certificateStatusConfig{
 			Certificate: map[string]string{"": "", "ACTIVE": "Active"},

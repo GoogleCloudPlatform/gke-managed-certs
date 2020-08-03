@@ -143,9 +143,8 @@ func TestIngress(t *testing.T) {
 			ingress := clientsingress.NewFake([]*apiv1beta1.Ingress{tc.ingress})
 			metrics := metrics.NewFake()
 
-			sync := New(config.NewFakeCertificateStatusConfig(), event, ingress,
-				clientsmcrt.NewFake(managedCertificates), metrics, random.NewFake("", nil),
-				sslcertificatemanager.NewFake(), state.NewFakeWithEntries(tc.state))
+			sync := New(config.NewFake(), event, ingress, clientsmcrt.NewFake(managedCertificates),
+				metrics, random.NewFake(""), sslcertificatemanager.NewFake(), state.NewFakeWithEntries(tc.state))
 
 			id := types.NewId("default", "foo")
 			err := sync.Ingress(ctx, id)
@@ -247,7 +246,7 @@ func TestManagedCertificate(t *testing.T) {
 				New(types.NewId("default", "foo"), "example.com").Build(),
 			state:      state.NewFake(),
 			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo", nil),
+			random:     random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -270,7 +269,7 @@ func TestManagedCertificate(t *testing.T) {
 			sslManager: sslcertificatemanager.
 				NewFakeWithEntry("foo", []string{"example.com"},
 					"ACTIVE", []string{"ACTIVE"}),
-			random: random.NewFake("foo", nil),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
@@ -297,7 +296,7 @@ func TestManagedCertificate(t *testing.T) {
 			sslManager: sslcertificatemanager.
 				NewFakeWithEntry("foo", []string{"example.com"},
 					"ACTIVE", []string{"ACTIVE"}),
-			random: random.NewFake("foo", nil),
+			random: random.NewFake("foo"),
 
 			wantState:      state.NewFake(),
 			wantSslManager: sslcertificatemanager.NewFake(),
@@ -317,7 +316,7 @@ func TestManagedCertificate(t *testing.T) {
 			sslManager: sslcertificatemanager.
 				NewFakeWithEntry("foo", []string{"example.com"},
 					"ACTIVE", []string{"ACTIVE"}),
-			random: random.NewFake("foo", nil),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -345,7 +344,7 @@ func TestManagedCertificate(t *testing.T) {
 				},
 			}),
 			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo", nil),
+			random:     random.NewFake("foo"),
 
 			wantState:      state.NewFake(),
 			wantSslManager: sslcertificatemanager.NewFake(),
@@ -363,7 +362,7 @@ func TestManagedCertificate(t *testing.T) {
 				},
 			}),
 			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo", nil),
+			random:     random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -389,7 +388,7 @@ func TestManagedCertificate(t *testing.T) {
 				},
 			}),
 			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo", nil),
+			random:     random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -412,7 +411,7 @@ func TestManagedCertificate(t *testing.T) {
 				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
 			}),
 			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo", nil),
+			random:     random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -440,7 +439,7 @@ func TestManagedCertificate(t *testing.T) {
 			sslManager: sslcertificatemanager.
 				NewFakeWithEntry("foo", []string{"different-domain.com"},
 					"ACTIVE", []string{"ACTIVE"}),
-			random: random.NewFake("foo", nil),
+			random: random.NewFake("foo"),
 
 			wantState:      state.NewFake(),
 			wantSslManager: sslcertificatemanager.NewFake(),
@@ -460,10 +459,9 @@ func TestManagedCertificate(t *testing.T) {
 					tc.managedCertificate)
 			}
 
-			config := config.NewFakeCertificateStatusConfig()
 			managedCertificate := clientsmcrt.NewFake(managedCertificates)
 			metrics := metrics.NewFake()
-			sync := New(config, &event.Fake{}, clientsingress.NewFake(nil),
+			sync := New(config.NewFake(), &event.Fake{}, clientsingress.NewFake(nil),
 				managedCertificate, metrics, tc.random, tc.sslManager, tc.state)
 
 			id := types.NewId("default", "foo")
