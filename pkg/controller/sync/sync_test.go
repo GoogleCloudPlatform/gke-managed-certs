@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	clientsingress "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
@@ -87,7 +88,7 @@ func TestIngress(t *testing.T) {
 			},
 			ingress:     ingress.New(types.NewId("default", "foo"), "in-a-different-namespace", ""),
 			wantIngress: ingress.New(types.NewId("default", "foo"), "in-a-different-namespace", ""),
-			wantEvent:   event.Fake{MissingCnt: 1},
+			wantEvent:   event.Fake{MissingCertificateCnt: 1},
 			wantErr:     utilserrors.NotFound,
 		},
 		"not existing certificate": {
@@ -96,7 +97,7 @@ func TestIngress(t *testing.T) {
 			state:       map[types.Id]state.Entry{},
 			ingress:     ingress.New(types.NewId("default", "foo"), "not-existing-certificate", ""),
 			wantIngress: ingress.New(types.NewId("default", "foo"), "not-existing-certificate", ""),
-			wantEvent:   event.Fake{MissingCnt: 1},
+			wantEvent:   event.Fake{MissingCertificateCnt: 1},
 			wantErr:     utilserrors.NotFound,
 		},
 		"happy path": {
@@ -108,7 +109,7 @@ func TestIngress(t *testing.T) {
 			},
 			ingress:     ingress.New(types.NewId("default", "foo"), "regular1,regular2,deleted1,deleted2", "regular1,deleted1"),
 			wantIngress: ingress.New(types.NewId("default", "foo"), "regular1,regular2,deleted1,deleted2", "regular1,regular2"),
-			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 2},
+			wantMetrics: metrics.Fake{BindingCnt: 2},
 		},
 		"metrics: excluded from SLO calculation": {
 			state: map[types.Id]state.Entry{
@@ -118,7 +119,7 @@ func TestIngress(t *testing.T) {
 			},
 			ingress:     ingress.New(types.NewId("default", "foo"), "excludedSLO1,excludedSLO2,regular", "excludedSLO1"),
 			wantIngress: ingress.New(types.NewId("default", "foo"), "excludedSLO1,excludedSLO2,regular", "excludedSLO1,excludedSLO2,regular"),
-			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 1},
+			wantMetrics: metrics.Fake{BindingCnt: 1},
 		},
 		"metrics: binding already reported": {
 			state: map[types.Id]state.Entry{
@@ -128,7 +129,7 @@ func TestIngress(t *testing.T) {
 			},
 			ingress:     ingress.New(types.NewId("default", "foo"), "bindingReported1,bindingReported2,regular", "bindingReported1"),
 			wantIngress: ingress.New(types.NewId("default", "foo"), "bindingReported1,bindingReported2,regular", "bindingReported1,bindingReported2,regular"),
-			wantMetrics: metrics.Fake{SslCertificateBindingLatencyObserved: 1},
+			wantMetrics: metrics.Fake{BindingCnt: 1},
 		},
 	} {
 		t.Run(description, func(t *testing.T) {
@@ -142,9 +143,10 @@ func TestIngress(t *testing.T) {
 			}
 			ingress := clientsingress.NewFake([]*apiv1beta1.Ingress{tc.ingress})
 			metrics := metrics.NewFake()
+			state := state.NewFakeWithEntries(tc.state)
 
-			sync := New(config.NewFake(), event, ingress, clientsmcrt.NewFake(managedCertificates),
-				metrics, random.NewFake(""), sslcertificatemanager.NewFake(), state.NewFakeWithEntries(tc.state))
+			sync := New(config.NewFake(), event, ingress, clientsmcrt.NewFake(managedCertificates), metrics,
+				random.NewFake(""), sslcertificatemanager.New(event, metrics, ssl.NewFake().Build(), state), state)
 
 			id := types.NewId("default", "foo")
 			err := sync.Ingress(ctx, id)
@@ -166,49 +168,50 @@ func TestIngress(t *testing.T) {
 	}
 }
 
-func getSslCertificate(id types.Id, state state.Interface,
-	sslManager sslcertificatemanager.Interface) (*compute.SslCertificate, error) {
-
+func getSslCert(id types.Id, state state.Interface, ssl ssl.Interface) (*compute.SslCertificate, error) {
 	entry, err := state.Get(id)
 	if err != nil {
 		return nil, err
 	}
 
-	return sslManager.Get(entry.SslCertificateName, nil)
+	return ssl.Get(entry.SslCertificateName)
 }
 
 func TestManagedCertificate(t *testing.T) {
 	for description, tc := range map[string]struct {
 		managedCertificate *apisv1.ManagedCertificate
 		state              state.Interface
-		sslManager         sslcertificatemanager.Interface
+		ssl                ssl.Interface
 		random             random.Interface
 
 		wantState              state.Interface
-		wantSslManager         sslcertificatemanager.Interface
+		wantSsl                ssl.Interface
 		wantManagedCertificate *apisv1.ManagedCertificate
 		wantMetrics            *metrics.Fake
 		wantError              error
 	}{
+		// API server found/not found: the ManagedCertificate exists/does not exist in the cluster.
+		// State found/not found: the controller knows/does not know about a ManagedCertificate.
+		// GCP found/not found: A corresponding SslCertificate resource exists/does not exist in GCP.
 		"API server: not found, state: not found, GCP: not found": {
-			state:      state.NewFake(),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.New(""),
+			state:  state.NewFake(),
+			ssl:    ssl.NewFake().Build(),
+			random: random.New(""),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
-			wantMetrics:    metrics.NewFake(),
+			wantState:   state.NewFake(),
+			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.NewFake(),
 		},
 		"API server: not found, state: found, GCP: not found": {
 			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
 			}),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.New(""),
+			ssl:    ssl.NewFake().Build(),
+			random: random.New(""),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
-			wantMetrics:    metrics.NewFake(),
+			wantState:   state.NewFake(),
+			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.NewFake(),
 		},
 		"API server: not found, state: found, GCP: found": {
 			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
@@ -216,14 +219,13 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateName: "foo",
 				},
 			}),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.New(""),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
-			wantMetrics:    metrics.NewFake(),
+			wantState:   state.NewFake(),
+			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.NewFake(),
 		},
 		"API server: not found, state: found soft deleted, GCP: found": {
 			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
@@ -232,21 +234,20 @@ func TestManagedCertificate(t *testing.T) {
 					SoftDeleted:        true,
 				},
 			}),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.New(""),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
-			wantMetrics:    metrics.NewFake(),
+			wantState:   state.NewFake(),
+			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.NewFake(),
 		},
 		"API server: found, state: not found, GCP: not found": {
 			managedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").Build(),
-			state:      state.NewFake(),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo"),
+			state:  state.NewFake(),
+			ssl:    ssl.NewFake().Build(),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -254,29 +255,27 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithCertificateName("foo").
+				WithStatus("", "").
 				Build(),
-			wantMetrics: &metrics.Fake{SslCertificateCreationLatencyObserved: 1},
+			wantMetrics: &metrics.Fake{CreationCnt: 1},
 		},
 		"API server: found, state: not found, GCP: found": {
 			managedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").Build(),
 			state: state.NewFake(),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			wantSsl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithStatus("Active", "Active").
@@ -293,13 +292,12 @@ func TestManagedCertificate(t *testing.T) {
 					SoftDeleted:        true,
 				},
 			}),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
+			wantState: state.NewFake(),
+			wantSsl:   ssl.NewFake().Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").Build(),
 			wantMetrics: metrics.NewFake(),
@@ -313,9 +311,8 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
@@ -324,9 +321,8 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			wantSsl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithStatus("Active", "Active").
@@ -343,11 +339,11 @@ func TestManagedCertificate(t *testing.T) {
 					SoftDeleted:        true,
 				},
 			}),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo"),
+			ssl:    ssl.NewFake().Build(),
+			random: random.NewFake("foo"),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
+			wantState: state.NewFake(),
+			wantSsl:   ssl.NewFake().Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").Build(),
 			wantMetrics: metrics.NewFake(),
@@ -361,8 +357,8 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo"),
+			ssl:    ssl.NewFake().Build(),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -370,11 +366,11 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithCertificateName("foo").
+				WithStatus("", "").
 				Build(),
 			wantMetrics: metrics.NewFake(),
 		},
@@ -387,8 +383,8 @@ func TestManagedCertificate(t *testing.T) {
 					ExcludedFromSLO:    true,
 				},
 			}),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo"),
+			ssl:    ssl.NewFake().Build(),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -396,11 +392,11 @@ func TestManagedCertificate(t *testing.T) {
 					ExcludedFromSLO:    true,
 				},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithCertificateName("foo").
+				WithStatus("", "").
 				Build(),
 			wantMetrics: metrics.NewFake(),
 		},
@@ -410,8 +406,8 @@ func TestManagedCertificate(t *testing.T) {
 			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
 			}),
-			sslManager: sslcertificatemanager.NewFake(),
-			random:     random.NewFake("foo"),
+			ssl:    ssl.NewFake().Build(),
+			random: random.NewFake("foo"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
@@ -419,13 +415,13 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			wantSslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"example.com"}, "", nil),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				WithCertificateName("foo").
+				WithStatus("", "").
 				Build(),
-			wantMetrics: &metrics.Fake{SslCertificateCreationLatencyObserved: 1},
+			wantMetrics: &metrics.Fake{CreationCnt: 1},
 		},
 		"API server: found, state: found, GCP: found; certificates different": {
 			managedCertificate: managedcertificate.
@@ -436,13 +432,12 @@ func TestManagedCertificate(t *testing.T) {
 					SslCertificateCreationReported: true,
 				},
 			}),
-			sslManager: sslcertificatemanager.
-				NewFakeWithEntry("foo", []string{"different-domain.com"},
-					"ACTIVE", []string{"ACTIVE"}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"different-domain.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
-			wantState:      state.NewFake(),
-			wantSslManager: sslcertificatemanager.NewFake(),
+			wantState: state.NewFake(),
+			wantSsl:   ssl.NewFake().Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
 				Build(),
@@ -460,9 +455,12 @@ func TestManagedCertificate(t *testing.T) {
 			}
 
 			managedCertificate := clientsmcrt.NewFake(managedCertificates)
+			event := &event.Fake{}
 			metrics := metrics.NewFake()
-			sync := New(config.NewFake(), &event.Fake{}, clientsingress.NewFake(nil),
-				managedCertificate, metrics, tc.random, tc.sslManager, tc.state)
+
+			sync := New(config.NewFake(), event, clientsingress.NewFake(nil),
+				managedCertificate, metrics, tc.random,
+				sslcertificatemanager.New(event, metrics, tc.ssl, tc.state), tc.state)
 
 			id := types.NewId("default", "foo")
 			if err := sync.ManagedCertificate(ctx, id); err != tc.wantError {
@@ -474,18 +472,13 @@ func TestManagedCertificate(t *testing.T) {
 				t.Fatalf("Diff state (-want, +got): %s", diff)
 			}
 
-			wantSslCertificate, wantSslCertificateErr := getSslCertificate(id,
-				tc.wantState, tc.wantSslManager)
-			gotSslCertificate, gotSslCertificateErr := getSslCertificate(id,
-				tc.state, tc.sslManager)
-			sslCertificateDiff := cmp.Diff(wantSslCertificate, gotSslCertificate)
-			if wantSslCertificateErr != gotSslCertificateErr ||
-				sslCertificateDiff != "" {
-
+			wantSslCert, wantSslCertErr := getSslCert(id, tc.wantState, tc.wantSsl)
+			gotSslCert, gotSslCertErr := getSslCert(id, tc.state, tc.ssl)
+			sslCertDiff := cmp.Diff(wantSslCert, gotSslCert)
+			if wantSslCertErr != gotSslCertErr || sslCertDiff != "" {
 				t.Fatalf(`Diff SslCertificate (-want, +got): %s,
 					got error: %v, want error: %v`,
-					sslCertificateDiff, gotSslCertificateErr,
-					wantSslCertificateErr)
+					sslCertDiff, gotSslCertErr, wantSslCertErr)
 			}
 
 			if tc.wantManagedCertificate != nil && len(managedCertificates) != 1 {

@@ -21,11 +21,11 @@ import (
 )
 
 type Fake struct {
-	ManagedCertificatesStatuses           map[string]int
-	SslCertificateBackendErrorObserved    int
-	SslCertificateQuotaErrorObserved      int
-	SslCertificateBindingLatencyObserved  int
-	SslCertificateCreationLatencyObserved int
+	ManagedCertificatesStatuses map[string]int
+	BackendErrorCnt             int
+	QuotaErrorCnt               int
+	BindingCnt                  int
+	CreationCnt                 int
 }
 
 var _ Interface = &Fake{}
@@ -41,17 +41,17 @@ func (f *Fake) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 }
 
 func (f *Fake) ObserveSslCertificateBackendError() {
-	f.SslCertificateBackendErrorObserved++
+	f.BackendErrorCnt++
 }
 
 func (f *Fake) ObserveSslCertificateQuotaError() {
-	f.SslCertificateQuotaErrorObserved++
+	f.QuotaErrorCnt++
 }
 
 func (f *Fake) ObserveSslCertificateBindingLatency(creationTime time.Time) {
-	f.SslCertificateBindingLatencyObserved++
+	f.BindingCnt++
 }
 
 func (f *Fake) ObserveSslCertificateCreationLatency(creationTime time.Time) {
-	f.SslCertificateCreationLatencyObserved++
+	f.CreationCnt++
 }

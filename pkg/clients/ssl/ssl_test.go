@@ -28,13 +28,16 @@ func TestError_IsQuotaExceeded(t *testing.T) {
 		out bool
 	}{
 		{
-			&Error{&compute.Operation{Error: &compute.OperationError{}}}, false,
+			&Error{&compute.Operation{Error: &compute.OperationError{}}},
+			false,
 		},
 		{
-			newFakeError("foo"), false,
+			newFakeError("foo"),
+			false,
 		},
 		{
-			NewFakeQuotaExceededError(), true,
+			NewFakeQuotaExceededError(),
+			true,
 		},
 	}
 

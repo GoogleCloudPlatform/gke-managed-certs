@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package dns provides operations needed to interact with DNS in an e2e test.
 package dns
 
 import (
@@ -29,12 +30,15 @@ const (
 	recordTypeA = "A"
 )
 
-type Dns interface {
+type Interface interface {
+	// Create adds DNS A records pointing `randomNames` at the IP address to the configured DNS zone
+	// and returns the resulting domain names.
 	Create(randomNames []string, ip string) ([]string, error)
+	// DeleteAll deletes all A records in DNS zone {d.zone}.
 	DeleteAll() error
 }
 
-type dnsImpl struct {
+type impl struct {
 	// service provides operations on DNS resources
 	service *dns.Service
 	// zone is a DNS zone this client operates on
@@ -43,13 +47,13 @@ type dnsImpl struct {
 	domain string
 }
 
-func New(oauthClient *http.Client, zone, domain string) (Dns, error) {
+func New(oauthClient *http.Client, zone, domain string) (Interface, error) {
 	service, err := dns.New(oauthClient)
 	if err != nil {
 		return nil, err
 	}
 
-	return dnsImpl{
+	return impl{
 		domain:  domain,
 		service: service,
 		zone:    zone,
@@ -61,7 +65,7 @@ func New(oauthClient *http.Client, zone, domain string) (Dns, error) {
 //
 // For each item `randomName` in `randomNames` an A record is added to the `d.zone` DNS zone.
 // The record points `randomName`.`d.domain` to the `ip` address.
-func (d dnsImpl) Create(randomNames []string, ip string) ([]string, error) {
+func (d impl) Create(randomNames []string, ip string) ([]string, error) {
 	var domainNames []string
 	var additions []*dns.ResourceRecordSet
 
@@ -82,8 +86,8 @@ func (d dnsImpl) Create(randomNames []string, ip string) ([]string, error) {
 	return domainNames, err
 }
 
-// DeleteAll deletes all A records in DNS zone {d.zone}.{topLevelZone}.
-func (d dnsImpl) DeleteAll() error {
+// DeleteAll deletes all A records in DNS zone {d.zone}.
+func (d impl) DeleteAll() error {
 	resourceRecordsResponse, err := d.service.ResourceRecordSets.List(projectID, d.zone).Do()
 	if err != nil {
 		return err

@@ -120,9 +120,10 @@ func (s impl) Delete(ctx context.Context, sslCertificateName string,
 	}
 
 	if utilserrors.IgnoreNotFound(err) != nil {
+		s.metrics.ObserveSslCertificateBackendError()
+
 		if managedCertificate != nil {
 			s.event.BackendError(*managedCertificate, err)
-			s.metrics.ObserveSslCertificateBackendError()
 		}
 
 		return err
@@ -140,10 +141,12 @@ func (s impl) Exists(sslCertificateName string,
 
 	exists, err := s.ssl.Exists(sslCertificateName)
 	if err != nil {
+		s.metrics.ObserveSslCertificateBackendError()
+
 		if managedCertificate != nil {
 			s.event.BackendError(*managedCertificate, err)
-			s.metrics.ObserveSslCertificateBackendError()
 		}
+
 		return false, err
 	}
 
@@ -156,10 +159,12 @@ func (s impl) Get(sslCertificateName string,
 
 	sslCert, err := s.ssl.Get(sslCertificateName)
 	if err != nil {
+		s.metrics.ObserveSslCertificateBackendError()
+
 		if managedCertificate != nil {
 			s.event.BackendError(*managedCertificate, err)
-			s.metrics.ObserveSslCertificateBackendError()
 		}
+
 		return nil, err
 	}
 

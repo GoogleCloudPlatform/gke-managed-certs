@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	apiv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -53,6 +54,18 @@ func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.Id) error {
 	return nil
 }
 
+// Controller maintains two workqueues which contain Ingresses and ManagedCertificates,
+// respectively, that need to be processed.
+//
+// Resources are queued on the workqueues:
+// 1. when they are created, deleted or updated,
+// 2. occasionally every existing resource is added to the queue to make sure
+//    they are in sync, even if one of operations from 1. is missed.
+//
+// The test uses a fake `sync` component instead of one doing the real synchronization
+// with external state and user intent. Fake sync counts all the resources it sees.
+// The aim of the test is to make sure that all expected resources were queued and
+// delivered to sync.
 func TestController(t *testing.T) {
 	testCases := map[string]struct {
 		ingresses                    []types.Id
@@ -92,8 +105,7 @@ func TestController(t *testing.T) {
 
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
-			ctx := context.Background()
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 			var ingresses []*apiv1beta1.Ingress
 			for _, id := range testCase.ingresses {
@@ -102,7 +114,10 @@ func TestController(t *testing.T) {
 
 			var mcrts []*apisv1.ManagedCertificate
 			for _, id := range testCase.managedCertificatesInCluster {
-				mcrts = append(mcrts, managedcertificate.New(id, "example.com").WithStatus("Active", "Active").Build())
+				mcrts = append(mcrts, managedcertificate.
+					New(id, "example.com").
+					WithStatus("Active", "Active").
+					Build())
 			}
 
 			stateEntries := make(map[types.Id]state.Entry, 0)
@@ -118,17 +133,27 @@ func TestController(t *testing.T) {
 					Ingress:            clientsingress.NewFake(ingresses),
 					ManagedCertificate: clientsmcrt.NewFake(mcrts),
 				},
-				metrics:                 metrics,
-				ingressQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
-				managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
-				state:                   state.NewFakeWithEntries(stateEntries),
-				sync:                    sync,
+				metrics: metrics,
+				ingressQueue: workqueue.NewNamedRateLimitingQueue(
+					workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+				managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(
+					workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
+				state: state.NewFakeWithEntries(stateEntries),
+				sync:  sync,
 			}
 
+			// Trigger resources queuing.
 			go ctrl.Run(ctx)
 
+			// Loop until all expected resources are processed.
 			go func() {
-				for len(sync.ingresses) < len(testCase.wantIngresses) || len(sync.managedCertificates) < len(testCase.wantManagedCertificates) {
+				for len(sync.ingresses) < len(testCase.wantIngresses) ||
+					len(sync.managedCertificates) < len(testCase.wantManagedCertificates) {
+
+					t.Logf("%d/%d Ingresses, %d/%d ManagedCertificates synchronized",
+						len(sync.ingresses), len(testCase.wantIngresses),
+						len(sync.managedCertificates), len(testCase.wantManagedCertificates))
+					time.Sleep(500 * time.Millisecond)
 				}
 
 				cancel()

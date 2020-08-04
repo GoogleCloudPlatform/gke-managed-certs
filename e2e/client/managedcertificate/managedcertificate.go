@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package managedcertificate provides operations needed for interacting
+// with ManagedCertificate resources in an e2e test.
 package managedcertificate
 
 import (
@@ -30,17 +32,26 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
-type ManagedCertificate interface {
+// Interface provides operations for interacting with ManagedCertificate
+// resources in an e2e test.
+type Interface interface {
+	// CreateV1beta1 creates a ManagedCertificate v1beta1.
 	CreateV1beta1(name string, domains []string) error
+	// CreateV1beta2 creates a ManagedCertificate v1beta2.
 	CreateV1beta2(name string, domains []string) error
+	// Create creates a ManagedCertificate v1.
 	Create(name string, domains []string) error
+	// DeleteAll deletes all ManagedCertificates.
 	DeleteAll() error
+	// Delete deletes a ManagedCertificate.
 	Delete(name string) error
+	// Get fetches a ManagedCertificate.
 	Get(name string) (*apisv1.ManagedCertificate, error)
+	// Update updates a ManagedCertificate.
 	Update(mcrt *apisv1.ManagedCertificate) error
 }
 
-type managedCertificateImpl struct {
+type impl struct {
 	// clientv1beta1 manages ManagedCertificate v1beta1 custom resources
 	clientv1beta1 clientsetv1beta1.ManagedCertificateInterface
 	// clientv1beta2 manages ManagedCertificate v1beta2 custom resources
@@ -49,20 +60,20 @@ type managedCertificateImpl struct {
 	client clientsetv1.ManagedCertificateInterface
 }
 
-func New(config *rest.Config, namespace string) (ManagedCertificate, error) {
+func New(config *rest.Config, namespace string) (Interface, error) {
 	clientset, err := versioned.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return managedCertificateImpl{
+	return impl{
 		clientv1beta1: clientset.NetworkingV1beta1().ManagedCertificates(namespace),
 		clientv1beta2: clientset.NetworkingV1beta2().ManagedCertificates(namespace),
 		client:        clientset.NetworkingV1().ManagedCertificates(namespace),
 	}, nil
 }
 
-func (m managedCertificateImpl) CreateV1beta1(name string, domains []string) error {
+func (m impl) CreateV1beta1(name string, domains []string) error {
 	mcrt := &apisv1beta1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -78,7 +89,7 @@ func (m managedCertificateImpl) CreateV1beta1(name string, domains []string) err
 	return err
 }
 
-func (m managedCertificateImpl) CreateV1beta2(name string, domains []string) error {
+func (m impl) CreateV1beta2(name string, domains []string) error {
 	mcrt := &apisv1beta2.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -94,7 +105,7 @@ func (m managedCertificateImpl) CreateV1beta2(name string, domains []string) err
 	return err
 }
 
-func (m managedCertificateImpl) Create(name string, domains []string) error {
+func (m impl) Create(name string, domains []string) error {
 	mcrt := &apisv1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -110,7 +121,7 @@ func (m managedCertificateImpl) Create(name string, domains []string) error {
 	return err
 }
 
-func (m managedCertificateImpl) DeleteAll() error {
+func (m impl) DeleteAll() error {
 	mcrts, err := m.client.List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -125,15 +136,15 @@ func (m managedCertificateImpl) DeleteAll() error {
 	return nil
 }
 
-func (m managedCertificateImpl) Delete(name string) error {
+func (m impl) Delete(name string) error {
 	return errors.IgnoreNotFound(m.client.Delete(name, &metav1.DeleteOptions{}))
 }
 
-func (m managedCertificateImpl) Get(name string) (*apisv1.ManagedCertificate, error) {
+func (m impl) Get(name string) (*apisv1.ManagedCertificate, error) {
 	return m.client.Get(name, metav1.GetOptions{})
 }
 
-func (m managedCertificateImpl) Update(mcrt *apisv1.ManagedCertificate) error {
+func (m impl) Update(mcrt *apisv1.ManagedCertificate) error {
 	_, err := m.client.Update(mcrt)
 	return err
 }

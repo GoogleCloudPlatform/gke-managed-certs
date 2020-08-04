@@ -23,13 +23,13 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type builder struct {
+type Builder struct {
 	managedCertificate *apisv1.ManagedCertificate
 }
 
 // New builds a ManagedCertificate for a given domain and id.
-func New(id types.Id, domain string) *builder {
-	return &builder{
+func New(id types.Id, domain string) *Builder {
+	return &Builder{
 		&apisv1.ManagedCertificate{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Now().Rfc3339Copy(),
@@ -47,7 +47,7 @@ func New(id types.Id, domain string) *builder {
 	}
 }
 
-func (b *builder) WithStatus(status string, domainStatus ...string) *builder {
+func (b *Builder) WithStatus(status string, domainStatus ...string) *Builder {
 	b.managedCertificate.Status.CertificateStatus = status
 	for i, domain := range b.managedCertificate.Spec.Domains {
 		b.managedCertificate.Status.DomainStatus = append(b.managedCertificate.Status.DomainStatus, apisv1.DomainStatus{
@@ -58,11 +58,11 @@ func (b *builder) WithStatus(status string, domainStatus ...string) *builder {
 	return b
 }
 
-func (b *builder) WithCertificateName(certificateName string) *builder {
+func (b *Builder) WithCertificateName(certificateName string) *Builder {
 	b.managedCertificate.Status.CertificateName = certificateName
 	return b
 }
 
-func (b *builder) Build() *apisv1.ManagedCertificate {
+func (b *Builder) Build() *apisv1.ManagedCertificate {
 	return b.managedCertificate
 }

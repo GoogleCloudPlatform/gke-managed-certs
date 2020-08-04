@@ -22,11 +22,11 @@ import (
 )
 
 type Fake struct {
-	BackendErrorCnt int
-	CreateCnt       int
-	DeleteCnt       int
-	MissingCnt      int
-	TooManyCnt      int
+	BackendErrorCnt        int
+	CreateCnt              int
+	DeleteCnt              int
+	MissingCertificateCnt  int
+	TooManyCertificatesCnt int
 }
 
 var _ Interface = (*Fake)(nil)
@@ -44,9 +44,9 @@ func (f *Fake) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string)
 }
 
 func (f *Fake) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
-	f.MissingCnt++
+	f.MissingCertificateCnt++
 }
 
 func (f *Fake) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
-	f.TooManyCnt++
+	f.TooManyCertificatesCnt++
 }

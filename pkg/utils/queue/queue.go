@@ -40,6 +40,10 @@ func Add(queue workqueue.RateLimitingInterface, obj interface{}) {
 }
 
 // AddId adds resource identified by id to queue.
+//
+// The key to be added to the queue is constructed in a way compatible
+// with cache.MetaNamespaceKeyFunc, i.e. if namespace is empty,
+// the key equals the name, otherwise it equals namespace/name.
 func AddId(queue workqueue.RateLimitingInterface, id types.Id) {
 	key := id.Name
 	if len(id.Namespace) > 0 {

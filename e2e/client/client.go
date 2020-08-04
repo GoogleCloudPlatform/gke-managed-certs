@@ -54,10 +54,10 @@ type Clients struct {
 	ClusterRoleBinding rbacv1beta1.ClusterRoleBindingInterface
 	CustomResource     apiextv1.CustomResourceDefinitionInterface
 	Deployment         appsv1.DeploymentInterface
-	Dns                dns.Dns
+	Dns                dns.Interface
 	Event              eventsv1beta1.EventInterface
 	Ingress            extv1beta1.IngressInterface
-	ManagedCertificate managedcertificate.ManagedCertificate
+	ManagedCertificate managedcertificate.Interface
 	Service            corev1.ServiceInterface
 	ServiceAccount     corev1.ServiceAccountInterface
 	SslCertificate     ssl.Interface
@@ -160,7 +160,7 @@ func gcloud(command ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.Replace(string(out), "\n", "", -1), nil
+	return string(out), nil
 }
 
 func getOauthClient() (*http.Client, error) {
@@ -187,6 +187,6 @@ func getOauthClient() (*http.Client, error) {
 		return nil, err
 	}
 
-	token := &oauth2.Token{AccessToken: accessToken}
+	token := &oauth2.Token{AccessToken: strings.Replace(accessToken, "\n", "", -1)}
 	return oauth2.NewClient(oauth2.NoContext, oauth2.StaticTokenSource(token)), nil
 }

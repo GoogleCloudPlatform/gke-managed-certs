@@ -33,6 +33,8 @@ type fake struct {
 	configmaps map[string]*api.ConfigMap
 }
 
+var _ Interface = &fake{}
+
 func NewFake() Interface {
 	return &fake{configmaps: make(map[string]*api.ConfigMap, 0)}
 }

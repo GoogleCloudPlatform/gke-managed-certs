@@ -21,372 +21,406 @@ import (
 	"errors"
 	"testing"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
 
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
+	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 var (
-	domain           = "foo.com"
-	cert             = &compute.SslCertificate{}
-	certId           = types.NewId("default", "bar")
-	errGeneric       = errors.New("generic error")
-	errQuotaExceeded = ssl.NewFakeQuotaExceededError()
-	errNotFound      = &googleapi.Error{Code: 404}
+	errFake  = errors.New("fake error")
+	errQuota = ssl.NewFakeQuotaExceededError()
 )
 
-type fakeSsl struct {
-	err            error
-	exists         bool
-	sslCertificate *compute.SslCertificate
+type sslError struct {
+	ssl.Fake
+
+	err    error
+	exists bool
 }
 
-var _ ssl.Interface = (*fakeSsl)(nil)
-
-func (f fakeSsl) Create(ctx context.Context, name string, domains []string) error {
-	return f.err
+func (s *sslError) Create(ctx context.Context, name string, domains []string) error {
+	return s.err
 }
 
-func (f fakeSsl) Delete(ctx context.Context, name string) error {
-	return f.err
+func (s *sslError) Delete(ctx context.Context, name string) error {
+	return s.err
 }
 
-func (f fakeSsl) Exists(name string) (bool, error) {
-	return f.exists, f.err
+func (s *sslError) Exists(name string) (bool, error) {
+	return s.exists, s.err
 }
 
-func (f fakeSsl) Get(name string) (*compute.SslCertificate, error) {
-	return f.sslCertificate, f.err
-}
-
-func (f fakeSsl) List() ([]*compute.SslCertificate, error) {
-	return nil, errors.New("not implemented")
-}
-
-func withErr(err error) fakeSsl {
-	return fakeSsl{
-		err:            err,
-		exists:         false,
-		sslCertificate: nil,
-	}
-}
-
-func withExists(err error, exists bool) fakeSsl {
-	return fakeSsl{
-		err:            err,
-		exists:         exists,
-		sslCertificate: nil,
-	}
-}
-
-func withCert(err error, sslCertificate *compute.SslCertificate) fakeSsl {
-	return fakeSsl{
-		err:            err,
-		exists:         false,
-		sslCertificate: sslCertificate,
-	}
+func (s *sslError) Get(name string) (*compute.SslCertificate, error) {
+	return nil, s.err
 }
 
 func TestCreate(t *testing.T) {
-	testCases := []struct {
-		ssl                   ssl.Interface
-		wantErr               error
-		wantTooManyCertsEvent bool
-		wantExcludedFromSLO   bool
-		wantBackendErrorEvent bool
-		wantCreateEvent       bool
+	for description, testCase := range map[string]struct {
+		ssl                ssl.Interface
+		name               string
+		managedCertificate *apisv1.ManagedCertificate
+		state              state.Interface
+
+		wantErr     error
+		wantSsl     ssl.Interface
+		wantState   state.Interface
+		wantEvent   event.Fake
+		wantMetrics metrics.Fake
 	}{
-		{
-			ssl:             withErr(nil),
-			wantCreateEvent: true,
-		},
-		{
-			ssl:                   withErr(errQuotaExceeded),
-			wantErr:               errQuotaExceeded,
-			wantTooManyCertsEvent: true,
-			wantExcludedFromSLO:   true,
-		},
-		{
-			ssl:                   withErr(errGeneric),
-			wantErr:               errGeneric,
-			wantBackendErrorEvent: true,
-		},
-	}
+		"happy path": {
+			ssl:                ssl.NewFake().Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+			state:              state.NewFake(),
 
-	for _, tc := range testCases {
-		ctx := context.Background()
+			wantSsl:   ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			wantState: state.NewFake(),
+			wantEvent: event.Fake{CreateCnt: 1},
+		},
+		"quota exceeded, empty state": {
+			ssl:                &sslError{err: errQuota},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+			state:              state.NewFake(),
 
-		event := &event.Fake{}
-		metrics := metrics.NewFake()
-		state := state.NewFakeWithEntries(map[types.Id]state.Entry{
-			certId: state.Entry{SslCertificateName: ""},
+			wantErr:     utilserrors.NotFound,
+			wantSsl:     ssl.NewFake().Build(),
+			wantState:   state.NewFake(),
+			wantEvent:   event.Fake{TooManyCertificatesCnt: 1},
+			wantMetrics: metrics.Fake{QuotaErrorCnt: 1},
+		},
+		"quota exceeded, entry in state": {
+			ssl:                &sslError{err: errQuota},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+				},
+			}),
+
+			wantErr: errQuota,
+			wantSsl: ssl.NewFake().Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+					ExcludedFromSLO:    true,
+				},
+			}),
+			wantEvent:   event.Fake{TooManyCertificatesCnt: 1},
+			wantMetrics: metrics.Fake{QuotaErrorCnt: 1},
+		},
+		"other error": {
+			ssl:                &sslError{err: errFake},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+				},
+			}),
+
+			wantErr: errFake,
+			wantSsl: ssl.NewFake().Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+				},
+			}),
+			wantEvent:   event.Fake{BackendErrorCnt: 1},
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+		},
+	} {
+		t.Run(description, func(t *testing.T) {
+			ctx := context.Background()
+
+			event := event.Fake{}
+			metrics := metrics.NewFake()
+			manager := New(&event, metrics, testCase.ssl, testCase.state)
+
+			err := manager.Create(ctx, testCase.name, *testCase.managedCertificate)
+
+			if err != testCase.wantErr {
+				t.Fatalf("Create(): %v, want: %v", err, testCase.wantErr)
+			}
+
+			wantSsl, _ := testCase.wantSsl.List()
+			gotSsl, _ := testCase.ssl.List()
+			if diff := cmp.Diff(wantSsl, gotSsl); diff != "" {
+				t.Fatalf("Diff ssl (-want, +got): %s", diff)
+			}
+
+			if diff := cmp.Diff(testCase.wantState.List(), testCase.state.List()); diff != "" {
+				t.Fatalf("Diff state (-want, +got): %s", diff)
+			}
+
+			if diff := cmp.Diff(testCase.wantEvent, event); diff != "" {
+				t.Fatalf("Diff event (-want, +got): %s", diff)
+			}
+
+			if diff := cmp.Diff(testCase.wantMetrics, *metrics); diff != "" {
+				t.Fatalf("Diff metrics (-want, +got): %s", diff)
+			}
 		})
-		sut := New(event, metrics, tc.ssl, state)
-
-		err := sut.Create(ctx, "", *managedcertificate.New(certId, domain).Build())
-
-		if err != tc.wantErr {
-			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
-		}
-
-		oneTooManyCertsEvent := event.TooManyCnt == 1
-		if tc.wantTooManyCertsEvent != oneTooManyCertsEvent {
-			t.Fatalf("TooManyCertificates events generated: %d, want event: %t",
-				event.TooManyCnt, tc.wantTooManyCertsEvent)
-		}
-
-		oneSslCertificateQuotaErrorObserved := metrics.SslCertificateQuotaErrorObserved == 1
-		if tc.wantTooManyCertsEvent != oneSslCertificateQuotaErrorObserved {
-			t.Fatalf("Metric SslCertificateQuotaError observed %d times",
-				metrics.SslCertificateQuotaErrorObserved)
-		}
-
-		entry, err := state.Get(certId)
-		if err != nil {
-			t.Fatalf("state.Get(%s): %v, want nil", certId.String(), err)
-		}
-		if entry.ExcludedFromSLO != tc.wantExcludedFromSLO {
-			t.Fatalf("Excluded from SLO is %t, want %t",
-				entry.ExcludedFromSLO, tc.wantExcludedFromSLO)
-		}
-
-		oneBackendErrorEvent := event.BackendErrorCnt == 1
-		if tc.wantBackendErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t",
-				event.BackendErrorCnt, tc.wantBackendErrorEvent)
-		}
-
-		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
-		if tc.wantBackendErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times",
-				metrics.SslCertificateBackendErrorObserved)
-		}
-
-		oneCreateEvent := event.CreateCnt == 1
-		if tc.wantCreateEvent != oneCreateEvent {
-			t.Fatalf("Create events generated: %d, want event: %t",
-				event.CreateCnt, tc.wantCreateEvent)
-		}
 	}
 }
 
 func TestDelete(t *testing.T) {
-	testCases := []struct {
-		ssl             ssl.Interface
-		mcrt            *apisv1.ManagedCertificate
-		wantErr         error
-		wantErrorEvent  bool
-		wantDeleteEvent bool
+	for description, testCase := range map[string]struct {
+		ssl                ssl.Interface
+		name               string
+		managedCertificate *apisv1.ManagedCertificate
+
+		wantErr     error
+		wantSsl     ssl.Interface
+		wantEvent   event.Fake
+		wantMetrics metrics.Fake
 	}{
-		{
-			ssl: withErr(nil),
+		"happy path with ManagedCertificate": {
+			ssl:                ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
+			wantSsl:   ssl.NewFake().Build(),
+			wantEvent: event.Fake{DeleteCnt: 1},
 		},
-		{
-			ssl:             withErr(nil),
-			mcrt:            managedcertificate.New(certId, domain).Build(),
-			wantDeleteEvent: true,
+		"happy path without ManagedCertificate": {
+			ssl:  ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name: "foo",
+
+			wantSsl: ssl.NewFake().Build(),
 		},
-		{
-			ssl:     withErr(errGeneric),
-			wantErr: errGeneric,
+		"not found with ManagedCertificate": {
+			ssl:                ssl.NewFake().Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
+			wantSsl: ssl.NewFake().Build(),
 		},
-		{
-			ssl:            withErr(errGeneric),
-			mcrt:           managedcertificate.New(certId, domain).Build(),
-			wantErr:        errGeneric,
-			wantErrorEvent: true,
+		"not found without ManagedCertificate": {
+			ssl:  ssl.NewFake().Build(),
+			name: "foo",
+
+			wantSsl: ssl.NewFake().Build(),
 		},
-		{
-			ssl: withErr(errNotFound),
+		"other error with ManagedCertificate": {
+			ssl:                &sslError{err: errFake},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
+			wantErr:     errFake,
+			wantSsl:     ssl.NewFake().Build(),
+			wantEvent:   event.Fake{BackendErrorCnt: 1},
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
-		{
-			ssl:  withErr(errNotFound),
-			mcrt: managedcertificate.New(certId, domain).Build(),
+		"other error without ManagedCertificate": {
+			ssl:  &sslError{err: errFake},
+			name: "foo",
+
+			wantErr:     errFake,
+			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
-	}
+	} {
+		t.Run(description, func(t *testing.T) {
+			ctx := context.Background()
 
-	for _, tc := range testCases {
-		ctx := context.Background()
+			event := event.Fake{}
+			metrics := metrics.NewFake()
+			manager := New(&event, metrics, testCase.ssl, state.NewFake())
 
-		event := &event.Fake{}
-		metrics := metrics.NewFake()
-		sut := New(event, metrics, tc.ssl, state.NewFake())
+			err := manager.Delete(ctx, testCase.name, testCase.managedCertificate)
 
-		err := sut.Delete(ctx, "", tc.mcrt)
+			if err != testCase.wantErr {
+				t.Fatalf("Delete(): %v, want: %v", err, testCase.wantErr)
+			}
 
-		if err != tc.wantErr {
-			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
-		}
+			wantSsl, _ := testCase.wantSsl.List()
+			gotSsl, _ := testCase.ssl.List()
+			if diff := cmp.Diff(wantSsl, gotSsl); diff != "" {
+				t.Fatalf("Diff ssl (-want, +got): %s", diff)
+			}
 
-		oneBackendErrorEvent := event.BackendErrorCnt == 1
-		if tc.wantErrorEvent != oneBackendErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t",
-				event.BackendErrorCnt, tc.wantErrorEvent)
-		}
+			if diff := cmp.Diff(testCase.wantEvent, event); diff != "" {
+				t.Fatalf("Diff event (-want, +got): %s", diff)
+			}
 
-		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
-		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times",
-				metrics.SslCertificateBackendErrorObserved)
-		}
-
-		oneDeleteEvent := event.DeleteCnt == 1
-		if tc.wantDeleteEvent != oneDeleteEvent {
-			t.Fatalf("Delete events generated: %d, want event: %t",
-				event.DeleteCnt, tc.wantDeleteEvent)
-		}
+			if diff := cmp.Diff(&testCase.wantMetrics, metrics); diff != "" {
+				t.Fatalf("Diff metrics (-want, +got): %s", diff)
+			}
+		})
 	}
 }
 
 func TestExists(t *testing.T) {
-	testCases := []struct {
-		ssl            ssl.Interface
-		mcrt           *apisv1.ManagedCertificate
-		wantExists     bool
-		wantErr        error
-		wantErrorEvent bool
+	for description, testCase := range map[string]struct {
+		ssl                ssl.Interface
+		name               string
+		managedCertificate *apisv1.ManagedCertificate
+
+		wantExists  bool
+		wantErr     error
+		wantEvent   event.Fake
+		wantMetrics metrics.Fake
 	}{
-		{
-			ssl: withExists(nil, false),
-		},
-		{
-			ssl:  withExists(nil, false),
-			mcrt: managedcertificate.New(certId, domain).Build(),
-		},
-		{
-			ssl:        withExists(nil, true),
+		"happy path with ManagedCertificate": {
+			ssl:                ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
 			wantExists: true,
 		},
-		{
-			ssl:        withExists(nil, true),
-			mcrt:       managedcertificate.New(certId, domain).Build(),
+		"happy path without ManagedCertificate": {
+			ssl:  ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name: "foo",
+
 			wantExists: true,
 		},
-		{
-			ssl:     withExists(errGeneric, false),
-			wantErr: errGeneric,
+		"not found with ManagedCertificate": {
+			ssl:                ssl.NewFake().Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
+			wantExists: false,
 		},
-		{
-			ssl:            withExists(errGeneric, false),
-			mcrt:           managedcertificate.New(certId, domain).Build(),
-			wantErr:        errGeneric,
-			wantErrorEvent: true,
+		"not found without ManagedCertificate": {
+			ssl:  ssl.NewFake().Build(),
+			name: "foo",
+
+			wantExists: false,
 		},
-		{
-			ssl:     withExists(errGeneric, true),
-			wantErr: errGeneric,
+		"other error with ManagedCertificate": {
+			ssl:                &sslError{err: errFake, exists: false},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
+
+			wantExists:  false,
+			wantErr:     errFake,
+			wantEvent:   event.Fake{BackendErrorCnt: 1},
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
-		{
-			ssl:            withExists(errGeneric, true),
-			mcrt:           managedcertificate.New(certId, domain).Build(),
-			wantErr:        errGeneric,
-			wantErrorEvent: true,
+		"other error without ManagedCertificate": {
+			ssl:  &sslError{err: errFake, exists: false},
+			name: "foo",
+
+			wantExists:  false,
+			wantErr:     errFake,
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
-	}
+	} {
+		t.Run(description, func(t *testing.T) {
+			event := event.Fake{}
+			metrics := metrics.NewFake()
+			manager := New(&event, metrics, testCase.ssl, state.NewFake())
 
-	for _, tc := range testCases {
-		event := &event.Fake{}
-		metrics := metrics.NewFake()
-		sut := New(event, metrics, tc.ssl, state.NewFake())
+			exists, err := manager.Exists(testCase.name, testCase.managedCertificate)
 
-		exists, err := sut.Exists("", tc.mcrt)
+			if exists != testCase.wantExists || err != testCase.wantErr {
+				t.Fatalf("Exists(): %t, %v, want %t, %v", exists, err, testCase.wantExists, testCase.wantErr)
+			}
 
-		if err != tc.wantErr {
-			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
-		} else if exists != tc.wantExists {
-			t.Fatalf("exists: %t, want %t", exists, tc.wantExists)
-		}
+			if diff := cmp.Diff(testCase.wantEvent, event); diff != "" {
+				t.Fatalf("Diff event (-want, +got): %s", diff)
+			}
 
-		oneErrorEvent := event.BackendErrorCnt == 1
-		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t",
-				event.BackendErrorCnt, tc.wantErrorEvent)
-		}
-
-		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
-		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times",
-				metrics.SslCertificateBackendErrorObserved)
-		}
+			if diff := cmp.Diff(&testCase.wantMetrics, metrics); diff != "" {
+				t.Fatalf("Diff metrics (-want, +got): %s", diff)
+			}
+		})
 	}
 }
 
 func TestGet(t *testing.T) {
-	testCases := []struct {
-		ssl            ssl.Interface
-		mcrt           *apisv1.ManagedCertificate
-		wantCert       *compute.SslCertificate
-		wantErr        error
-		wantErrorEvent bool
+	for description, testCase := range map[string]struct {
+		ssl                ssl.Interface
+		name               string
+		managedCertificate *apisv1.ManagedCertificate
+
+		wantCert    *compute.SslCertificate
+		wantErr     error
+		wantEvent   event.Fake
+		wantMetrics metrics.Fake
 	}{
-		{
-			ssl: withCert(nil, nil),
-		},
-		{
-			ssl:  withCert(nil, nil),
-			mcrt: managedcertificate.New(certId, domain).Build(),
-		},
-		{
-			ssl:      withCert(nil, cert),
-			wantCert: cert,
-		},
-		{
-			ssl:      withCert(nil, cert),
-			mcrt:     managedcertificate.New(certId, domain).Build(),
-			wantCert: cert,
-		},
-		{
-			ssl:     withCert(errGeneric, nil),
-			wantErr: errGeneric,
-		},
-		{
-			ssl:            withCert(errGeneric, nil),
-			mcrt:           managedcertificate.New(certId, domain).Build(),
-			wantErr:        errGeneric,
-			wantErrorEvent: true,
-		},
-		{
-			ssl:     withCert(errGeneric, cert),
-			wantErr: errGeneric,
-		},
-		{
-			ssl:            withCert(errGeneric, cert),
-			mcrt:           managedcertificate.New(certId, domain).Build(),
-			wantErr:        errGeneric,
-			wantErrorEvent: true,
-		},
-	}
+		"happy path with ManagedCertificate": {
+			ssl:                ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
 
-	for _, tc := range testCases {
-		event := &event.Fake{}
-		metrics := metrics.NewFake()
-		sut := New(event, metrics, tc.ssl, state.NewFake())
+			wantCert: ssl.NewFakeSslCertificate("foo", "", map[string]string{"example.com": ""}),
+		},
+		"happy path without ManagedCertificate": {
+			ssl:  ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			name: "foo",
 
-		sslCert, err := sut.Get("", tc.mcrt)
+			wantCert: ssl.NewFakeSslCertificate("foo", "", map[string]string{"example.com": ""}),
+		},
+		"not found with ManagedCertificate": {
+			ssl:                ssl.NewFake().Build(),
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
 
-		if err != tc.wantErr {
-			t.Fatalf("err %#v, want %#v", err, tc.wantErr)
-		} else if sslCert != tc.wantCert {
-			t.Fatalf("cert: %#v, want %#v", sslCert, tc.wantCert)
-		}
+			wantCert:    nil,
+			wantErr:     utilserrors.NotFound,
+			wantEvent:   event.Fake{BackendErrorCnt: 1},
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+		},
+		"not found without ManagedCertificate": {
+			ssl:  ssl.NewFake().Build(),
+			name: "foo",
 
-		oneErrorEvent := event.BackendErrorCnt == 1
-		if tc.wantErrorEvent != oneErrorEvent {
-			t.Fatalf("BackendError events generated: %d, want event: %t",
-				event.BackendErrorCnt, tc.wantErrorEvent)
-		}
+			wantCert:    nil,
+			wantErr:     utilserrors.NotFound,
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+		},
+		"other error with ManagedCertificate": {
+			ssl:                &sslError{err: errFake},
+			name:               "foo",
+			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
 
-		oneSslCertificateBackendErrorObserved := metrics.SslCertificateBackendErrorObserved == 1
-		if tc.wantErrorEvent != oneSslCertificateBackendErrorObserved {
-			t.Fatalf("Metric SslCertificateBackendError observed %d times",
-				metrics.SslCertificateBackendErrorObserved)
-		}
+			wantCert:    nil,
+			wantErr:     errFake,
+			wantEvent:   event.Fake{BackendErrorCnt: 1},
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+		},
+		"other error without ManagedCertificate": {
+			ssl:  &sslError{err: errFake},
+			name: "foo",
+
+			wantCert:    nil,
+			wantErr:     errFake,
+			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+		},
+	} {
+		t.Run(description, func(t *testing.T) {
+			event := event.Fake{}
+			metrics := metrics.NewFake()
+			manager := New(&event, metrics, testCase.ssl, state.NewFake())
+
+			cert, err := manager.Get(testCase.name, testCase.managedCertificate)
+
+			if diff := cmp.Diff(testCase.wantCert, cert); diff != "" {
+				t.Fatalf("Diff SslCertificates (-want, +got): %s", diff)
+			}
+
+			if err != testCase.wantErr {
+				t.Fatalf("Get(): %v, want %v", err, testCase.wantErr)
+			}
+
+			if diff := cmp.Diff(testCase.wantEvent, event); diff != "" {
+				t.Fatalf("Diff event (-want, +got): %s", diff)
+			}
+
+			if diff := cmp.Diff(&testCase.wantMetrics, metrics); diff != "" {
+				t.Fatalf("Diff metrics (-want, +got): %s", diff)
+			}
+		})
 	}
 }
