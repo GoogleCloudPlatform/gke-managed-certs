@@ -26,6 +26,17 @@ Managed Certificates consist of two parts:
 * Managed Certificate CRD which is needed to tell the controller what
   domains you want to secure.
 
+## Limitations
+
+* Managed Certificates support multi-SAN non-wildcard certificates.
+* Managed Certificates are compatible only with [GKE Ingress](https://github.com/kubernetes/ingress-gce).
+* A single ManagedCertificate supports up to 100 domain names.
+* A single Ingress supports up to 15 certificates, and all types of certificates
+  count towards the limit.
+* A GCP project supports up to
+  [ssl_certificates](https://cloud.google.com/load-balancing/docs/quotas#ssl_certificates)
+  quota of certificates.
+
 ## Prerequisites
 
 1. You need to use a Kubernetes cluster with GKE-Ingress v1.5.1+.
@@ -95,9 +106,8 @@ Managed Certificates consist of two parts:
                       path: key.json
                 ```
 1. Configure your domain example.com so that it points at the load balancer
-created for your cluster by Ingress. Note that if you add a CAA record to restrict
-the CAs that are allowed to provision certificates for your domain, Managed Certificates
-currently support:
+created for your cluster by Ingress. If you add a CAA record to restrict the CAs that are allowed
+to provision certificates for your domain, note that Managed Certificates currently support:
     * [Google Trust Services](http://pki.goog),
     * Let's Encrypt.
 In the future additional CAs may be available and a CAA record may make it impossible
@@ -127,7 +137,7 @@ To install Managed Certificates in your own cluster in GCP, you need to:
 1. Create a Managed Certificate custom object, specifying up to 100 non-wildcard domains
 not longer than 63 characters each, for which you want to obtain a certificate:
     ```yaml
-    apiVersion: networking.gke.io/v1beta2
+    apiVersion: networking.gke.io/v1
     kind: ManagedCertificate
     metadata:
       name: example-certificate
@@ -163,16 +173,20 @@ You can do the below steps in any order to turn SSL off:
 
 # Troubleshooting
 
-1. Use the same ManagedCertificate resource at every endpoint to which your domain resolves to.
+1. Check Kubernetes events attached to ManagedCertificate and Ingress resources
+   for information on temporary failures.
+
+2. Use the same ManagedCertificate resource at every endpoint to which your domain resolves to.
 
    A real life example is when your example.com domain points at two IP
-   addresses, one for IPv4 and one for IPv6. You [deploy two Ingress objects](https://github.com/kubernetes/ingress-gce/issues/87) to handle IPv4 and IPv6 traffic separately. If you create
+   addresses, one for IPv4 and one for IPv6. You [deploy two Ingress objects](https://github.com/kubernetes/ingress-gce/issues/87)
+   to handle IPv4 and IPv6 traffic separately. If you create
    two separate ManagedCertificate resources and attach each of them to one of
    the Ingresses, one of the ManagedCertificate resources may not be
-   provisioned. The reason is that the Certificate Authority is free to check
-   any of the IP addresses the domain resolves to.
+   provisioned. The reason is that the Certificate Authority is free to verify
+   challenges on any of the IP addresses the domain resolves to.
 
-2. GKE Managed Certificates communicate with GKE Ingress using annotation
+3. Managed Certificates communicate with GKE Ingress using annotation
    kubernetes.io/pre-shared-cert. Problems may arise for instance if you:
 
    * forcibly keep clearing this annotation,
@@ -185,10 +199,11 @@ You can do the below steps in any order to turn SSL off:
 # API changes
 
 Managed Certificates support the following versions of Managed Certificate CRD,
-the API: v1beta1 and v1beta2.
+the API: v1, v1beta2 and v1beta1.
 
-v1beta2 is now introduced as a new version of the API to support more than one
-domain per certificate (multi-SAN).
+You should use the v1 version. v1beta2 and v1beta1 are deprecated and will be
+removed in the future.
 
-v1beta1 does not support more than one domain per certificate (multi-SAN)
-and is deprecated. In the future the support for v1beta1 will be dropped.
+v1beta2 supports more than one domain name per certificate (multi-SAN).
+
+v1beta1 supports one domain name per certificate.
