@@ -25,7 +25,7 @@ import (
 // ManagedCertificateList is a list of ManagedCertificate objects.
 type ManagedCertificateList struct {
 	metav1.TypeMeta `json:",inline"`
-	// metdata is the standard list metadata.
+	// metadata is the standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
