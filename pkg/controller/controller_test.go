@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	apiv1beta1 "k8s.io/api/extensions/v1beta1"
+	apiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"

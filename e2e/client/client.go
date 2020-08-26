@@ -28,7 +28,7 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
-	extv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
@@ -56,7 +56,7 @@ type Clients struct {
 	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Interface
 	Event              eventsv1beta1.EventInterface
-	Ingress            extv1beta1.IngressInterface
+	Ingress            networkingv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.Interface
 	Service            corev1.ServiceInterface
 	ServiceAccount     corev1.ServiceAccountInterface
@@ -89,7 +89,7 @@ func New(namespace string) (*Clients, error) {
 		return nil, err
 	}
 
-	extClient, err := extv1beta1.NewForConfig(config)
+	networkingClient, err := networkingv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func New(namespace string) (*Clients, error) {
 		Deployment:         appsClient.Deployments(namespace),
 		Dns:                dnsClient,
 		Event:              eventClient.Events(namespace),
-		Ingress:            extClient.Ingresses(namespace),
+		Ingress:            networkingClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
 		Service:            coreClient.Services(namespace),
 		ServiceAccount:     coreClient.ServiceAccounts(namespace),

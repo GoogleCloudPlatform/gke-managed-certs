@@ -18,7 +18,7 @@ package event
 
 import (
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 )
 
 type Fake struct {
@@ -43,7 +43,7 @@ func (f *Fake) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string)
 	f.DeleteCnt++
 }
 
-func (f *Fake) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
+func (f *Fake) MissingCertificate(ingress networkingv1beta1.Ingress, mcrtName string) {
 	f.MissingCertificateCnt++
 }
 

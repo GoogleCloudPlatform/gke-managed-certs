@@ -19,7 +19,7 @@ package event
 
 import (
 	"k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -49,7 +49,7 @@ type Interface interface {
 	Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string)
 	// MissingCertificate creates an event when a ManagedCertificate attached to Ingress
 	// is not found.
-	MissingCertificate(ingress extv1beta1.Ingress, mcrtName string)
+	MissingCertificate(ingress networkingv1beta1.Ingress, mcrtName string)
 	// TooManyCertificates creates an event when quota for maximum
 	// number of SslCertificates per GCP project is exceeded.
 	TooManyCertificates(mcrt apisv1.ManagedCertificate, err error)
@@ -71,7 +71,7 @@ func New(client kubernetes.Interface) (Interface, error) {
 	if err := apisv1.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}
-	if err := extv1beta1.AddToScheme(eventsScheme); err != nil {
+	if err := networkingv1beta1.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +100,7 @@ func (e impl) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) 
 
 // MissingCertificate creates an event when a ManagedCertificate attached to Ingress
 // is not found.
-func (e impl) MissingCertificate(ingress extv1beta1.Ingress, mcrtName string) {
+func (e impl) MissingCertificate(ingress networkingv1beta1.Ingress, mcrtName string) {
 	e.recorder.Eventf(&ingress, v1.EventTypeWarning, reasonMissingCertificate,
 		"ManagedCertificate %s:%s missing", ingress.Namespace, mcrtName)
 }

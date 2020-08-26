@@ -22,7 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -89,15 +89,15 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 		return err
 	}
 
-	ingress := &extv1beta1.Ingress{
+	ingress := &networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
 				"networking.gke.io/managed-certificates": annotationManagedCertificatesValue,
 			},
 		},
-		Spec: extv1beta1.IngressSpec{
-			Backend: &extv1beta1.IngressBackend{
+		Spec: networkingv1beta1.IngressSpec{
+			Backend: &networkingv1beta1.IngressBackend{
 				ServiceName: name,
 				ServicePort: intstr.FromInt(int(port)),
 			},

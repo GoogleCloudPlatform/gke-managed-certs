@@ -26,7 +26,7 @@ import (
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
-	apiv1beta1 "k8s.io/api/extensions/v1beta1"
+	apiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/klog"
 
 	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"

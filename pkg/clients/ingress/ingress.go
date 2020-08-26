@@ -21,12 +21,12 @@ package ingress
 import (
 	"context"
 
-	apiv1beta1 "k8s.io/api/extensions/v1beta1"
+	apiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
-	informersv1beta1 "k8s.io/client-go/informers/extensions/v1beta1"
+	informersv1beta1 "k8s.io/client-go/informers/networking/v1beta1"
 	"k8s.io/client-go/kubernetes"
-	typedv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	typedv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -52,7 +52,7 @@ type Interface interface {
 }
 
 type impl struct {
-	client   typedv1beta1.ExtensionsV1beta1Interface
+	client   typedv1beta1.NetworkingV1beta1Interface
 	factory  informers.SharedInformerFactory
 	informer informersv1beta1.IngressInformer
 }
@@ -61,9 +61,9 @@ func New(clientset *kubernetes.Clientset) Interface {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 
 	return impl{
-		client:   clientset.ExtensionsV1beta1(),
+		client:   clientset.NetworkingV1beta1(),
 		factory:  factory,
-		informer: factory.Extensions().V1beta1().Ingresses(),
+		informer: factory.Networking().V1beta1().Ingresses(),
 	}
 }
 

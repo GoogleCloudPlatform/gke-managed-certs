@@ -19,7 +19,7 @@ package ingress
 import (
 	"context"
 
-	apiv1beta1 "k8s.io/api/extensions/v1beta1"
+	apiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"

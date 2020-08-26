@@ -274,8 +274,13 @@ func deployController(registry, tag string) error {
 				Verbs:     []string{"*"},
 			},
 			{
-				APIGroups: []string{"", "extensions"},
-				Resources: []string{"configmaps", "endpoints", "events", "ingresses"},
+				APIGroups: []string{"networking.k8s.io"},
+				Resources: []string{"ingresses"},
+				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps", "endpoints", "events"},
 				Verbs:     []string{"*"},
 			},
 		},
