@@ -32,10 +32,10 @@ const (
 
 type Interface interface {
 	// Create adds DNS A records pointing `randomNames` at the IP address to the configured DNS zone
-	// and returns the resulting domain names.
-	Create(randomNames []string, ip string) ([]string, error)
-	// DeleteAll deletes all A records in DNS zone {d.zone}.
-	DeleteAll() error
+	// and returns the resulting domain names and the records added to the zone.
+	Create(randomNames []string, ip string) ([]string, []*dns.ResourceRecordSet, error)
+	// Delete deletes specified records from the DNS zone `d.zone`.
+	Delete(records []*dns.ResourceRecordSet) error
 }
 
 type impl struct {
@@ -60,12 +60,13 @@ func New(oauthClient *http.Client, zone, domain string) (Interface, error) {
 	}, nil
 }
 
-// Create adds DNS A records pointing `randomNames` at the IP address to the configured DNS zone
-// and returns the resulting domain names.
+// Create adds DNS A records pointing `randomNames` at the IP address `ip` to the configured DNS zone.
 //
 // For each item `randomName` in `randomNames` an A record is added to the `d.zone` DNS zone.
 // The record points `randomName`.`d.domain` to the `ip` address.
-func (d impl) Create(randomNames []string, ip string) ([]string, error) {
+//
+// Returns the resulting domain names and DNS records added to the DNS zone.
+func (d impl) Create(randomNames []string, ip string) ([]string, []*dns.ResourceRecordSet, error) {
 	var domainNames []string
 	var additions []*dns.ResourceRecordSet
 
@@ -83,34 +84,20 @@ func (d impl) Create(randomNames []string, ip string) ([]string, error) {
 	_, err := d.service.Changes.Create(projectID, d.zone, &dns.Change{
 		Additions: additions,
 	}).Do()
-	return domainNames, err
+	return domainNames, additions, err
 }
 
-// DeleteAll deletes all A records in DNS zone {d.zone}.
-func (d impl) DeleteAll() error {
-	resourceRecordsResponse, err := d.service.ResourceRecordSets.List(projectID, d.zone).Do()
-	if err != nil {
-		return err
+// Delete deletes specified records from the DNS zone `d.zone`.
+func (d impl) Delete(records []*dns.ResourceRecordSet) error {
+	var names []string
+	for _, record := range records {
+		names = append(names, record.Name)
 	}
 
-	var allNames []string
-	var allANames []string
-	var recordsA []*dns.ResourceRecordSet
-	for _, record := range resourceRecordsResponse.Rrsets {
-		allNames = append(allNames, record.Name)
+	klog.Infof("Delete DNS records from %s; names: %v", d.zone, names)
 
-		if record.Type == recordTypeA {
-			recordsA = append(recordsA, record)
-			allANames = append(allANames, record.Name)
-		}
-	}
-
-	klog.Infof("Delete all DNS A records in %s; all names: %v; all A names: %v", d.zone, allNames, allANames)
-
-	_, err = d.service.Changes.Create(projectID, d.zone, &dns.Change{
-		Deletions: recordsA,
+	_, err := d.service.Changes.Create(projectID, d.zone, &dns.Change{
+		Deletions: records,
 	}).Do()
-
-	klog.Infof("Successfully deleted DNS A records: %v", allANames)
 	return err
 }

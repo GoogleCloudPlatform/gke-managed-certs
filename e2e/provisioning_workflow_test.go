@@ -91,11 +91,11 @@ func TestProvisioningWorkflow(t *testing.T) {
 	}
 	klog.Infof("Ingress IP: %s", ip)
 
-	defer clients.Dns.DeleteAll()
-	domains, err := clients.Dns.Create(generateRandomNames(2*mcrtCount), ip)
+	domains, records, err := clients.Dns.Create(generateRandomNames(2*mcrtCount), ip)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clients.Dns.Delete(records)
 	klog.Infof("Generated random domains: %v", domains)
 
 	for i, mcrtName := range mcrtNames {

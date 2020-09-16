@@ -17,8 +17,9 @@ limitations under the License.
 package event
 
 import (
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+
+	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 )
 
 type Fake struct {
