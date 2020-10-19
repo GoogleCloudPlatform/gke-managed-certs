@@ -30,34 +30,44 @@ func TestCRDValidation(t *testing.T) {
 	}
 
 	for i, tc := range []struct {
+		desc    string
 		domains []string
 		success bool
-		desc    string
 	}{
 		{
+			"Domain with trailing dot not allowed",
+			[]string{"trailing-dot.example.com."},
+			false,
+		},
+		{
+			"Domain with uppercase characters not allowed",
+			[]string{"UPPER-CASE.example.com"},
+			false,
+		},
+		{
+			"Domain >63 characters not allowed",
 			[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.validation.example.com"},
 			false,
-			"Domain >63 characters not allowed",
 		},
 		{
+			"Domain with a wildcard not allowed",
 			[]string{"*.validation.example.com"},
 			false,
-			"Domain with a wildcard not allowed",
 		},
 		{
+			"More than 100 SANs not allowed",
 			domains101,
 			false,
-			"More than 100 SANs not allowed",
 		},
 		{
+			"Single non-wildcard domain <=63 characters allowed",
 			[]string{"validation.example.com"},
 			true,
-			"Single non-wildcard domain <=63 characters allowed",
 		},
 		{
+			"Multiple domain names allowed",
 			[]string{"validation1.example.com", "validation2.example.com"},
 			true,
-			"Multiple domain names allowed",
 		},
 	} {
 		i, tc := i, tc

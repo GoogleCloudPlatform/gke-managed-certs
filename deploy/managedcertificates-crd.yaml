@@ -65,7 +65,7 @@ spec:
                 items:
                   type: string
                   maxLength: 63
-                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+                  pattern: '^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$'
   - name: v1beta2  # (Deprecated)
     served: true
     storage: false
@@ -112,7 +112,7 @@ spec:
                 items:
                   type: string
                   maxLength: 63
-                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+                  pattern: '^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$'
   - name: v1
     served: true
     storage: true
@@ -159,7 +159,7 @@ spec:
                 items:
                   type: string
                   maxLength: 63
-                  pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'
+                  pattern: '^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$'
     additionalPrinterColumns:
     - name: Age
       type: date
