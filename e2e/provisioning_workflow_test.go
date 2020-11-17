@@ -38,10 +38,10 @@ const (
 	statusSuccess                  = 200
 )
 
-func getIngressIP(name string) (string, error) {
+func getIngressIP(ctx context.Context, name string) (string, error) {
 	var ip string
 	err := utils.Retry(func() error {
-		ing, err := clients.Ingress.Get(name, metav1.GetOptions{})
+		ing, err := clients.Ingress.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -83,9 +83,9 @@ func TestProvisioningWorkflow(t *testing.T) {
 	}
 
 	ingressName := "test-provisioning-workflow"
-	createIngress(t, ingressName, 8080, strings.Join(mcrtNames, annotationSeparator))
+	createIngress(t, ctx, ingressName, 8080, strings.Join(mcrtNames, annotationSeparator))
 
-	ip, err := getIngressIP(ingressName)
+	ip, err := getIngressIP(ctx, ingressName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,11 +99,11 @@ func TestProvisioningWorkflow(t *testing.T) {
 	klog.Infof("Generated random domains: %v", domains)
 
 	for i, mcrtName := range mcrtNames {
-		err := clients.ManagedCertificate.Create(mcrtName, []string{domains[2*i], domains[2*i+1]})
+		err := clients.ManagedCertificate.Create(ctx, mcrtName, []string{domains[2*i], domains[2*i+1]})
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer clients.ManagedCertificate.Delete(mcrtName)
+		defer clients.ManagedCertificate.Delete(ctx, mcrtName)
 	}
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
@@ -117,7 +117,7 @@ func TestProvisioningWorkflow(t *testing.T) {
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
 		err := utils.Retry(func() error {
 			for _, mcrtName := range mcrtNames {
-				mcrt, err := clients.ManagedCertificate.Get(mcrtName)
+				mcrt, err := clients.ManagedCertificate.Get(ctx, mcrtName)
 				if err != nil {
 					return err
 				}

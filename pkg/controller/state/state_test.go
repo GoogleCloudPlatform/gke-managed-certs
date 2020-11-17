@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -59,12 +60,12 @@ type failConfigMapMock struct {
 
 var _ configmap.Interface = (*failConfigMapMock)(nil)
 
-func (c *failConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+func (c *failConfigMapMock) Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++
 	return nil, errors.New("Fake error - failed to get a config map")
 }
 
-func (c *failConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (c *failConfigMapMock) UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error {
 	c.changeCount++
 	return errors.New("Fake error - failed to update or create a config map")
 }
@@ -84,12 +85,12 @@ type emptyConfigMapMock struct {
 
 var _ configmap.Interface = (*emptyConfigMapMock)(nil)
 
-func (c *emptyConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+func (c *emptyConfigMapMock) Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++
 	return &api.ConfigMap{Data: map[string]string{}}, nil
 }
 
-func (c *emptyConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (c *emptyConfigMapMock) UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error {
 	c.changeCount++
 	return nil
 }
@@ -109,7 +110,7 @@ type filledConfigMapMock struct {
 
 var _ configmap.Interface = (*filledConfigMapMock)(nil)
 
-func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error) {
+func (c *filledConfigMapMock) Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error) {
 	c.getCount++
 	return &api.ConfigMap{
 		Data: map[string]string{
@@ -118,7 +119,7 @@ func (c *filledConfigMapMock) Get(namespace, name string) (*api.ConfigMap, error
 	}, nil
 }
 
-func (c *filledConfigMapMock) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (c *filledConfigMapMock) UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error {
 	c.changeCount++
 	return nil
 }
@@ -132,6 +133,7 @@ func newFilled(t *testing.T) *filledConfigMapMock {
 }
 
 func TestState(t *testing.T) {
+	ctx := context.Background()
 	runtime.ErrorHandlers = nil
 
 	for description, testCase := range map[string]struct {
@@ -153,7 +155,7 @@ func TestState(t *testing.T) {
 	} {
 		t.Run(description, func(t *testing.T) {
 			// Create a state instance.
-			state := New(testCase.configmap)
+			state := New(ctx, testCase.configmap)
 
 			// At the beginning there are wantInitItems items in state.
 			if len(state.List()) != testCase.wantInitItems {
@@ -172,25 +174,25 @@ func TestState(t *testing.T) {
 			}
 
 			// Setting flags on a missing item fails.
-			if err := state.SetExcludedFromSLO(missingId); !utilserrors.IsNotFound(err) {
+			if err := state.SetExcludedFromSLO(ctx, missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetExcludedFromSLO(%s): %v, want %v",
 					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSoftDeleted(missingId); !utilserrors.IsNotFound(err) {
+			if err := state.SetSoftDeleted(ctx, missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSoftDeleted(%s): %v, want %v",
 					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateBindingReported(missingId); !utilserrors.IsNotFound(err) {
+			if err := state.SetSslCertificateBindingReported(ctx, missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSslCertificateBindingReported(%s): %v, want %v",
 					missingId.String(), err, utilserrors.NotFound)
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateCreationReported(missingId); !utilserrors.IsNotFound(err) {
+			if err := state.SetSslCertificateCreationReported(ctx, missingId); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSslCertificateCreationReported(%s): %v, want %v",
 					missingId.String(), err, utilserrors.NotFound)
 			}
@@ -198,7 +200,7 @@ func TestState(t *testing.T) {
 
 			// Add an item to state.
 			id := types.NewId("default", "foo")
-			state.Insert(id, "foo")
+			state.Insert(ctx, id, "foo")
 			changeCount++
 			testCase.configmap.check(changeCount)
 
@@ -217,32 +219,32 @@ func TestState(t *testing.T) {
 			}
 
 			// Set all the flags one by one.
-			if err := state.SetExcludedFromSLO(id); err != nil {
+			if err := state.SetExcludedFromSLO(ctx, id); err != nil {
 				t.Fatalf("SetExcludedFromSLO(%s): %v, want nil", id.String(), err)
 			}
 			changeCount++
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSoftDeleted(id); err != nil {
+			if err := state.SetSoftDeleted(ctx, id); err != nil {
 				t.Fatalf("SetSoftDeleted(%s): %v, want nil", id.String(), err)
 			}
 			changeCount++
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateBindingReported(id); err != nil {
+			if err := state.SetSslCertificateBindingReported(ctx, id); err != nil {
 				t.Fatalf("SetSslCertificateBindingReported(%s): %v, want nil", id.String(), err)
 			}
 			changeCount++
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSslCertificateCreationReported(id); err != nil {
+			if err := state.SetSslCertificateCreationReported(ctx, id); err != nil {
 				t.Fatalf("SetSslCertificateCreationReported(%s): %v, want nil", id.String(), err)
 			}
 			changeCount++
 			testCase.configmap.check(changeCount)
 
 			// Delete the item
-			state.Delete(id)
+			state.Delete(ctx, id)
 			changeCount++
 			testCase.configmap.check(changeCount)
 

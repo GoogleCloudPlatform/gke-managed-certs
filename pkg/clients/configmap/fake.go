@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -39,7 +40,7 @@ func NewFake() Interface {
 	return &fake{configmaps: make(map[string]*api.ConfigMap, 0)}
 }
 
-func (f *fake) Get(namespace, name string) (*api.ConfigMap, error) {
+func (f *fake) Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error) {
 	for k, v := range f.configmaps {
 		pieces := strings.Split(k, separator)
 		if len(pieces) != 2 {
@@ -54,7 +55,7 @@ func (f *fake) Get(namespace, name string) (*api.ConfigMap, error) {
 	return nil, errors.NotFound
 }
 
-func (f *fake) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (f *fake) UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error {
 	f.configmaps[fmt.Sprintf("%s%s%s", namespace, separator, configmap.Name)] = configmap
 	return nil
 }

@@ -109,7 +109,7 @@ func main() {
 		RetryPeriod:   leaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				controller := controller.New(config, clients)
+				controller := controller.New(ctx, config, clients)
 
 				go func() {
 					<-setupSignalHandler()

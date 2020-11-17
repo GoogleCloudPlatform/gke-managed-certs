@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -39,7 +40,7 @@ const (
 )
 
 // Deploys Managed Certificate CRD
-func deployCRD() error {
+func deployCRD(ctx context.Context) error {
 	domainRegex := `^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$`
 	var maxDomains1 int64 = 1
 	var maxDomains100 int64 = 100
@@ -225,16 +226,16 @@ func deployCRD() error {
 			Scope: apiextv1.NamespaceScoped,
 		},
 	}
-	if err := utilserrors.IgnoreNotFound(clients.CustomResource.Delete(crd.Name, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.CustomResource.Delete(ctx, crd.Name, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
-	if _, err := clients.CustomResource.Create(&crd); err != nil {
+	if _, err := clients.CustomResource.Create(ctx, &crd, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	klog.Infof("Created custom resource definition %s", crd.Name)
 
 	if err := utils.Retry(func() error {
-		crd, err := clients.CustomResource.Get(crd.Name, metav1.GetOptions{})
+		crd, err := clients.CustomResource.Get(ctx, crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("ManagedCertificate CRD not yet established: %v", err)
 		}
@@ -254,13 +255,13 @@ func deployCRD() error {
 }
 
 // Deploys Managed Certificate controller with all related objects
-func deployController(registry, tag string) error {
-	if err := deleteController(); err != nil {
+func deployController(ctx context.Context, registry, tag string) error {
+	if err := deleteController(ctx); err != nil {
 		return err
 	}
 
 	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
-	if _, err := clients.ServiceAccount.Create(&serviceAccount); err != nil {
+	if _, err := clients.ServiceAccount.Create(ctx, &serviceAccount, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	klog.Infof("Created service account %s", serviceAccountName)
@@ -285,7 +286,7 @@ func deployController(registry, tag string) error {
 			},
 		},
 	}
-	if _, err := clients.ClusterRole.Create(&clusterRole); err != nil {
+	if _, err := clients.ClusterRole.Create(ctx, &clusterRole, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	klog.Infof("Created cluster role %s", clusterRoleName)
@@ -299,7 +300,7 @@ func deployController(registry, tag string) error {
 			Name:     clusterRoleName,
 		},
 	}
-	if _, err := clients.ClusterRoleBinding.Create(&clusterRoleBinding); err != nil {
+	if _, err := clients.ClusterRoleBinding.Create(ctx, &clusterRoleBinding, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	klog.Infof("Created cluster role binding %s", clusterRoleBindingName)
@@ -386,7 +387,7 @@ func deployController(registry, tag string) error {
 			},
 		},
 	}
-	if _, err := clients.Deployment.Create(&deployment); err != nil {
+	if _, err := clients.Deployment.Create(ctx, &deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	klog.Infof("Created deployment %s", deploymentName)
@@ -395,23 +396,23 @@ func deployController(registry, tag string) error {
 }
 
 // Deletes Managed Certificate controller and all related objects
-func deleteController() error {
-	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(serviceAccountName, &metav1.DeleteOptions{})); err != nil {
+func deleteController(ctx context.Context) error {
+	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx, serviceAccountName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted service account %s", serviceAccountName)
 
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(clusterRoleName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(ctx, clusterRoleName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role %s", clusterRoleName)
 
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(clusterRoleBindingName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
 
-	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(deploymentName, &metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(ctx, deploymentName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted deployment %s", deploymentName)

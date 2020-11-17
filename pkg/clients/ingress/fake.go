@@ -54,7 +54,7 @@ func (f *Fake) List() ([]*apiv1beta1.Ingress, error) {
 	return f.ingresses, nil
 }
 
-func (f *Fake) Update(ingress *apiv1beta1.Ingress) error {
+func (f *Fake) Update(ctx context.Context, ingress *apiv1beta1.Ingress) error {
 	for i, ing := range f.ingresses {
 		if ing.Namespace == ingress.Namespace && ing.Name == ingress.Name {
 			f.ingresses[i] = ingress

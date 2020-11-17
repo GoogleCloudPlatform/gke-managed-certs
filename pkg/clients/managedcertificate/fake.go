@@ -54,7 +54,7 @@ func (f *Fake) List() ([]*apisv1.ManagedCertificate, error) {
 	return f.managedCertificates, nil
 }
 
-func (f *Fake) Update(managedCertificate *apisv1.ManagedCertificate) error {
+func (f *Fake) Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error {
 	for i, cert := range f.managedCertificates {
 		if cert.Namespace == managedCertificate.Namespace &&
 			cert.Name == managedCertificate.Name {

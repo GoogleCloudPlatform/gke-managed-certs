@@ -18,6 +18,8 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
+
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
@@ -29,9 +31,9 @@ import (
 // Interface exposes operations for manipulating ConfigMap resources.
 type Interface interface {
 	// Get fetches a ConfigMap.
-	Get(namespace, name string) (*api.ConfigMap, error)
+	Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error)
 	// UpdateOrCreate updates or creates a ConfigMap.
-	UpdateOrCreate(namespace string, configmap *api.ConfigMap) error
+	UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error
 }
 
 type impl struct {
@@ -45,19 +47,19 @@ func New(config *rest.Config) Interface {
 }
 
 // Get fetches a ConfigMap.
-func (c impl) Get(namespace, name string) (*api.ConfigMap, error) {
-	return c.client.ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+func (c impl) Get(ctx context.Context, namespace, name string) (*api.ConfigMap, error) {
+	return c.client.ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // UpdateOrCreate updates or creates a ConfigMap.
-func (c impl) UpdateOrCreate(namespace string, configmap *api.ConfigMap) error {
+func (c impl) UpdateOrCreate(ctx context.Context, namespace string, configmap *api.ConfigMap) error {
 	configmaps := c.client.ConfigMaps(namespace)
 
-	_, err := configmaps.Update(configmap)
+	_, err := configmaps.Update(ctx, configmap, metav1.UpdateOptions{})
 	if !errors.IsNotFound(err) {
 		return err
 	}
 
-	_, err = configmaps.Create(configmap)
+	_, err = configmaps.Create(ctx, configmap, metav1.CreateOptions{})
 	return err
 }

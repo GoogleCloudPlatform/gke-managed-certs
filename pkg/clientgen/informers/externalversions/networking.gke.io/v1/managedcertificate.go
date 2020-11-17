@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	networkinggkeiov1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
@@ -61,13 +62,13 @@ func NewFilteredManagedCertificateInformer(client versioned.Interface, namespace
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().ManagedCertificates(namespace).List(options)
+				return client.NetworkingV1().ManagedCertificates(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().ManagedCertificates(namespace).Watch(options)
+				return client.NetworkingV1().ManagedCertificates(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&networkinggkeiov1.ManagedCertificate{},

@@ -22,6 +22,7 @@ import (
 	"context"
 
 	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	informersv1beta1 "k8s.io/client-go/informers/networking/v1beta1"
@@ -46,7 +47,7 @@ type Interface interface {
 	// List returns all Ingress resources.
 	List() ([]*apiv1beta1.Ingress, error)
 	// Update updates the given Ingress resource.
-	Update(ingress *apiv1beta1.Ingress) error
+	Update(ctx context.Context, ingress *apiv1beta1.Ingress) error
 	// Run initializes the object exposing the Ingress API.
 	Run(ctx context.Context, queue workqueue.RateLimitingInterface)
 }
@@ -79,8 +80,8 @@ func (ing impl) List() ([]*apiv1beta1.Ingress, error) {
 	return ing.informer.Lister().List(labels.Everything())
 }
 
-func (ing impl) Update(ingress *apiv1beta1.Ingress) error {
-	_, err := ing.client.Ingresses(ingress.Namespace).Update(ingress)
+func (ing impl) Update(ctx context.Context, ingress *apiv1beta1.Ingress) error {
+	_, err := ing.client.Ingresses(ingress.Namespace).Update(ctx, ingress, metav1.UpdateOptions{})
 	return err
 }
 

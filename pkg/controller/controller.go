@@ -48,9 +48,9 @@ type controller struct {
 	sync                    sync.Interface
 }
 
-func New(config *config.Config, clients *clients.Clients) *controller {
+func New(ctx context.Context, config *config.Config, clients *clients.Clients) *controller {
 	metrics := metrics.New(config)
-	state := state.New(clients.ConfigMap)
+	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
 

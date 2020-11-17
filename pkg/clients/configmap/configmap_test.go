@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -53,6 +54,8 @@ func buildCreateFunc(called *bool) cgotesting.ReactionFunc {
 }
 
 func TestUpdateOrCreate(t *testing.T) {
+	ctx := context.Background()
+
 	testCases := []struct {
 		updateError   error
 		createCalled  bool
@@ -73,7 +76,7 @@ func TestUpdateOrCreate(t *testing.T) {
 		configMap := impl{
 			client: fakeClient,
 		}
-		err := configMap.UpdateOrCreate(namespace, &api.ConfigMap{})
+		err := configMap.UpdateOrCreate(ctx, namespace, &api.ConfigMap{})
 
 		if err != testCase.returnedError {
 			t.Errorf("UpdateOrCreate returned error %#v, want %#v", err, testCase.returnedError)

@@ -85,7 +85,7 @@ func (s impl) Create(ctx context.Context, sslCertificateName string,
 			s.metrics.ObserveSslCertificateQuotaError()
 
 			id := types.NewId(managedCertificate.Namespace, managedCertificate.Name)
-			if err := s.state.SetExcludedFromSLO(id); err != nil {
+			if err := s.state.SetExcludedFromSLO(ctx, id); err != nil {
 				return err
 			}
 

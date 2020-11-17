@@ -19,6 +19,8 @@ limitations under the License.
 package managedcertificate
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
@@ -36,19 +38,19 @@ import (
 // resources in an e2e test.
 type Interface interface {
 	// CreateV1beta1 creates a ManagedCertificate v1beta1.
-	CreateV1beta1(name string, domains []string) error
+	CreateV1beta1(ctx context.Context, name string, domains []string) error
 	// CreateV1beta2 creates a ManagedCertificate v1beta2.
-	CreateV1beta2(name string, domains []string) error
+	CreateV1beta2(ctx context.Context, name string, domains []string) error
 	// Create creates a ManagedCertificate v1.
-	Create(name string, domains []string) error
+	Create(ctx context.Context, name string, domains []string) error
 	// DeleteAll deletes all ManagedCertificates.
-	DeleteAll() error
+	DeleteAll(ctx context.Context) error
 	// Delete deletes a ManagedCertificate.
-	Delete(name string) error
+	Delete(ctx context.Context, name string) error
 	// Get fetches a ManagedCertificate.
-	Get(name string) (*apisv1.ManagedCertificate, error)
+	Get(ctx context.Context, name string) (*apisv1.ManagedCertificate, error)
 	// Update updates a ManagedCertificate.
-	Update(mcrt *apisv1.ManagedCertificate) error
+	Update(ctx context.Context, mcrt *apisv1.ManagedCertificate) error
 }
 
 type impl struct {
@@ -73,7 +75,7 @@ func New(config *rest.Config, namespace string) (Interface, error) {
 	}, nil
 }
 
-func (m impl) CreateV1beta1(name string, domains []string) error {
+func (m impl) CreateV1beta1(ctx context.Context, name string, domains []string) error {
 	mcrt := &apisv1beta1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -85,11 +87,11 @@ func (m impl) CreateV1beta1(name string, domains []string) error {
 			DomainStatus: []apisv1beta1.DomainStatus{},
 		},
 	}
-	_, err := m.clientv1beta1.Create(mcrt)
+	_, err := m.clientv1beta1.Create(ctx, mcrt, metav1.CreateOptions{})
 	return err
 }
 
-func (m impl) CreateV1beta2(name string, domains []string) error {
+func (m impl) CreateV1beta2(ctx context.Context, name string, domains []string) error {
 	mcrt := &apisv1beta2.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -101,11 +103,11 @@ func (m impl) CreateV1beta2(name string, domains []string) error {
 			DomainStatus: []apisv1beta2.DomainStatus{},
 		},
 	}
-	_, err := m.clientv1beta2.Create(mcrt)
+	_, err := m.clientv1beta2.Create(ctx, mcrt, metav1.CreateOptions{})
 	return err
 }
 
-func (m impl) Create(name string, domains []string) error {
+func (m impl) Create(ctx context.Context, name string, domains []string) error {
 	mcrt := &apisv1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -117,18 +119,18 @@ func (m impl) Create(name string, domains []string) error {
 			DomainStatus: []apisv1.DomainStatus{},
 		},
 	}
-	_, err := m.client.Create(mcrt)
+	_, err := m.client.Create(ctx, mcrt, metav1.CreateOptions{})
 	return err
 }
 
-func (m impl) DeleteAll() error {
-	mcrts, err := m.client.List(metav1.ListOptions{})
+func (m impl) DeleteAll(ctx context.Context) error {
+	mcrts, err := m.client.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, mcrt := range mcrts.Items {
-		if err := m.Delete(mcrt.Name); err != nil {
+		if err := m.Delete(ctx, mcrt.Name); err != nil {
 			return err
 		}
 	}
@@ -136,15 +138,15 @@ func (m impl) DeleteAll() error {
 	return nil
 }
 
-func (m impl) Delete(name string) error {
-	return errors.IgnoreNotFound(m.client.Delete(name, &metav1.DeleteOptions{}))
+func (m impl) Delete(ctx context.Context, name string) error {
+	return errors.IgnoreNotFound(m.client.Delete(ctx, name, metav1.DeleteOptions{}))
 }
 
-func (m impl) Get(name string) (*apisv1.ManagedCertificate, error) {
-	return m.client.Get(name, metav1.GetOptions{})
+func (m impl) Get(ctx context.Context, name string) (*apisv1.ManagedCertificate, error) {
+	return m.client.Get(ctx, name, metav1.GetOptions{})
 }
 
-func (m impl) Update(mcrt *apisv1.ManagedCertificate) error {
-	_, err := m.client.Update(mcrt)
+func (m impl) Update(ctx context.Context, mcrt *apisv1.ManagedCertificate) error {
+	_, err := m.client.Update(ctx, mcrt, metav1.UpdateOptions{})
 	return err
 }

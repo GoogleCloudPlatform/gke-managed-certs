@@ -18,6 +18,7 @@ limitations under the License.
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -46,14 +47,14 @@ type Entry struct {
 }
 
 type Interface interface {
-	Delete(id types.Id)
+	Delete(ctx context.Context, id types.Id)
 	Get(id types.Id) (Entry, error)
-	Insert(id types.Id, sslCertificateName string)
+	Insert(ctx context.Context, id types.Id, sslCertificateName string)
 	List() map[types.Id]Entry
-	SetExcludedFromSLO(id types.Id) error
-	SetSoftDeleted(id types.Id) error
-	SetSslCertificateBindingReported(id types.Id) error
-	SetSslCertificateCreationReported(id types.Id) error
+	SetExcludedFromSLO(ctx context.Context, id types.Id) error
+	SetSoftDeleted(ctx context.Context, id types.Id) error
+	SetSslCertificateBindingReported(ctx context.Context, id types.Id) error
+	SetSslCertificateCreationReported(ctx context.Context, id types.Id) error
 }
 
 type impl struct {
@@ -66,10 +67,10 @@ type impl struct {
 	configmap configmap.Interface
 }
 
-func New(configmap configmap.Interface) Interface {
+func New(ctx context.Context, configmap configmap.Interface) Interface {
 	mapping := make(map[types.Id]Entry)
 
-	config, err := configmap.Get(configMapNamespace, configMapName)
+	config, err := configmap.Get(ctx, configMapNamespace, configMapName)
 	if err != nil {
 		klog.Warning(err)
 	} else if len(config.Data) > 0 {
@@ -83,11 +84,11 @@ func New(configmap configmap.Interface) Interface {
 }
 
 // Delete deletes entry associated with ManagedCertificate id.
-func (state *impl) Delete(id types.Id) {
+func (state *impl) Delete(ctx context.Context, id types.Id) {
 	state.Lock()
 	defer state.Unlock()
 	delete(state.mapping, id)
-	state.persist()
+	state.persist(ctx)
 }
 
 // Get fetches an entry associated with ManagedCertificate id.
@@ -105,7 +106,7 @@ func (state *impl) Get(id types.Id) (Entry, error) {
 
 // Insert adds a new entry with an associated SslCertificate name.
 // If an id already exists in state, it is overwritten.
-func (state *impl) Insert(id types.Id, sslCertificateName string) {
+func (state *impl) Insert(ctx context.Context, id types.Id, sslCertificateName string) {
 	state.Lock()
 	defer state.Unlock()
 
@@ -117,7 +118,7 @@ func (state *impl) Insert(id types.Id, sslCertificateName string) {
 	v.SslCertificateName = sslCertificateName
 
 	state.mapping[id] = v
-	state.persist()
+	state.persist(ctx)
 }
 
 // List fetches all data stored in state.
@@ -136,7 +137,7 @@ func (state *impl) List() map[types.Id]Entry {
 // SetExcludedFromSLO sets to true a flag indicating that entry associated
 // with given ManagedCertificate id should not be taken into account
 // for the purposes of SLO calculation.
-func (state *impl) SetExcludedFromSLO(id types.Id) error {
+func (state *impl) SetExcludedFromSLO(ctx context.Context, id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -148,14 +149,14 @@ func (state *impl) SetExcludedFromSLO(id types.Id) error {
 	v.ExcludedFromSLO = true
 
 	state.mapping[id] = v
-	state.persist()
+	state.persist(ctx)
 
 	return nil
 }
 
 // SetSoftDeleted sets to true a flag indicating that entry associated
 // with given ManagedCertificate id has been deleted.
-func (state *impl) SetSoftDeleted(id types.Id) error {
+func (state *impl) SetSoftDeleted(ctx context.Context, id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -167,7 +168,7 @@ func (state *impl) SetSoftDeleted(id types.Id) error {
 	v.SoftDeleted = true
 
 	state.mapping[id] = v
-	state.persist()
+	state.persist(ctx)
 
 	return nil
 }
@@ -175,7 +176,7 @@ func (state *impl) SetSoftDeleted(id types.Id) error {
 // SetSslCertificateBindingReported sets to true a flag indicating that
 // SslCertificate binding metric has been already reported
 // for this ManagedCertificate id.
-func (state *impl) SetSslCertificateBindingReported(id types.Id) error {
+func (state *impl) SetSslCertificateBindingReported(ctx context.Context, id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -187,7 +188,7 @@ func (state *impl) SetSslCertificateBindingReported(id types.Id) error {
 	v.SslCertificateBindingReported = true
 
 	state.mapping[id] = v
-	state.persist()
+	state.persist(ctx)
 
 	return nil
 }
@@ -195,7 +196,7 @@ func (state *impl) SetSslCertificateBindingReported(id types.Id) error {
 // SetSslCertificateCreationReported sets to true a flag indicating that
 // SslCertificate creation metric has been already reported
 // for this ManagedCertificate id.
-func (state *impl) SetSslCertificateCreationReported(id types.Id) error {
+func (state *impl) SetSslCertificateCreationReported(ctx context.Context, id types.Id) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -207,19 +208,19 @@ func (state *impl) SetSslCertificateCreationReported(id types.Id) error {
 	v.SslCertificateCreationReported = true
 
 	state.mapping[id] = v
-	state.persist()
+	state.persist(ctx)
 
 	return nil
 }
 
-func (state *impl) persist() {
+func (state *impl) persist(ctx context.Context) {
 	config := &api.ConfigMap{
 		Data: marshal(state.mapping),
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configMapName,
 		},
 	}
-	if err := state.configmap.UpdateOrCreate(configMapNamespace, config); err != nil {
+	if err := state.configmap.UpdateOrCreate(ctx, configMapNamespace, config); err != nil {
 		runtime.HandleError(err)
 	}
 }

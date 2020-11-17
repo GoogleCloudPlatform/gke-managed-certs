@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 
 	exitCode := m.Run()
 
-	if err := tearDown(clients, gke, sslCertificatesBegin); err != nil {
+	if err := tearDown(ctx, clients, gke, sslCertificatesBegin); err != nil {
 		klog.Fatal(err)
 	}
 
@@ -77,7 +77,7 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 	klog.Info("setting up")
 
 	if !gke {
-		if err := deployCRD(); err != nil {
+		if err := deployCRD(ctx); err != nil {
 			return nil, err
 		}
 
@@ -85,12 +85,12 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 		tag := os.Getenv(controllerImageTagEnv)
 		klog.Infof("Controller image registry=%s, tag=%s", registry, tag)
 
-		if err := deployController(registry, tag); err != nil {
+		if err := deployController(ctx, registry, tag); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
+	if err := clients.ManagedCertificate.DeleteAll(ctx); err != nil {
 		return nil, err
 	}
 
@@ -116,10 +116,10 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 	return sslCertificatesBegin, nil
 }
 
-func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute.SslCertificate) error {
+func tearDown(ctx context.Context, clients *client.Clients, gke bool, sslCertificatesBegin []*compute.SslCertificate) error {
 	klog.Infof("tearing down")
 
-	if err := clients.ManagedCertificate.DeleteAll(); err != nil {
+	if err := clients.ManagedCertificate.DeleteAll(ctx); err != nil {
 		return err
 	}
 
@@ -140,12 +140,12 @@ func tearDown(clients *client.Clients, gke bool, sslCertificatesBegin []*compute
 
 	if !gke {
 		name := "managedcertificates.networking.gke.io"
-		if err := errors.IgnoreNotFound(clients.CustomResource.Delete(name, &metav1.DeleteOptions{})); err != nil {
+		if err := errors.IgnoreNotFound(clients.CustomResource.Delete(ctx, name, metav1.DeleteOptions{})); err != nil {
 			return err
 		}
 		klog.Infof("Deleted custom resource definition %s", name)
 
-		if err := deleteController(); err != nil {
+		if err := deleteController(ctx); err != nil {
 			return err
 		}
 	}

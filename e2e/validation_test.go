@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -24,6 +25,8 @@ import (
 )
 
 func TestCRDValidation(t *testing.T) {
+	ctx := context.Background()
+
 	var domains101 []string
 	for i := 0; i < 101; i++ {
 		domains101 = append(domains101, fmt.Sprintf("too-many-%d.validation.example.com", i))
@@ -74,11 +77,11 @@ func TestCRDValidation(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 			name := fmt.Sprintf("crd-validation-%d", i)
-			err := clients.ManagedCertificate.Create(name, tc.domains)
+			err := clients.ManagedCertificate.Create(ctx, name, tc.domains)
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}
-			defer clients.ManagedCertificate.Delete(name)
+			defer clients.ManagedCertificate.Delete(ctx, name)
 
 			if err == nil {
 				return

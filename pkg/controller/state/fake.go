@@ -17,12 +17,14 @@ limitations under the License.
 package state
 
 import (
+	"context"
+
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/configmap"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 func NewFake() Interface {
-	return New(configmap.NewFake())
+	return New(context.Background(), configmap.NewFake())
 }
 
 func NewFakeWithEntries(mapping map[types.Id]Entry) Interface {

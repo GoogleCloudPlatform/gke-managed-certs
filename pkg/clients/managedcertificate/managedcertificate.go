@@ -21,6 +21,7 @@ package managedcertificate
 import (
 	"context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -46,7 +47,7 @@ type Interface interface {
 	// List returns all ManagedCertificate resources.
 	List() ([]*apisv1.ManagedCertificate, error)
 	// Update updates the given ManagedCertificate resource.
-	Update(managedCertificate *apisv1.ManagedCertificate) error
+	Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error
 	// Run initializes the object exposing the ManagedCertificate
 	// API.
 	Run(ctx context.Context, queue workqueue.RateLimitingInterface)
@@ -80,8 +81,9 @@ func (m impl) List() ([]*apisv1.ManagedCertificate, error) {
 	return m.informer.Lister().List(labels.Everything())
 }
 
-func (m impl) Update(managedCertificate *apisv1.ManagedCertificate) error {
-	_, err := m.client.ManagedCertificates(managedCertificate.Namespace).Update(managedCertificate)
+func (m impl) Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error {
+	_, err := m.client.ManagedCertificates(managedCertificate.Namespace).
+		Update(ctx, managedCertificate, metav1.UpdateOptions{})
 	return err
 }
 

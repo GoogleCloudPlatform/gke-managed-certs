@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -29,10 +30,10 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
-func createIngress(t *testing.T, name string, port int32, annotationManagedCertificatesValue string) error {
+func createIngress(t *testing.T, ctx context.Context, name string, port int32, annotationManagedCertificatesValue string) error {
 	t.Helper()
 
-	if err := errors.IgnoreNotFound(clients.Deployment.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Deployment.Delete(ctx, name, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 
@@ -63,12 +64,12 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 			},
 		},
 	}
-	if _, err := clients.Deployment.Create(deployment); err != nil {
+	if _, err := clients.Deployment.Create(ctx, deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	t.Cleanup(func() { clients.Deployment.Delete(name, &metav1.DeleteOptions{}) })
+	t.Cleanup(func() { clients.Deployment.Delete(ctx, name, metav1.DeleteOptions{}) })
 
-	if err := errors.IgnoreNotFound(clients.Service.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Service.Delete(ctx, name, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 
@@ -80,12 +81,12 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 			Selector: appHello,
 		},
 	}
-	if _, err := clients.Service.Create(service); err != nil {
+	if _, err := clients.Service.Create(ctx, service, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	t.Cleanup(func() { clients.Service.Delete(name, &metav1.DeleteOptions{}) })
+	t.Cleanup(func() { clients.Service.Delete(ctx, name, metav1.DeleteOptions{}) })
 
-	if err := errors.IgnoreNotFound(clients.Ingress.Delete(name, &metav1.DeleteOptions{})); err != nil {
+	if err := errors.IgnoreNotFound(clients.Ingress.Delete(ctx, name, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 
@@ -103,10 +104,10 @@ func createIngress(t *testing.T, name string, port int32, annotationManagedCerti
 			},
 		},
 	}
-	if _, err := clients.Ingress.Create(ingress); err != nil {
+	if _, err := clients.Ingress.Create(ctx, ingress, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	t.Cleanup(func() { clients.Ingress.Delete(name, &metav1.DeleteOptions{}) })
+	t.Cleanup(func() { clients.Ingress.Delete(ctx, name, metav1.DeleteOptions{}) })
 
 	return nil
 }

@@ -17,40 +17,43 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"testing"
 )
 
 func TestUpgradeCRD(t *testing.T) {
+	ctx := context.Background()
+
 	for description, testCase := range map[string]struct {
-		createResource func(name, domain string) error
+		createResource func(ctx context.Context, name, domain string) error
 	}{
 		"v1beta1": {
-			createResource: func(name, domain string) error {
-				return clients.ManagedCertificate.CreateV1beta1(name, []string{domain})
+			createResource: func(ctx context.Context, name, domain string) error {
+				return clients.ManagedCertificate.CreateV1beta1(ctx, name, []string{domain})
 			},
 		},
 		"v1beta2": {
-			createResource: func(name, domain string) error {
-				return clients.ManagedCertificate.CreateV1beta2(name, []string{domain})
+			createResource: func(ctx context.Context, name, domain string) error {
+				return clients.ManagedCertificate.CreateV1beta2(ctx, name, []string{domain})
 			},
 		},
 	} {
 		t.Run(description, func(t *testing.T) {
-			if err := testCase.createResource("upgrade-crd", "upgrade-crd1.example.com"); err != nil {
+			if err := testCase.createResource(ctx, "upgrade-crd", "upgrade-crd1.example.com"); err != nil {
 				t.Fatalf("Creation failed: %v", err)
 			}
 
-			mcrt, err := clients.ManagedCertificate.Get("upgrade-crd")
+			mcrt, err := clients.ManagedCertificate.Get(ctx, "upgrade-crd")
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			mcrt.Spec.Domains = append(mcrt.Spec.Domains, "upgrade-crd2.example.com")
-			if err := clients.ManagedCertificate.Update(mcrt); err != nil {
+			if err := clients.ManagedCertificate.Update(ctx, mcrt); err != nil {
 				t.Fatalf("Failed to update %v", err)
 			}
 
-			if err := clients.ManagedCertificate.Delete("upgrade-crd"); err != nil {
+			if err := clients.ManagedCertificate.Delete(ctx, "upgrade-crd"); err != nil {
 				t.Fatalf("Failed to delete %v", err)
 			}
 		})

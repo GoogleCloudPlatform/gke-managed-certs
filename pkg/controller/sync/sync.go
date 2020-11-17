@@ -160,7 +160,7 @@ func buildPreSharedCertAnnotation(sslCertificates map[string]bool) string {
 	return strings.Join(result, separator)
 }
 
-func (s impl) reportManagedCertificatesAttached(managedCertificates []types.Id) error {
+func (s impl) reportManagedCertificatesAttached(ctx context.Context, managedCertificates []types.Id) error {
 	for _, id := range managedCertificates {
 		entry, err := s.state.Get(id)
 		if err != nil {
@@ -182,15 +182,14 @@ func (s impl) reportManagedCertificatesAttached(managedCertificates []types.Id) 
 			return err
 		}
 
-		creationTime, err := time.Parse(time.RFC3339,
-			mcrt.CreationTimestamp.Format(time.RFC3339))
+		creationTime, err := time.Parse(time.RFC3339, mcrt.CreationTimestamp.Format(time.RFC3339))
 		if err != nil {
 			return err
 		}
 
 		s.metrics.ObserveSslCertificateBindingLatency(creationTime)
 
-		if err := s.state.SetSslCertificateBindingReported(id); err != nil {
+		if err := s.state.SetSslCertificateBindingReported(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -228,18 +227,18 @@ func (s impl) Ingress(ctx context.Context, id types.Id) error {
 	}
 	ingress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
 
-	if err := s.ingress.Update(ingress); err != nil {
+	if err := s.ingress.Update(ctx, ingress); err != nil {
 		return fmt.Errorf("Failed to update Ingress %s: %v", id.String(), err)
 	}
 
-	if err := s.reportManagedCertificatesAttached(managedCertificates); err != nil {
+	if err := s.reportManagedCertificatesAttached(ctx, managedCertificates); err != nil {
 		return fmt.Errorf("reportManagedCertificatesAttached(): %w", err)
 	}
 
 	return nil
 }
 
-func (s impl) insertSslCertificateName(id types.Id) (string, error) {
+func (s impl) insertSslCertificateName(ctx context.Context, id types.Id) (string, error) {
 	if entry, err := s.state.Get(id); err == nil {
 		return entry.SslCertificateName, nil
 	}
@@ -252,11 +251,11 @@ func (s impl) insertSslCertificateName(id types.Id) (string, error) {
 	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s",
 		sslCertificateName, id.String())
 
-	s.state.Insert(id, sslCertificateName)
+	s.state.Insert(ctx, id, sslCertificateName)
 	return sslCertificateName, nil
 }
 
-func (s impl) observeSslCertificateCreationLatency(sslCertificateName string,
+func (s impl) observeSslCertificateCreationLatency(ctx context.Context, sslCertificateName string,
 	id types.Id, managedCertificate apisv1.ManagedCertificate) error {
 
 	entry, err := s.state.Get(id)
@@ -285,7 +284,7 @@ func (s impl) observeSslCertificateCreationLatency(sslCertificateName string,
 	}
 
 	s.metrics.ObserveSslCertificateCreationLatency(creationTime)
-	if err := s.state.SetSslCertificateCreationReported(id); err != nil {
+	if err := s.state.SetSslCertificateCreationReported(ctx, id); err != nil {
 		return err
 	}
 
@@ -297,7 +296,7 @@ func (s impl) deleteSslCertificate(ctx context.Context,
 	id types.Id, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
-	if err := s.state.SetSoftDeleted(id); err != nil {
+	if err := s.state.SetSoftDeleted(ctx, id); err != nil {
 		return err
 	}
 
@@ -309,7 +308,7 @@ func (s impl) deleteSslCertificate(ctx context.Context,
 	}
 
 	klog.Infof("Remove entry for ManagedCertificate %s from state", id.String())
-	s.state.Delete(id)
+	s.state.Delete(ctx, id)
 	return nil
 }
 
@@ -326,7 +325,7 @@ func (s impl) createSslCertificate(ctx context.Context, sslCertificateName strin
 			return nil, err
 		}
 
-		if err := s.observeSslCertificateCreationLatency(sslCertificateName,
+		if err := s.observeSslCertificateCreationLatency(ctx, sslCertificateName,
 			id, *managedCertificate); err != nil {
 			return nil, err
 		}
@@ -369,7 +368,7 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
 
 	klog.Infof("Syncing ManagedCertificate %s", id.String())
 
-	sslCertificateName, err := s.insertSslCertificateName(id)
+	sslCertificateName, err := s.insertSslCertificateName(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -391,5 +390,5 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
 		return err
 	}
 
-	return s.managedCertificate.Update(managedCertificate)
+	return s.managedCertificate.Update(ctx, managedCertificate)
 }
