@@ -16,7 +16,7 @@ In GKE all the components are already installed.
 Follow the [how-to](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs)
 for more information. For a GCP setup follow the instructions below.
 
-This feature status is Beta.
+This feature status is GA.
 
 # Installation
 
@@ -40,7 +40,7 @@ Managed Certificates consist of two parts:
 ## Prerequisites
 
 1. You need to use a Kubernetes cluster with GKE-Ingress v1.5.1+.
-    * Managed Certificates have been tested against Kubernetes v1.16.6.
+    * Managed Certificates have been tested against Kubernetes v1.19.0.
     * Kubernetes v1.15+ most likely will work as well.
     * Kubernetes v1.13-v1.15 most likely will work if you enable the
       [CustomResourceWebhookConversion feature](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definition-versioning/),
