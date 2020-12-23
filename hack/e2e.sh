@@ -31,7 +31,7 @@ KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gke"}
 PLATFORM=${PLATFORM:-"gcp"}
 PROJECT=${PROJECT:-`gcloud config list --format="value(core.project)"`}
 PULL_NUMBER=${PULL_NUMBER:-""}
-REGISTRY=${REGISTRY:-"eu.gcr.io/managed-certs-gke"}
+REGISTRY=${REGISTRY:-"gcr.io/gke-managed-certs"}
 TAG=${TAG:-"ci_latest"}
 
 while getopts "p:r:t:z:" opt; do

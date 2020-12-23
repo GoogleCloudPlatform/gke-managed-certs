@@ -29,7 +29,7 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-REGISTRY=${REGISTRY:-"eu.gcr.io/managed-certs-gke"}
+REGISTRY=${REGISTRY:-"gcr.io/gke-managed-certs"}
 
 # Latest commit hash for current branch
 GIT_COMMIT=${GIT_COMMIT:-`git rev-parse HEAD`}
