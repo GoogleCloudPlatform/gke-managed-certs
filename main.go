@@ -59,12 +59,12 @@ func main() {
 	klog.InitFlags(nil)
 	flags.Register()
 
-	klog.V(1).Infof("managed-certificate-controller %s starting. Latest commit hash: %s",
+	klog.V(0).Infof("managed-certificate-controller %s starting. Latest commit hash: %s",
 		version.Version, version.GitCommit)
 	for i, a := range os.Args {
 		klog.V(0).Infof("argv[%d]: %q", i, a)
 	}
-	klog.V(1).Infof("Flags = %+v", flags.F)
+	klog.V(0).Infof("Flags = %+v", flags.F)
 
 	config, err := config.New(flags.F.GCEConfigFilePath)
 	if err != nil {
