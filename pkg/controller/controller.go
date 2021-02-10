@@ -77,7 +77,8 @@ func (c *controller) Run(ctx context.Context) error {
 	c.clients.Run(ctx, c.ingressQueue, c.managedCertificateQueue)
 
 	klog.Info("Waiting for cache sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.clients.HasSynced) {
+	cacheCtx, _ := context.WithTimeout(ctx, 15*time.Second)
+	if !cache.WaitForCacheSync(cacheCtx.Done(), c.clients.HasSynced) {
 		return fmt.Errorf("Timed out waiting for cache sync")
 	}
 	klog.Info("Cache synced")
