@@ -36,6 +36,8 @@ const (
 	clusterRoleBindingName = "managed-certificate-role-binding"
 	clusterRoleName        = "managed-certificate-role"
 	deploymentName         = "managed-certificate-controller"
+	gcpSecretName          = "managed-certificate-gcp-sa"
+	secretKey              = "key.json"
 	serviceAccountName     = "managed-certificate-account"
 )
 
@@ -255,10 +257,19 @@ func deployCRD(ctx context.Context) error {
 }
 
 // Deploys Managed Certificate controller with all related objects
-func deployController(ctx context.Context, registry, tag string) error {
+func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag string) error {
 	if err := deleteController(ctx); err != nil {
 		return err
 	}
+
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: gcpSecretName},
+		StringData: map[string]string{secretKey: gcpServiceAccountJson},
+	}
+	if _, err := clients.Secret.Create(ctx, &secret, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+	klog.Infof("Created secret %s", gcpSecretName)
 
 	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
 	if _, err := clients.ServiceAccount.Create(ctx, &serviceAccount, metav1.CreateOptions{}); err != nil {
@@ -318,6 +329,9 @@ func deployController(ctx context.Context, registry, tag string) error {
 	logFileVolume := "logfile"
 	logFileVolumePath := "/var/log/managed_certificate_controller.log"
 
+	saKeyVolume := "sa-key-volume"
+	saKeyVolumePath := "/etc/gcp"
+
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
 		Spec: appsv1.DeploymentSpec{
@@ -348,11 +362,22 @@ func deployController(ctx context.Context, registry, tag string) error {
 									MountPath: logFileVolumePath,
 									ReadOnly:  false,
 								},
+								{
+									Name:      saKeyVolume,
+									MountPath: saKeyVolumePath,
+									ReadOnly:  true,
+								},
 							},
 							Args: []string{
 								"--logtostderr=false",
 								"--alsologtostderr",
 								fmt.Sprintf("--log_file=%s", logFileVolumePath),
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+									Value: fmt.Sprintf("%s/%s", saKeyVolumePath, secretKey),
+								},
 							},
 						},
 					},
@@ -382,6 +407,20 @@ func deployController(ctx context.Context, registry, tag string) error {
 								},
 							},
 						},
+						{
+							Name: saKeyVolume,
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: gcpSecretName,
+									Items: []corev1.KeyToPath{
+										{
+											Key:  secretKey,
+											Path: secretKey,
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -397,6 +436,11 @@ func deployController(ctx context.Context, registry, tag string) error {
 
 // Deletes Managed Certificate controller and all related objects
 func deleteController(ctx context.Context) error {
+	if err := utilserrors.IgnoreNotFound(clients.Secret.Delete(ctx, gcpSecretName, metav1.DeleteOptions{})); err != nil {
+		return err
+	}
+	klog.Infof("Deleted secret %s", gcpSecretName)
+
 	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx, serviceAccountName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}

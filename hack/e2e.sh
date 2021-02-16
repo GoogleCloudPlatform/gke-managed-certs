@@ -52,6 +52,12 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
+if [ $PLATFORM = "gcp" ]
+then
+  project_id=`gcloud config get-value project`
+  gsutil cp gs://${project_id}/key.json /tmp/gcp_service_account.json
+fi
+
 name=managed-certificate-controller
 runner_image=${name}-runner
 runner_path=/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/
@@ -70,11 +76,13 @@ docker run -v ${SCRIPT_ROOT}:${runner_path} \
   -v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
   -v ${KUBECONFIG}:/root/.kube/config \
   -v ${ARTIFACTS}:/tmp/artifacts \
+  -v `pwd`/gcp_service_account.json:/tmp/gcp_service_account.json \
   ${runner_image}:latest bash -c \
   "set -ex && cd ${runner_path} && dest=/tmp/artifacts; \
   rm -rf \${dest}/* && mkdir -p \${dest} && \
   { \
     CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
+    GCP_SERVICE_ACCOUNT_FILE=/tmp/gcp_service_account.json \
     KUBECONFIG=\${HOME}/.kube/config \
     KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
     PROJECT=${PROJECT} \
@@ -86,3 +94,5 @@ docker run -v ${SCRIPT_ROOT}:${runner_path} \
     go test ./e2e/... -test.timeout=60m -logtostderr=false -alsologtostderr=true -v -log_dir=\${dest} \
       > \${dest}/e2e.out.txt && exitcode=\${?} || exitcode=\${?} ; \
   } && cat \${dest}/e2e.out.txt | go-junit-report > \${dest}/junit_01.xml && exit \${exitcode}"
+
+rm /tmp/gcp_service_account.json

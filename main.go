@@ -59,19 +59,22 @@ func main() {
 	klog.InitFlags(nil)
 	flags.Register()
 
-	klog.V(0).Infof("managed-certificate-controller %s starting. Latest commit hash: %s",
+	klog.Infof("managed-certificate-controller %s starting. Latest commit hash: %s",
 		version.Version, version.GitCommit)
 	for i, a := range os.Args {
-		klog.V(0).Infof("argv[%d]: %q", i, a)
+		klog.Infof("argv[%d]: %q", i, a)
 	}
-	klog.V(0).Infof("Flags = %+v", flags.F)
+	klog.Infof("Flags = %+v", flags.F)
 
-	config, err := config.New(flags.F.GCEConfigFilePath)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	config, err := config.New(ctx, flags.F.GCEConfigFilePath)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	clients, err := clients.New(config)
+	clients, err := clients.New(ctx, config)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -98,9 +101,6 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Unable to create leader election lock: %v", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          lock,
