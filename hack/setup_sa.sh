@@ -31,7 +31,6 @@ gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA
 
 gcloud iam service-accounts keys create ./key.json --iam-account $NODE_SA_EMAIL
 
-project_id=`gcloud config get-value project`
-gsutil mb -b on gs://${project_id}
-gsutil cp key.json gs://${project_id}/key.json
+gsutil mb -b on gs://${PROJECT}
+gsutil cp key.json gs://${PROJECT}/key.json
 rm key.json
