@@ -62,7 +62,7 @@ type Clients struct {
 	Ssl ssl.Interface
 }
 
-func New(config *config.Config) (*Clients, error) {
+func New(ctx context.Context, config *config.Config) (*Clients, error) {
 	clusterConfig, err := clientcmd.BuildConfigFromFlags(
 		flags.F.APIServerHost, flags.F.KubeConfigFilePath)
 	if err != nil {
@@ -72,7 +72,7 @@ func New(config *config.Config) (*Clients, error) {
 	kubernetesClient := kubernetes.NewForConfigOrDie(clusterConfig)
 	managedCertificateClient := versioned.NewForConfigOrDie(clusterConfig)
 
-	oauthClient := oauth2.NewClient(oauth2.NoContext, config.Compute.TokenSource)
+	oauthClient := oauth2.NewClient(ctx, config.Compute.TokenSource)
 	oauthClient.Timeout = config.Compute.Timeout
 	ssl, err := ssl.New(oauthClient, config.Compute.ProjectID)
 	if err != nil {

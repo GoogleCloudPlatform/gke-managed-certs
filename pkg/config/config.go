@@ -18,6 +18,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -93,8 +94,8 @@ type Config struct {
 	SslCertificateNamePrefix string
 }
 
-func New(gceConfigFilePath string) (*Config, error) {
-	tokenSource, projectID, err := getTokenSourceAndProjectID(gceConfigFilePath)
+func New(ctx context.Context, gceConfigFilePath string) (*Config, error) {
+	tokenSource, projectID, err := getTokenSourceAndProjectID(ctx, gceConfigFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func New(gceConfigFilePath string) (*Config, error) {
 	}, nil
 }
 
-func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, string, error) {
+func getTokenSourceAndProjectID(ctx context.Context, gceConfigFilePath string) (oauth2.TokenSource, string, error) {
 	if gceConfigFilePath != "" {
 		klog.V(1).Info("In a GKE cluster")
 
@@ -163,7 +164,7 @@ func getTokenSourceAndProjectID(gceConfigFilePath string) (oauth2.TokenSource, s
 
 	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
 		klog.V(1).Info("In a GCP cluster")
-		tokenSource, err := google.DefaultTokenSource(oauth2.NoContext, compute.ComputeScope)
+		tokenSource, err := google.DefaultTokenSource(ctx, compute.ComputeScope)
 		return tokenSource, projectID, err
 	} else {
 		klog.V(1).Info("Using default TokenSource")

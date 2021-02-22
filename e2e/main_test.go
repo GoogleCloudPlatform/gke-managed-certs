@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -35,10 +36,11 @@ import (
 )
 
 const (
-	controllerImageTagEnv = "TAG"
-	controllerRegistryEnv = "REGISTRY"
-	namespace             = "default"
-	platformEnv           = "PLATFORM"
+	controllerImageTagEnv    = "TAG"
+	controllerRegistryEnv    = "REGISTRY"
+	gcpServiceAccountFileEnv = "GCP_SERVICE_ACCOUNT_FILE"
+	namespace                = "default"
+	platformEnv              = "PLATFORM"
 )
 
 var clients *client.Clients
@@ -81,11 +83,17 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 			return nil, err
 		}
 
+		gcpServiceAccountFileName := os.Getenv(gcpServiceAccountFileEnv)
+		gcpServiceAccountJson, err := ioutil.ReadFile(gcpServiceAccountFileName)
+		if err != nil {
+			return nil, fmt.Errorf("can't read file %s: %w", gcpServiceAccountFileName, err)
+		}
+
 		registry := os.Getenv(controllerRegistryEnv)
 		tag := os.Getenv(controllerImageTagEnv)
 		klog.Infof("Controller image registry=%s, tag=%s", registry, tag)
 
-		if err := deployController(ctx, registry, tag); err != nil {
+		if err := deployController(ctx, string(gcpServiceAccountJson), registry, tag); err != nil {
 			return nil, err
 		}
 	}

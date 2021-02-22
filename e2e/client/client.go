@@ -57,6 +57,7 @@ type Clients struct {
 	Event              corev1.EventInterface
 	Ingress            networkingv1beta1.IngressInterface
 	ManagedCertificate managedcertificate.Interface
+	Secret             corev1.SecretInterface
 	Service            corev1.ServiceInterface
 	ServiceAccount     corev1.ServiceAccountInterface
 	SslCertificate     ssl.Interface
@@ -131,6 +132,7 @@ func New(namespace string) (*Clients, error) {
 		Event:              coreClient.Events(namespace),
 		Ingress:            networkingClient.Ingresses(namespace),
 		ManagedCertificate: managedCertificateClient,
+		Secret:             coreClient.Secrets(namespace),
 		Service:            coreClient.Services(namespace),
 		ServiceAccount:     coreClient.ServiceAccounts(namespace),
 		SslCertificate:     sslCertificateClient,
