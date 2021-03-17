@@ -125,7 +125,7 @@ To install Managed Certificates in your own cluster in GCP, you need to:
    You may want to build your own managed-certificate-controller image and
    reference it in the deploy/managed-certificate-controller.yaml file. The default
    image is periodically built by a CI system and may not be stable. Alternatively
-   you may use `gcr.io/google-containers/managed-certificate-controller:v0.4.2`
+   you may use `gcr.io/gke-release/managed-certificate-controller:v1.0.5`
    which is deployed in GKE, however this README likely will not be kept up to date with
    future GKE updates, and so this image may become stale.
     ```console
