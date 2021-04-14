@@ -62,7 +62,7 @@ spec:
       serviceAccountName: managed-certificate-account
       containers:
       - name: managed-certificate-controller
-        image: gcr.io/gke-release/managed-certificate-controller:v1.0.5
+        image: gcr.io/gke-release/managed-certificate-controller:v1.0.7
         imagePullPolicy: Always
         volumeMounts:
         - name: ssl-certs

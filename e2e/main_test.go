@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 
@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
+func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*computev1.SslCertificate, error) {
 	klog.Info("setting up")
 
 	if !gke {
@@ -124,7 +124,7 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 	return sslCertificatesBegin, nil
 }
 
-func tearDown(ctx context.Context, clients *client.Clients, gke bool, sslCertificatesBegin []*compute.SslCertificate) error {
+func tearDown(ctx context.Context, clients *client.Clients, gke bool, sslCertificatesBegin []*computev1.SslCertificate) error {
 	klog.Infof("tearing down")
 
 	if err := clients.ManagedCertificate.DeleteAll(ctx); err != nil {

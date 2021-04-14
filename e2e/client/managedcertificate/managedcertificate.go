@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	apisv1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
 	apisv1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
@@ -48,9 +48,9 @@ type Interface interface {
 	// Delete deletes a ManagedCertificate.
 	Delete(ctx context.Context, name string) error
 	// Get fetches a ManagedCertificate.
-	Get(ctx context.Context, name string) (*apisv1.ManagedCertificate, error)
+	Get(ctx context.Context, name string) (*v1.ManagedCertificate, error)
 	// Update updates a ManagedCertificate.
-	Update(ctx context.Context, mcrt *apisv1.ManagedCertificate) error
+	Update(ctx context.Context, mcrt *v1.ManagedCertificate) error
 }
 
 type impl struct {
@@ -108,15 +108,15 @@ func (m impl) CreateV1beta2(ctx context.Context, name string, domains []string) 
 }
 
 func (m impl) Create(ctx context.Context, name string, domains []string) error {
-	mcrt := &apisv1.ManagedCertificate{
+	mcrt := &v1.ManagedCertificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: apisv1.ManagedCertificateSpec{
+		Spec: v1.ManagedCertificateSpec{
 			Domains: domains,
 		},
-		Status: apisv1.ManagedCertificateStatus{
-			DomainStatus: []apisv1.DomainStatus{},
+		Status: v1.ManagedCertificateStatus{
+			DomainStatus: []v1.DomainStatus{},
 		},
 	}
 	_, err := m.client.Create(ctx, mcrt, metav1.CreateOptions{})
@@ -142,11 +142,11 @@ func (m impl) Delete(ctx context.Context, name string) error {
 	return errors.IgnoreNotFound(m.client.Delete(ctx, name, metav1.DeleteOptions{}))
 }
 
-func (m impl) Get(ctx context.Context, name string) (*apisv1.ManagedCertificate, error) {
+func (m impl) Get(ctx context.Context, name string) (*v1.ManagedCertificate, error) {
 	return m.client.Get(ctx, name, metav1.GetOptions{})
 }
 
-func (m impl) Update(ctx context.Context, mcrt *apisv1.ManagedCertificate) error {
+func (m impl) Update(ctx context.Context, mcrt *v1.ManagedCertificate) error {
 	_, err := m.client.Update(ctx, mcrt, metav1.UpdateOptions{})
 	return err
 }

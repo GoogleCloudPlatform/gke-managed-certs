@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
@@ -37,7 +37,7 @@ const (
 )
 
 type Error struct {
-	operation *compute.Operation
+	operation *computev1.Operation
 }
 
 func (e *Error) Error() string {
@@ -71,18 +71,18 @@ type Interface interface {
 	// Error is not nil if an error has occurred.
 	Exists(name string) (bool, error)
 	// Get fetches an SslCertificate resource.
-	Get(name string) (*compute.SslCertificate, error)
+	Get(name string) (*computev1.SslCertificate, error)
 	// List fetches all SslCertificate resources.
-	List() ([]*compute.SslCertificate, error)
+	List() ([]*computev1.SslCertificate, error)
 }
 
 type impl struct {
-	service   *compute.Service
+	service   *computev1.Service
 	projectID string
 }
 
 func New(client *http.Client, projectID string) (Interface, error) {
-	service, err := compute.New(client)
+	service, err := computev1.New(client)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +95,8 @@ func New(client *http.Client, projectID string) (Interface, error) {
 
 // Create creates a new SslCertificate resource.
 func (s impl) Create(ctx context.Context, name string, domains []string) error {
-	sslCertificate := &compute.SslCertificate{
-		Managed: &compute.SslCertificateManagedSslCertificate{
+	sslCertificate := &computev1.SslCertificate{
+		Managed: &computev1.SslCertificateManagedSslCertificate{
 			Domains: domains,
 		},
 		Name: name,
@@ -137,12 +137,12 @@ func (s impl) Exists(name string) (bool, error) {
 }
 
 // Get fetches an SslCertificate resource.
-func (s impl) Get(name string) (*compute.SslCertificate, error) {
+func (s impl) Get(name string) (*computev1.SslCertificate, error) {
 	return s.service.SslCertificates.Get(s.projectID, name).Do()
 }
 
 // List fetches all SslCertificate resources.
-func (s impl) List() ([]*compute.SslCertificate, error) {
+func (s impl) List() ([]*computev1.SslCertificate, error) {
 	sslCertificates, err := s.service.SslCertificates.List(s.projectID).Do()
 	if err != nil {
 		return nil, err

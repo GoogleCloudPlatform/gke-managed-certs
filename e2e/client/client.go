@@ -26,8 +26,8 @@ import (
 	"golang.org/x/oauth2"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
+	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
@@ -54,12 +54,12 @@ type Clients struct {
 	CustomResource     apiextv1.CustomResourceDefinitionInterface
 	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Interface
-	Event              corev1.EventInterface
-	Ingress            networkingv1beta1.IngressInterface
+	Event              v1.EventInterface
+	Ingress            netv1.IngressInterface
 	ManagedCertificate managedcertificate.Interface
-	Secret             corev1.SecretInterface
-	Service            corev1.ServiceInterface
-	ServiceAccount     corev1.ServiceAccountInterface
+	Secret             v1.SecretInterface
+	Service            v1.ServiceInterface
+	ServiceAccount     v1.ServiceAccountInterface
 	SslCertificate     ssl.Interface
 }
 
@@ -74,7 +74,7 @@ func New(namespace string) (*Clients, error) {
 		return nil, err
 	}
 
-	coreClient, err := corev1.NewForConfig(config)
+	coreClient, err := v1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func New(namespace string) (*Clients, error) {
 		return nil, err
 	}
 
-	networkingClient, err := networkingv1beta1.NewForConfig(config)
+	networkingClient, err := netv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

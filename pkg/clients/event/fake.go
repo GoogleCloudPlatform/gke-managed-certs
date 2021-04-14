@@ -17,9 +17,9 @@ limitations under the License.
 package event
 
 import (
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	netv1 "k8s.io/api/networking/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 )
 
 type Fake struct {
@@ -32,22 +32,22 @@ type Fake struct {
 
 var _ Interface = (*Fake)(nil)
 
-func (f *Fake) BackendError(mcrt apisv1.ManagedCertificate, err error) {
+func (f *Fake) BackendError(mcrt v1.ManagedCertificate, err error) {
 	f.BackendErrorCnt++
 }
 
-func (f *Fake) Create(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (f *Fake) Create(mcrt v1.ManagedCertificate, sslCertificateName string) {
 	f.CreateCnt++
 }
 
-func (f *Fake) Delete(mcrt apisv1.ManagedCertificate, sslCertificateName string) {
+func (f *Fake) Delete(mcrt v1.ManagedCertificate, sslCertificateName string) {
 	f.DeleteCnt++
 }
 
-func (f *Fake) MissingCertificate(ingress networkingv1beta1.Ingress, mcrtName string) {
+func (f *Fake) MissingCertificate(ingress netv1.Ingress, mcrtName string) {
 	f.MissingCertificateCnt++
 }
 
-func (f *Fake) TooManyCertificates(mcrt apisv1.ManagedCertificate, err error) {
+func (f *Fake) TooManyCertificates(mcrt v1.ManagedCertificate, err error) {
 	f.TooManyCertificatesCnt++
 }

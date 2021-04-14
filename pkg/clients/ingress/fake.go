@@ -19,7 +19,7 @@ package ingress
 import (
 	"context"
 
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	"k8s.io/api/networking/v1"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
@@ -27,16 +27,16 @@ import (
 )
 
 type Fake struct {
-	ingresses []*apiv1beta1.Ingress
+	ingresses []*v1.Ingress
 }
 
 var _ Interface = (*Fake)(nil)
 
-func NewFake(ingresses []*apiv1beta1.Ingress) *Fake {
+func NewFake(ingresses []*v1.Ingress) *Fake {
 	return &Fake{ingresses: ingresses}
 }
 
-func (f *Fake) Get(id types.Id) (*apiv1beta1.Ingress, error) {
+func (f *Fake) Get(id types.Id) (*v1.Ingress, error) {
 	for _, ingress := range f.ingresses {
 		if ingress.Namespace == id.Namespace && ingress.Name == id.Name {
 			return ingress, nil
@@ -50,11 +50,11 @@ func (f *Fake) HasSynced() bool {
 	return true
 }
 
-func (f *Fake) List() ([]*apiv1beta1.Ingress, error) {
+func (f *Fake) List() ([]*v1.Ingress, error) {
 	return f.ingresses, nil
 }
 
-func (f *Fake) Update(ctx context.Context, ingress *apiv1beta1.Ingress) error {
+func (f *Fake) Update(ctx context.Context, ingress *v1.Ingress) error {
 	for i, ing := range f.ingresses {
 		if ing.Namespace == ingress.Namespace && ing.Name == ingress.Name {
 			f.ingresses[i] = ingress

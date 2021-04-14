@@ -24,10 +24,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	computev1 "google.golang.org/api/compute/v1"
+	netv1 "k8s.io/api/networking/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	clientsingress "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
@@ -73,8 +73,8 @@ func TestParse(t *testing.T) {
 func TestIngress(t *testing.T) {
 	for description, tc := range map[string]struct {
 		state       map[types.Id]state.Entry
-		ingress     *apiv1beta1.Ingress
-		wantIngress *apiv1beta1.Ingress
+		ingress     *netv1.Ingress
+		wantIngress *netv1.Ingress
 		wantEvent   event.Fake
 		wantMetrics metrics.Fake
 		wantErr     error
@@ -136,12 +136,12 @@ func TestIngress(t *testing.T) {
 			ctx := context.Background()
 
 			event := &event.Fake{}
-			var managedCertificates []*apisv1.ManagedCertificate
+			var managedCertificates []*v1.ManagedCertificate
 			for id := range tc.state {
 				domain := fmt.Sprintf("mcrt-%s.example.com", id.String())
 				managedCertificates = append(managedCertificates, managedcertificate.New(id, domain).Build())
 			}
-			ingress := clientsingress.NewFake([]*apiv1beta1.Ingress{tc.ingress})
+			ingress := clientsingress.NewFake([]*netv1.Ingress{tc.ingress})
 			metrics := metrics.NewFake()
 			state := state.NewFakeWithEntries(tc.state)
 
@@ -155,7 +155,7 @@ func TestIngress(t *testing.T) {
 			}
 
 			gotIngresses, _ := ingress.List()
-			if diff := cmp.Diff([]*apiv1beta1.Ingress{tc.wantIngress}, gotIngresses); diff != "" {
+			if diff := cmp.Diff([]*netv1.Ingress{tc.wantIngress}, gotIngresses); diff != "" {
 				t.Fatalf("Diff Ingress (-want, +got): %s", diff)
 			}
 			if diff := cmp.Diff(&tc.wantEvent, event); diff != "" {
@@ -168,7 +168,7 @@ func TestIngress(t *testing.T) {
 	}
 }
 
-func getSslCert(id types.Id, state state.Interface, ssl ssl.Interface) (*compute.SslCertificate, error) {
+func getSslCert(id types.Id, state state.Interface, ssl ssl.Interface) (*computev1.SslCertificate, error) {
 	entry, err := state.Get(id)
 	if err != nil {
 		return nil, err
@@ -179,14 +179,14 @@ func getSslCert(id types.Id, state state.Interface, ssl ssl.Interface) (*compute
 
 func TestManagedCertificate(t *testing.T) {
 	for description, tc := range map[string]struct {
-		managedCertificate *apisv1.ManagedCertificate
+		managedCertificate *v1.ManagedCertificate
 		state              state.Interface
 		ssl                ssl.Interface
 		random             random.Interface
 
 		wantState              state.Interface
 		wantSsl                ssl.Interface
-		wantManagedCertificate *apisv1.ManagedCertificate
+		wantManagedCertificate *v1.ManagedCertificate
 		wantMetrics            *metrics.Fake
 		wantError              error
 	}{
@@ -448,7 +448,7 @@ func TestManagedCertificate(t *testing.T) {
 		t.Run(description, func(t *testing.T) {
 			ctx := context.Background()
 
-			var managedCertificates []*apisv1.ManagedCertificate
+			var managedCertificates []*v1.ManagedCertificate
 			if tc.managedCertificate != nil {
 				managedCertificates = append(managedCertificates,
 					tc.managedCertificate)

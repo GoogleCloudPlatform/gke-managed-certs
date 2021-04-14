@@ -19,16 +19,16 @@ package ssl
 import (
 	"context"
 
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 func newFakeError(code string) *Error {
 	return &Error{
-		operation: &compute.Operation{
-			Error: &compute.OperationError{
-				Errors: []*compute.OperationErrorErrors{{Code: code}},
+		operation: &computev1.Operation{
+			Error: &computev1.OperationError{
+				Errors: []*computev1.OperationErrorErrors{{Code: code}},
 			},
 		},
 	}
@@ -38,14 +38,14 @@ func NewFakeQuotaExceededError() *Error {
 	return newFakeError(codeQuotaExceeded)
 }
 
-func NewFakeSslCertificate(name, status string, domainToStatus map[string]string) *compute.SslCertificate {
+func NewFakeSslCertificate(name, status string, domainToStatus map[string]string) *computev1.SslCertificate {
 	var domains []string
 	for domain := range domainToStatus {
 		domains = append(domains, domain)
 	}
 
-	return &compute.SslCertificate{
-		Managed: &compute.SslCertificateManagedSslCertificate{
+	return &computev1.SslCertificate{
+		Managed: &computev1.SslCertificateManagedSslCertificate{
 			Domains:      domains,
 			Status:       status,
 			DomainStatus: domainToStatus,
@@ -57,7 +57,7 @@ func NewFakeSslCertificate(name, status string, domainToStatus map[string]string
 
 // Fake
 type Fake struct {
-	mapping map[string]*compute.SslCertificate
+	mapping map[string]*computev1.SslCertificate
 }
 
 var _ Interface = &Fake{}
@@ -85,7 +85,7 @@ func (f *Fake) Exists(name string) (bool, error) {
 	return exists, nil
 }
 
-func (f *Fake) Get(name string) (*compute.SslCertificate, error) {
+func (f *Fake) Get(name string) (*computev1.SslCertificate, error) {
 	if e, _ := f.Exists(name); !e {
 		return nil, errors.NotFound
 	}
@@ -93,8 +93,8 @@ func (f *Fake) Get(name string) (*compute.SslCertificate, error) {
 	return f.mapping[name], nil
 }
 
-func (f *Fake) List() ([]*compute.SslCertificate, error) {
-	var result []*compute.SslCertificate
+func (f *Fake) List() ([]*computev1.SslCertificate, error) {
+	var result []*computev1.SslCertificate
 	for _, v := range f.mapping {
 		result = append(result, v)
 	}
@@ -108,7 +108,7 @@ type Builder struct {
 
 func NewFake() *Builder {
 	return &Builder{
-		fake: &Fake{mapping: make(map[string]*compute.SslCertificate, 0)},
+		fake: &Fake{mapping: make(map[string]*computev1.SslCertificate, 0)},
 	}
 }
 

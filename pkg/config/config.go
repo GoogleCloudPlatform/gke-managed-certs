@@ -26,7 +26,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/gce"
@@ -164,7 +164,7 @@ func getTokenSourceAndProjectID(ctx context.Context, gceConfigFilePath string) (
 
 	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
 		klog.V(1).Info("In a GCP cluster")
-		tokenSource, err := google.DefaultTokenSource(ctx, compute.ComputeScope)
+		tokenSource, err := google.DefaultTokenSource(ctx, computev1.ComputeScope)
 		return tokenSource, projectID, err
 	} else {
 		klog.V(1).Info("Using default TokenSource")

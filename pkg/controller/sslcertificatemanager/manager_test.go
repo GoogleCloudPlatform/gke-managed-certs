@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ssl"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
@@ -58,7 +58,7 @@ func (s *sslError) Exists(name string) (bool, error) {
 	return s.exists, s.err
 }
 
-func (s *sslError) Get(name string) (*compute.SslCertificate, error) {
+func (s *sslError) Get(name string) (*computev1.SslCertificate, error) {
 	return nil, s.err
 }
 
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
-		managedCertificate *apisv1.ManagedCertificate
+		managedCertificate *v1.ManagedCertificate
 		state              state.Interface
 
 		wantErr     error
@@ -177,7 +177,7 @@ func TestDelete(t *testing.T) {
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
-		managedCertificate *apisv1.ManagedCertificate
+		managedCertificate *v1.ManagedCertificate
 
 		wantErr     error
 		wantSsl     ssl.Interface
@@ -264,7 +264,7 @@ func TestExists(t *testing.T) {
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
-		managedCertificate *apisv1.ManagedCertificate
+		managedCertificate *v1.ManagedCertificate
 
 		wantExists  bool
 		wantErr     error
@@ -342,9 +342,9 @@ func TestGet(t *testing.T) {
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
-		managedCertificate *apisv1.ManagedCertificate
+		managedCertificate *v1.ManagedCertificate
 
-		wantCert    *compute.SslCertificate
+		wantCert    *computev1.SslCertificate
 		wantErr     error
 		wantEvent   event.Fake
 		wantMetrics metrics.Fake

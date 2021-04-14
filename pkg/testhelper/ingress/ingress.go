@@ -17,7 +17,7 @@ limitations under the License.
 package ingress
 
 import (
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	"k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
@@ -26,9 +26,9 @@ import (
 
 // New builds an Ingress for a given id and annotations.
 func New(id types.Id, annotationManagedCertificates,
-	annotationPreSharedCert string) *apiv1beta1.Ingress {
+	annotationPreSharedCert string) *v1.Ingress {
 
-	return &apiv1beta1.Ingress{
+	return &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: id.Namespace,
 			Name:      id.Name,

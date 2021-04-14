@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/client-go/util/workqueue"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	clientsingress "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
@@ -107,12 +107,12 @@ func TestController(t *testing.T) {
 		t.Run(description, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-			var ingresses []*apiv1beta1.Ingress
+			var ingresses []*netv1.Ingress
 			for _, id := range testCase.ingresses {
 				ingresses = append(ingresses, ingress.New(id, "", ""))
 			}
 
-			var mcrts []*apisv1.ManagedCertificate
+			var mcrts []*v1.ManagedCertificate
 			for _, id := range testCase.managedCertificatesInCluster {
 				mcrts = append(mcrts, managedcertificate.
 					New(id, "example.com").

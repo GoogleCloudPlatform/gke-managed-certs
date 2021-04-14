@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned"
 	clientsetv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/clientset/versioned/typed/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clientgen/informers/externalversions"
@@ -39,15 +39,15 @@ import (
 // on ManagedCertificate resources.
 type Interface interface {
 	// Get fetches the resource identified by id.
-	Get(id types.Id) (*apisv1.ManagedCertificate, error)
+	Get(id types.Id) (*v1.ManagedCertificate, error)
 	// HasSynced is true after first batch of ManagedCertificate
 	// resources defined in the cluster has been synchronized with
 	// the local storage.
 	HasSynced() bool
 	// List returns all ManagedCertificate resources.
-	List() ([]*apisv1.ManagedCertificate, error)
+	List() ([]*v1.ManagedCertificate, error)
 	// Update updates the given ManagedCertificate resource.
-	Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error
+	Update(ctx context.Context, managedCertificate *v1.ManagedCertificate) error
 	// Run initializes the object exposing the ManagedCertificate
 	// API.
 	Run(ctx context.Context, queue workqueue.RateLimitingInterface)
@@ -69,7 +69,7 @@ func New(clientset *versioned.Clientset) Interface {
 	}
 }
 
-func (m impl) Get(id types.Id) (*apisv1.ManagedCertificate, error) {
+func (m impl) Get(id types.Id) (*v1.ManagedCertificate, error) {
 	return m.informer.Lister().ManagedCertificates(id.Namespace).Get(id.Name)
 }
 
@@ -77,11 +77,11 @@ func (m impl) HasSynced() bool {
 	return m.informer.Informer().HasSynced()
 }
 
-func (m impl) List() ([]*apisv1.ManagedCertificate, error) {
+func (m impl) List() ([]*v1.ManagedCertificate, error) {
 	return m.informer.Lister().List(labels.Everything())
 }
 
-func (m impl) Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error {
+func (m impl) Update(ctx context.Context, managedCertificate *v1.ManagedCertificate) error {
 	_, err := m.client.ManagedCertificates(managedCertificate.Namespace).
 		Update(ctx, managedCertificate, metav1.UpdateOptions{})
 	return err

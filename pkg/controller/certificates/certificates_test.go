@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
@@ -31,20 +31,20 @@ const (
 	fakeTimeFieldValue = "time"
 )
 
-func sslCert(status string, domains map[string]string) compute.SslCertificate {
-	return compute.SslCertificate{
+func sslCert(status string, domains map[string]string) computev1.SslCertificate {
+	return computev1.SslCertificate{
 		Name:       fakeNameFieldValue,
 		ExpireTime: fakeTimeFieldValue,
-		Managed: &compute.SslCertificateManagedSslCertificate{
+		Managed: &computev1.SslCertificateManagedSslCertificate{
 			Status:       status,
 			DomainStatus: domains,
 		},
 	}
 }
 
-func mcrt(status string, domains []apisv1.DomainStatus) *apisv1.ManagedCertificate {
-	return &apisv1.ManagedCertificate{
-		Status: apisv1.ManagedCertificateStatus{
+func mcrt(status string, domains []v1.DomainStatus) *v1.ManagedCertificate {
+	return &v1.ManagedCertificate{
+		Status: v1.ManagedCertificateStatus{
 			CertificateName:   fakeNameFieldValue,
 			CertificateStatus: status,
 			ExpireTime:        fakeTimeFieldValue,
@@ -55,9 +55,9 @@ func mcrt(status string, domains []apisv1.DomainStatus) *apisv1.ManagedCertifica
 
 func TestCopyStatus(t *testing.T) {
 	testCases := map[string]struct {
-		sslCertIn   compute.SslCertificate
+		sslCertIn   computev1.SslCertificate
 		wantSuccess bool // translation should succeed
-		wantMcrt    *apisv1.ManagedCertificate
+		wantMcrt    *v1.ManagedCertificate
 	}{
 		"Wrong certificate status": {
 			sslCert("bad_status", nil),
@@ -72,18 +72,18 @@ func TestCopyStatus(t *testing.T) {
 		"Nil domain statuses -> []{} domain status": {
 			sslCert("ACTIVE", nil),
 			true,
-			mcrt("Active", []apisv1.DomainStatus{}),
+			mcrt("Active", []v1.DomainStatus{}),
 		},
 		"Correct translation": {
 			sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}),
 			true,
-			mcrt("Active", []apisv1.DomainStatus{apisv1.DomainStatus{Domain: "example.com", Status: "Active"}}),
+			mcrt("Active", []v1.DomainStatus{v1.DomainStatus{Domain: "example.com", Status: "Active"}}),
 		},
 	}
 
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
-			var mcrt apisv1.ManagedCertificate
+			var mcrt v1.ManagedCertificate
 			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFake())
 
 			if (err == nil) != testCase.wantSuccess {
@@ -121,13 +121,13 @@ func TestDiff(t *testing.T) {
 
 	for description, testCase := range testCases {
 		t.Run(description, func(t *testing.T) {
-			mcrt := apisv1.ManagedCertificate{
-				Spec: apisv1.ManagedCertificateSpec{
+			mcrt := v1.ManagedCertificate{
+				Spec: v1.ManagedCertificateSpec{
 					Domains: testCase.mcrtDomains,
 				},
 			}
-			sslCert := compute.SslCertificate{
-				Managed: &compute.SslCertificateManagedSslCertificate{
+			sslCert := computev1.SslCertificate{
+				Managed: &computev1.SslCertificateManagedSslCertificate{
 					Domains: testCase.sslCertDomains,
 				},
 				Type: "MANAGED",

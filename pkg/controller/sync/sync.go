@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v1"
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	computev1 "google.golang.org/api/compute/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/klog"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
@@ -103,7 +103,7 @@ func parse(annotation string) map[string]bool {
 // 2. a slice of ManagedCertificate ids that are attached to Ingress
 // via annotation managed-certificates.
 // 3. an error on failure.
-func (s impl) getCertificatesToAttach(ingress *apiv1beta1.Ingress) (map[string]bool, []types.Id, error) {
+func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) (map[string]bool, []types.Id, error) {
 	// If a ManagedCertificate attached to Ingress does not exist, add an event to Ingress
 	// and return an error.
 	boundManagedCertificates := parse(ingress.Annotations[config.AnnotationManagedCertificatesKey])
@@ -256,7 +256,7 @@ func (s impl) insertSslCertificateName(ctx context.Context, id types.Id) (string
 }
 
 func (s impl) observeSslCertificateCreationLatency(ctx context.Context, sslCertificateName string,
-	id types.Id, managedCertificate apisv1.ManagedCertificate) error {
+	id types.Id, managedCertificate v1.ManagedCertificate) error {
 
 	entry, err := s.state.Get(id)
 	if err != nil {
@@ -292,7 +292,7 @@ func (s impl) observeSslCertificateCreationLatency(ctx context.Context, sslCerti
 }
 
 func (s impl) deleteSslCertificate(ctx context.Context,
-	managedCertificate *apisv1.ManagedCertificate,
+	managedCertificate *v1.ManagedCertificate,
 	id types.Id, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
@@ -313,7 +313,7 @@ func (s impl) deleteSslCertificate(ctx context.Context,
 }
 
 func (s impl) createSslCertificate(ctx context.Context, sslCertificateName string,
-	id types.Id, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
+	id types.Id, managedCertificate *v1.ManagedCertificate) (*computev1.SslCertificate, error) {
 
 	exists, err := s.ssl.Exists(sslCertificateName, managedCertificate)
 	if err != nil {

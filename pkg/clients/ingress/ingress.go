@@ -21,13 +21,13 @@ package ingress
 import (
 	"context"
 
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	"k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
-	informersv1beta1 "k8s.io/client-go/informers/networking/v1beta1"
+	informersv1 "k8s.io/client-go/informers/networking/v1"
 	"k8s.io/client-go/kubernetes"
-	typedv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	typedv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -39,36 +39,36 @@ import (
 // on Ingress resources.
 type Interface interface {
 	// Get fetches the resource identified by id.
-	Get(id types.Id) (*apiv1beta1.Ingress, error)
+	Get(id types.Id) (*v1.Ingress, error)
 	// HasSynced is true after first batch of Ingress resources
 	// defined in the cluster has been synchronized with
 	// the local storage.
 	HasSynced() bool
 	// List returns all Ingress resources.
-	List() ([]*apiv1beta1.Ingress, error)
+	List() ([]*v1.Ingress, error)
 	// Update updates the given Ingress resource.
-	Update(ctx context.Context, ingress *apiv1beta1.Ingress) error
+	Update(ctx context.Context, ingress *v1.Ingress) error
 	// Run initializes the object exposing the Ingress API.
 	Run(ctx context.Context, queue workqueue.RateLimitingInterface)
 }
 
 type impl struct {
-	client   typedv1beta1.NetworkingV1beta1Interface
+	client   typedv1.NetworkingV1Interface
 	factory  informers.SharedInformerFactory
-	informer informersv1beta1.IngressInformer
+	informer informersv1.IngressInformer
 }
 
 func New(clientset *kubernetes.Clientset) Interface {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 
 	return impl{
-		client:   clientset.NetworkingV1beta1(),
+		client:   clientset.NetworkingV1(),
 		factory:  factory,
-		informer: factory.Networking().V1beta1().Ingresses(),
+		informer: factory.Networking().V1().Ingresses(),
 	}
 }
 
-func (ing impl) Get(id types.Id) (*apiv1beta1.Ingress, error) {
+func (ing impl) Get(id types.Id) (*v1.Ingress, error) {
 	return ing.informer.Lister().Ingresses(id.Namespace).Get(id.Name)
 }
 
@@ -76,11 +76,11 @@ func (ing impl) HasSynced() bool {
 	return ing.informer.Informer().HasSynced()
 }
 
-func (ing impl) List() ([]*apiv1beta1.Ingress, error) {
+func (ing impl) List() ([]*v1.Ingress, error) {
 	return ing.informer.Lister().List(labels.Everything())
 }
 
-func (ing impl) Update(ctx context.Context, ingress *apiv1beta1.Ingress) error {
+func (ing impl) Update(ctx context.Context, ingress *v1.Ingress) error {
 	_, err := ing.client.Ingresses(ingress.Namespace).Update(ctx, ingress, metav1.UpdateOptions{})
 	return err
 }
