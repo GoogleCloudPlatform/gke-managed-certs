@@ -23,7 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -277,9 +277,9 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	}
 	klog.Infof("Created service account %s", serviceAccountName)
 
-	clusterRole := rbacv1beta1.ClusterRole{
+	clusterRole := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-		Rules: []rbacv1beta1.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"networking.gke.io"},
 				Resources: []string{"managedcertificates"},
@@ -302,10 +302,10 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	}
 	klog.Infof("Created cluster role %s", clusterRoleName)
 
-	clusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
+	clusterRoleBinding := rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
-		Subjects:   []rbacv1beta1.Subject{{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"}},
-		RoleRef: rbacv1beta1.RoleRef{
+		Subjects:   []rbacv1.Subject{{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"}},
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     clusterRoleName,

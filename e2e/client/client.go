@@ -28,7 +28,7 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
-	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -49,8 +49,8 @@ const (
 )
 
 type Clients struct {
-	ClusterRole        rbacv1beta1.ClusterRoleInterface
-	ClusterRoleBinding rbacv1beta1.ClusterRoleBindingInterface
+	ClusterRole        rbacv1.ClusterRoleInterface
+	ClusterRoleBinding rbacv1.ClusterRoleBindingInterface
 	CustomResource     apiextv1.CustomResourceDefinitionInterface
 	Deployment         appsv1.DeploymentInterface
 	Dns                dns.Interface
@@ -89,7 +89,7 @@ func New(namespace string) (*Clients, error) {
 		return nil, err
 	}
 
-	rbacClient, err := rbacv1beta1.NewForConfig(config)
+	rbacClient, err := rbacv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

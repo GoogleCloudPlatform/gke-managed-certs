@@ -52,7 +52,7 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-mkdir /tmp/gcp_service_account
+mkdir -p /tmp/gcp_service_account
 if [ $PLATFORM = "gcp" ]
 then
   gsutil cp gs://${PROJECT}/key.json /tmp/gcp_service_account/key.json
