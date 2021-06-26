@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	netv1 "k8s.io/api/networking/v1"
-	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
@@ -38,29 +38,27 @@ import (
 )
 
 type fakeSync struct {
-	ingresses           []types.Id
-	managedCertificates []types.Id
+	ingresses           map[types.Id]bool
+	managedCertificates map[types.Id]bool
 }
 
 var _ sync.Interface = &fakeSync{}
 
 func (f *fakeSync) Ingress(ctx context.Context, id types.Id) error {
-	f.ingresses = append(f.ingresses, id)
+	f.ingresses[id] = true
 	return nil
 }
 
 func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.Id) error {
-	f.managedCertificates = append(f.managedCertificates, id)
+	f.managedCertificates[id] = true
 	return nil
 }
 
-// Controller maintains two workqueues which contain Ingresses and ManagedCertificates,
-// respectively, that need to be processed.
+// Controller maintains four workqueues which contain Ingresses and ManagedCertificates
+// to be processed.
 //
-// Resources are queued on the workqueues:
-// 1. when they are created, deleted or updated,
-// 2. occasionally every existing resource is added to the queue to make sure
-//    they are in sync, even if one of operations from 1. is missed.
+// The first pair of workqueues is used to handle resource creation, deletion or update.
+// The second pair of workqueues is used to occasionally synchronize all resources.
 //
 // The test uses a fake `sync` component instead of one doing the real synchronization
 // with external state and user intent. Fake sync counts all the resources it sees.
@@ -72,8 +70,8 @@ func TestController(t *testing.T) {
 		managedCertificatesInCluster []types.Id
 		managedCertificatesInState   []types.Id
 
-		wantIngresses           []types.Id
-		wantManagedCertificates []types.Id
+		wantIngresses           map[types.Id]bool
+		wantManagedCertificates map[types.Id]bool
 		wantMetrics             map[string]int
 	}{
 		"No items": {},
@@ -90,14 +88,14 @@ func TestController(t *testing.T) {
 				types.NewId("default", "b1"),
 				types.NewId("default", "b3"),
 			},
-			wantIngresses: []types.Id{
-				types.NewId("default", "a1"),
-				types.NewId("default", "a2"),
+			wantIngresses: map[types.Id]bool{
+				types.NewId("default", "a1"): true,
+				types.NewId("default", "a2"): true,
 			},
-			wantManagedCertificates: []types.Id{
-				types.NewId("default", "b1"),
-				types.NewId("default", "b2"),
-				types.NewId("default", "b3"),
+			wantManagedCertificates: map[types.Id]bool{
+				types.NewId("default", "b1"): true,
+				types.NewId("default", "b2"): true,
+				types.NewId("default", "b3"): true,
 			},
 			wantMetrics: map[string]int{"Active": 2},
 		},
@@ -126,21 +124,20 @@ func TestController(t *testing.T) {
 			}
 
 			metrics := metrics.NewFake()
-			sync := &fakeSync{}
-
-			ctrl := &controller{
+			sync := &fakeSync{
+				ingresses:           make(map[types.Id]bool),
+				managedCertificates: make(map[types.Id]bool),
+			}
+			ctrl := New(ctx, &params{
 				clients: &clients.Clients{
 					Ingress:            clientsingress.NewFake(ingresses),
 					ManagedCertificate: clientsmcrt.NewFake(mcrts),
 				},
-				metrics: metrics,
-				ingressQueue: workqueue.NewNamedRateLimitingQueue(
-					workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
-				managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(
-					workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
-				state: state.NewFakeWithEntries(stateEntries),
-				sync:  sync,
-			}
+				metrics:      metrics,
+				resyncPeriod: time.Minute,
+				state:        state.NewFakeWithEntries(stateEntries),
+				sync:         sync,
+			})
 
 			// Trigger resources queuing.
 			go ctrl.Run(ctx)
@@ -161,11 +158,11 @@ func TestController(t *testing.T) {
 
 			<-ctx.Done()
 
-			if diff := cmp.Diff(testCase.wantIngresses, sync.ingresses); diff != "" {
+			if diff := cmp.Diff(testCase.wantIngresses, sync.ingresses, cmpopts.EquateEmpty()); diff != "" {
 				t.Fatalf("Diff Ingresses (-want, +got): %s", diff)
 			}
 
-			if diff := cmp.Diff(testCase.wantManagedCertificates, sync.managedCertificates); diff != "" {
+			if diff := cmp.Diff(testCase.wantManagedCertificates, sync.managedCertificates, cmpopts.EquateEmpty()); diff != "" {
 				t.Fatalf("Diff ManagedCertificates (-want, +got): %s", diff)
 			}
 

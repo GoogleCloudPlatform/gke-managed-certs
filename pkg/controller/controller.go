@@ -39,35 +39,63 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
-type controller struct {
-	clients                 *clients.Clients
-	metrics                 metrics.Interface
-	ingressQueue            workqueue.RateLimitingInterface
-	managedCertificateQueue workqueue.RateLimitingInterface
-	state                   state.Interface
-	sync                    sync.Interface
+type params struct {
+	clients      *clients.Clients
+	config       *config.Config
+	metrics      metrics.Interface
+	resyncPeriod time.Duration
+	state        state.Interface
+	sync         sync.Interface
 }
 
-func New(ctx context.Context, config *config.Config, clients *clients.Clients) *controller {
+type controller struct {
+	clients                       *clients.Clients
+	ingressQueue                  workqueue.RateLimitingInterface
+	ingressResyncQueue            workqueue.RateLimitingInterface
+	managedCertificateQueue       workqueue.RateLimitingInterface
+	managedCertificateResyncQueue workqueue.RateLimitingInterface
+	metrics                       metrics.Interface
+	resyncPeriod                  time.Duration
+	state                         state.Interface
+	sync                          sync.Interface
+}
+
+func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config) *params {
 	metrics := metrics.New(config)
 	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
 
+	return &params{
+		clients:      clients,
+		config:       config,
+		metrics:      metrics,
+		resyncPeriod: 10 * time.Minute,
+		state:        state,
+		sync:         sync.New(config, clients.Event, clients.Ingress, clients.ManagedCertificate, metrics, random, ssl, state),
+	}
+}
+
+func New(ctx context.Context, p *params) *controller {
 	return &controller{
-		clients:                 clients,
-		metrics:                 metrics,
-		ingressQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
-		managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
-		state:                   state,
-		sync:                    sync.New(config, clients.Event, clients.Ingress, clients.ManagedCertificate, metrics, random, ssl, state),
+		clients:                       p.clients,
+		metrics:                       p.metrics,
+		ingressQueue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+		ingressResyncQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressResyncQueue"),
+		managedCertificateQueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
+		managedCertificateResyncQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateResyncQueue"),
+		resyncPeriod:                  p.resyncPeriod,
+		state:                         p.state,
+		sync:                          p.sync,
 	}
 }
 
 func (c *controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
 	defer c.ingressQueue.ShutDown()
+	defer c.ingressResyncQueue.ShutDown()
 	defer c.managedCertificateQueue.ShutDown()
+	defer c.managedCertificateResyncQueue.ShutDown()
 
 	klog.Info("Controller.Run()")
 
@@ -88,9 +116,15 @@ func (c *controller) Run(ctx context.Context) error {
 		func() { processNext(ctx, c.ingressQueue, c.sync.Ingress) },
 		time.Second, ctx.Done())
 	go wait.Until(
+		func() { processNext(ctx, c.ingressResyncQueue, c.sync.Ingress) },
+		time.Second, ctx.Done())
+	go wait.Until(
 		func() { processNext(ctx, c.managedCertificateQueue, c.sync.ManagedCertificate) },
 		time.Second, ctx.Done())
-	go wait.Until(func() { c.synchronizeAll(ctx) }, time.Minute, ctx.Done())
+	go wait.Until(
+		func() { processNext(ctx, c.managedCertificateResyncQueue, c.sync.ManagedCertificate) },
+		time.Second, ctx.Done())
+	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncPeriod, ctx.Done())
 	go wait.Until(func() { c.reportStatuses() }, time.Minute, ctx.Done())
 
 	klog.Info("Waiting for stop signal or error")
@@ -105,7 +139,7 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 		runtime.HandleError(err)
 	} else {
 		for _, ingress := range ingresses {
-			queue.Add(c.ingressQueue, ingress)
+			queue.Add(c.ingressResyncQueue, ingress)
 		}
 	}
 
@@ -113,7 +147,7 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 		runtime.HandleError(err)
 	} else {
 		for _, managedCertificate := range managedCertificates {
-			queue.Add(c.managedCertificateQueue, managedCertificate)
+			queue.Add(c.managedCertificateResyncQueue, managedCertificate)
 		}
 	}
 
