@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
+	ingressutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/queue"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
@@ -139,7 +140,12 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 		runtime.HandleError(err)
 	} else {
 		for _, ingress := range ingresses {
-			queue.Add(c.ingressResyncQueue, ingress)
+			if !ingressutils.IsGKE(ingress) {
+				klog.Infof("Skipping non-GKE Ingress %s/%s: %v",
+					ingress.Namespace, ingress.Name, *ingress)
+			} else {
+				queue.Add(c.ingressResyncQueue, ingress)
+			}
 		}
 	}
 

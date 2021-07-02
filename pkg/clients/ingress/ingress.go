@@ -30,7 +30,9 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 
+	ingressutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/ingress"
 	queueutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/queue"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
@@ -89,8 +91,29 @@ func (ing impl) Run(ctx context.Context, queue workqueue.RateLimitingInterface) 
 	go ing.factory.Start(ctx.Done())
 
 	ing.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { queueutils.Add(queue, obj) },
-		UpdateFunc: func(old, new interface{}) { queueutils.Add(queue, new) },
-		DeleteFunc: func(obj interface{}) { queueutils.Add(queue, obj) },
+		AddFunc: func(obj interface{}) {
+			if !ingressutils.IsGKE(obj) {
+				klog.Info("Ignoring add for Ingress")
+				return
+			}
+
+			queueutils.Add(queue, obj)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			if !ingressutils.IsGKE(new) {
+				klog.Info("Ignoring update for Ingress")
+				return
+			}
+
+			queueutils.Add(queue, new)
+		},
+		DeleteFunc: func(obj interface{}) {
+			if !ingressutils.IsGKE(obj) {
+				klog.Info("Ignoring delete for Ingress")
+				return
+			}
+
+			queueutils.Add(queue, obj)
+		},
 	})
 }

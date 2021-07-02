@@ -56,6 +56,7 @@ const (
 	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
 	sslRenewalFailed                       = "RENEWAL_FAILED"
 
+	AnnotationIngressClassKey        = "kubernetes.io/ingress.class"
 	AnnotationManagedCertificatesKey = "networking.gke.io/managed-certificates"
 	AnnotationPreSharedCertKey       = "ingress.gcp.kubernetes.io/pre-shared-cert"
 	SslCertificateNamePrefix         = "mcrt-"

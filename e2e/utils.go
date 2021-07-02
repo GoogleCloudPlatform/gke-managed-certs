@@ -26,6 +26,7 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
@@ -93,7 +94,7 @@ func createIngress(t *testing.T, ctx context.Context, name string, port int32, a
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				"networking.gke.io/managed-certificates": annotationManagedCertificatesValue,
+				config.AnnotationManagedCertificatesKey: annotationManagedCertificatesValue,
 			},
 		},
 		Spec: netv1.IngressSpec{
