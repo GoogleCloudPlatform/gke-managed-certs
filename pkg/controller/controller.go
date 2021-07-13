@@ -73,21 +73,26 @@ func NewParams(ctx context.Context, clients *clients.Clients, config *config.Con
 		metrics:      metrics,
 		resyncPeriod: 10 * time.Minute,
 		state:        state,
-		sync:         sync.New(config, clients.Event, clients.Ingress, clients.ManagedCertificate, metrics, random, ssl, state),
+		sync: sync.New(config, clients.Event, clients.Ingress,
+			clients.ManagedCertificate, metrics, random, ssl, state),
 	}
 }
 
 func New(ctx context.Context, p *params) *controller {
 	return &controller{
-		clients:                       p.clients,
-		metrics:                       p.metrics,
-		ingressQueue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
-		ingressResyncQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingressResyncQueue"),
-		managedCertificateQueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
-		managedCertificateResyncQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "managedCertificateResyncQueue"),
-		resyncPeriod:                  p.resyncPeriod,
-		state:                         p.state,
-		sync:                          p.sync,
+		clients: p.clients,
+		metrics: p.metrics,
+		ingressQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
+		ingressResyncQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), "ingressResyncQueue"),
+		managedCertificateQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
+		managedCertificateResyncQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(), "managedCertificateResyncQueue"),
+		resyncPeriod: p.resyncPeriod,
+		state:        p.state,
+		sync:         p.sync,
 	}
 }
 
@@ -126,7 +131,7 @@ func (c *controller) Run(ctx context.Context) error {
 		func() { processNext(ctx, c.managedCertificateResyncQueue, c.sync.ManagedCertificate) },
 		time.Second, ctx.Done())
 	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncPeriod, ctx.Done())
-	go wait.Until(func() { c.reportStatuses() }, time.Minute, ctx.Done())
+	go wait.Until(func() { c.reportMetrics() }, time.Minute, ctx.Done())
 
 	klog.Info("Waiting for stop signal or error")
 
@@ -162,7 +167,7 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 	}
 }
 
-func (c *controller) reportStatuses() {
+func (c *controller) reportMetrics() {
 	managedCertificates, err := c.clients.ManagedCertificate.List()
 	if err != nil {
 		runtime.HandleError(err)
@@ -175,6 +180,11 @@ func (c *controller) reportStatuses() {
 	}
 
 	c.metrics.ObserveManagedCertificatesStatuses(statuses)
+
+	c.metrics.ObserveIngressHighPriorityQueueLength(c.ingressQueue.Len())
+	c.metrics.ObserveIngressLowPriorityQueueLength(c.ingressResyncQueue.Len())
+	c.metrics.ObserveManagedCertificateHighPriorityQueueLength(c.managedCertificateQueue.Len())
+	c.metrics.ObserveManagedCertificateLowPriorityQueueLength(c.managedCertificateResyncQueue.Len())
 }
 
 func processNext(ctx context.Context, queue workqueue.RateLimitingInterface,

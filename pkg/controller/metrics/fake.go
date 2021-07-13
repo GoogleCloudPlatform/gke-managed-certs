@@ -36,6 +36,22 @@ func NewFake() *Fake {
 
 func (f *Fake) Start(address string) {}
 
+func (f *Fake) ObserveIngressHighPriorityQueueLength(length int) {
+	// not implemented
+}
+
+func (f *Fake) ObserveIngressLowPriorityQueueLength(length int) {
+	// not implemented
+}
+
+func (f *Fake) ObserveManagedCertificateHighPriorityQueueLength(length int) {
+	// not implemented
+}
+
+func (f *Fake) ObserveManagedCertificateLowPriorityQueueLength(length int) {
+	// not implemented
+}
+
 func (f *Fake) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 	f.ManagedCertificatesStatuses = statuses
 }
