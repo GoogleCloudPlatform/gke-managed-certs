@@ -25,6 +25,8 @@ import (
 )
 
 func TestCRDValidation(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	var domains101 []string
@@ -38,39 +40,39 @@ func TestCRDValidation(t *testing.T) {
 		success bool
 	}{
 		{
-			"Domain with trailing dot not allowed",
-			[]string{"trailing-dot.example.com."},
-			false,
+			desc:    "Domain with trailing dot not allowed",
+			domains: []string{"trailing-dot.example.com."},
+			success: false,
 		},
 		{
-			"Domain with uppercase characters not allowed",
-			[]string{"UPPER-CASE.example.com"},
-			false,
+			desc:    "Domain with uppercase characters not allowed",
+			domains: []string{"UPPER-CASE.example.com"},
+			success: false,
 		},
 		{
-			"Domain >63 characters not allowed",
-			[]string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.validation.example.com"},
-			false,
+			desc:    "Domain >63 characters not allowed",
+			domains: []string{"very-long-domain-name-which-exceeds-the-limit-of-63-characters.validation.example.com"},
+			success: false,
 		},
 		{
-			"Domain with a wildcard not allowed",
-			[]string{"*.validation.example.com"},
-			false,
+			desc:    "Domain with a wildcard not allowed",
+			domains: []string{"*.validation.example.com"},
+			success: false,
 		},
 		{
-			"More than 100 SANs not allowed",
-			domains101,
-			false,
+			desc:    "More than 100 SANs not allowed",
+			domains: domains101,
+			success: false,
 		},
 		{
-			"Single non-wildcard domain <=63 characters allowed",
-			[]string{"validation.example.com"},
-			true,
+			desc:    "Single non-wildcard domain <=63 characters allowed",
+			domains: []string{"validation.example.com"},
+			success: true,
 		},
 		{
-			"Multiple domain names allowed",
-			[]string{"validation1.example.com", "validation2.example.com"},
-			true,
+			desc:    "Multiple domain names allowed",
+			domains: []string{"validation1.example.com", "validation2.example.com"},
+			success: true,
 		},
 	} {
 		i, tc := i, tc
@@ -81,7 +83,9 @@ func TestCRDValidation(t *testing.T) {
 			if err == nil && !tc.success {
 				t.Fatalf("Created, want failure")
 			}
-			defer clients.ManagedCertificate.Delete(ctx, name)
+			t.Cleanup(func() {
+				clients.ManagedCertificate.Delete(ctx, name)
+			})
 
 			if err == nil {
 				return

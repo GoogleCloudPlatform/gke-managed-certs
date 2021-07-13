@@ -65,6 +65,8 @@ func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.Id) error {
 // The aim of the test is to make sure that all expected resources were queued and
 // delivered to sync.
 func TestController(t *testing.T) {
+	t.Parallel()
+
 	testCases := map[string]struct {
 		ingresses                    []types.Id
 		managedCertificatesInCluster []types.Id
@@ -102,7 +104,10 @@ func TestController(t *testing.T) {
 	}
 
 	for description, testCase := range testCases {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 			var ingresses []*netv1.Ingress

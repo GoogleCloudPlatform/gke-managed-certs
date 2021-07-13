@@ -34,6 +34,8 @@ import (
 // can be reported as well, and events are reported on a best-effort basis, so the test does not require
 // every event to be present.
 func TestEvents_ManagedCertificate(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	numCerts := 400 // Should be bigger than allowed quota.
 
@@ -45,7 +47,9 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 		if err := clients.ManagedCertificate.Create(ctx, name, []string{"quota.example.com"}); err != nil {
 			t.Fatal(err)
 		}
-		defer clients.ManagedCertificate.Delete(ctx, name)
+		t.Cleanup(func() {
+			clients.ManagedCertificate.Delete(ctx, name)
+		})
 	}
 
 	if err := utils.Retry(func() error {
@@ -88,6 +92,8 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 }
 
 func TestEvents_Ingress(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	ingressName := "test-events-ingress"
 

@@ -63,6 +63,8 @@ func (s *sslError) Get(name string) (*computev1.SslCertificate, error) {
 }
 
 func TestCreate(t *testing.T) {
+	t.Parallel()
+
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
@@ -139,7 +141,10 @@ func TestCreate(t *testing.T) {
 			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.Background()
 
 			event := event.Fake{}
@@ -174,6 +179,8 @@ func TestCreate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	t.Parallel()
+
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
@@ -230,7 +237,10 @@ func TestDelete(t *testing.T) {
 			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.Background()
 
 			event := event.Fake{}
@@ -261,6 +271,8 @@ func TestDelete(t *testing.T) {
 }
 
 func TestExists(t *testing.T) {
+	t.Parallel()
+
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
@@ -316,7 +328,10 @@ func TestExists(t *testing.T) {
 			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			event := event.Fake{}
 			metrics := metrics.NewFake()
 			manager := New(&event, metrics, testCase.ssl, state.NewFake())
@@ -339,6 +354,8 @@ func TestExists(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	t.Parallel()
+
 	for description, testCase := range map[string]struct {
 		ssl                ssl.Interface
 		name               string
@@ -399,7 +416,10 @@ func TestGet(t *testing.T) {
 			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			event := event.Fake{}
 			metrics := metrics.NewFake()
 			manager := New(&event, metrics, testCase.ssl, state.NewFake())

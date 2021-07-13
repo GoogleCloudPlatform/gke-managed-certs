@@ -133,6 +133,8 @@ func newFilled(t *testing.T) *filledConfigMapMock {
 }
 
 func TestState(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	runtime.ErrorHandlers = nil
 
@@ -153,7 +155,10 @@ func TestState(t *testing.T) {
 			wantInitItems: 1,
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			// Create a state instance.
 			state := New(ctx, testCase.configmap)
 
@@ -257,6 +262,8 @@ func TestState(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
+	t.Parallel()
+
 	mcrt1 := types.NewId("default", "mcrt1")
 	mcrt2 := types.NewId("system", "mcrt2")
 

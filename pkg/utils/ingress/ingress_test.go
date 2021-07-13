@@ -26,6 +26,8 @@ import (
 )
 
 func TestIsGKE(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		desc    string
 		ingress *v1.Ingress
@@ -64,7 +66,10 @@ func TestIsGKE(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.desc, func(t *testing.T) {
+			t.Parallel()
+
 			got := IsGKE(testCase.ingress)
 			if got != testCase.wantGKE {
 				t.Errorf("IsGKE(%+v): %t, want %t", testCase.ingress, got, testCase.wantGKE)

@@ -44,6 +44,8 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		annotation string
 		wantItems  []string
@@ -71,7 +73,9 @@ func TestParse(t *testing.T) {
 }
 
 func TestIngress(t *testing.T) {
-	for description, tc := range map[string]struct {
+	t.Parallel()
+
+	for description, testCase := range map[string]struct {
 		state       map[types.Id]state.Entry
 		ingress     *netv1.Ingress
 		wantIngress *netv1.Ingress
@@ -132,36 +136,39 @@ func TestIngress(t *testing.T) {
 			wantMetrics: metrics.Fake{BindingCnt: 1},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.Background()
 
 			event := &event.Fake{}
 			var managedCertificates []*v1.ManagedCertificate
-			for id := range tc.state {
+			for id := range testCase.state {
 				domain := fmt.Sprintf("mcrt-%s.example.com", id.String())
 				managedCertificates = append(managedCertificates, managedcertificate.New(id, domain).Build())
 			}
-			ingress := clientsingress.NewFake([]*netv1.Ingress{tc.ingress})
+			ingress := clientsingress.NewFake([]*netv1.Ingress{testCase.ingress})
 			metrics := metrics.NewFake()
-			state := state.NewFakeWithEntries(tc.state)
+			state := state.NewFakeWithEntries(testCase.state)
 
 			sync := New(config.NewFake(), event, ingress, clientsmcrt.NewFake(managedCertificates), metrics,
 				random.NewFake(""), sslcertificatemanager.New(event, metrics, ssl.NewFake().Build(), state), state)
 
 			id := types.NewId("default", "foo")
 			err := sync.Ingress(ctx, id)
-			if err != nil && !errors.Is(err, tc.wantErr) {
-				t.Fatalf("sync.Ingress(): %v, want %v", err, tc.wantErr)
+			if err != nil && !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("sync.Ingress(): %v, want %v", err, testCase.wantErr)
 			}
 
 			gotIngresses, _ := ingress.List()
-			if diff := cmp.Diff([]*netv1.Ingress{tc.wantIngress}, gotIngresses); diff != "" {
+			if diff := cmp.Diff([]*netv1.Ingress{testCase.wantIngress}, gotIngresses); diff != "" {
 				t.Fatalf("Diff Ingress (-want, +got): %s", diff)
 			}
-			if diff := cmp.Diff(&tc.wantEvent, event); diff != "" {
+			if diff := cmp.Diff(&testCase.wantEvent, event); diff != "" {
 				t.Fatalf("Diff events (-want, +got): %s", diff)
 			}
-			if diff := cmp.Diff(&tc.wantMetrics, metrics); diff != "" {
+			if diff := cmp.Diff(&testCase.wantMetrics, metrics); diff != "" {
 				t.Fatalf("Diff metrics (-want, +got): %s", diff)
 			}
 		})
@@ -178,7 +185,9 @@ func getSslCert(id types.Id, state state.Interface, ssl ssl.Interface) (*compute
 }
 
 func TestManagedCertificate(t *testing.T) {
-	for description, tc := range map[string]struct {
+	t.Parallel()
+
+	for description, testCase := range map[string]struct {
 		managedCertificate *v1.ManagedCertificate
 		state              state.Interface
 		ssl                ssl.Interface
@@ -445,13 +454,16 @@ func TestManagedCertificate(t *testing.T) {
 			wantError:   utilserrors.OutOfSync,
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.Background()
 
 			var managedCertificates []*v1.ManagedCertificate
-			if tc.managedCertificate != nil {
+			if testCase.managedCertificate != nil {
 				managedCertificates = append(managedCertificates,
-					tc.managedCertificate)
+					testCase.managedCertificate)
 			}
 
 			managedCertificate := clientsmcrt.NewFake(managedCertificates)
@@ -459,21 +471,22 @@ func TestManagedCertificate(t *testing.T) {
 			metrics := metrics.NewFake()
 
 			sync := New(config.NewFake(), event, clientsingress.NewFake(nil),
-				managedCertificate, metrics, tc.random,
-				sslcertificatemanager.New(event, metrics, tc.ssl, tc.state), tc.state)
+				managedCertificate, metrics, testCase.random,
+				sslcertificatemanager.New(event, metrics, testCase.ssl, testCase.state),
+				testCase.state)
 
 			id := types.NewId("default", "foo")
-			if err := sync.ManagedCertificate(ctx, id); err != tc.wantError {
+			if err := sync.ManagedCertificate(ctx, id); err != testCase.wantError {
 				t.Fatalf("sync.ManagedCertificate(%s): %v, want %v",
-					id, err, tc.wantError)
+					id, err, testCase.wantError)
 			}
 
-			if diff := cmp.Diff(tc.wantState.List(), tc.state.List()); diff != "" {
+			if diff := cmp.Diff(testCase.wantState.List(), testCase.state.List()); diff != "" {
 				t.Fatalf("Diff state (-want, +got): %s", diff)
 			}
 
-			wantSslCert, wantSslCertErr := getSslCert(id, tc.wantState, tc.wantSsl)
-			gotSslCert, gotSslCertErr := getSslCert(id, tc.state, tc.ssl)
+			wantSslCert, wantSslCertErr := getSslCert(id, testCase.wantState, testCase.wantSsl)
+			gotSslCert, gotSslCertErr := getSslCert(id, testCase.state, testCase.ssl)
 			sslCertDiff := cmp.Diff(wantSslCert, gotSslCert)
 			if wantSslCertErr != gotSslCertErr || sslCertDiff != "" {
 				t.Fatalf(`Diff SslCertificate (-want, +got): %s,
@@ -481,26 +494,25 @@ func TestManagedCertificate(t *testing.T) {
 					sslCertDiff, gotSslCertErr, wantSslCertErr)
 			}
 
-			if tc.wantManagedCertificate != nil && len(managedCertificates) != 1 {
+			if testCase.wantManagedCertificate != nil && len(managedCertificates) != 1 {
 				t.Fatalf(`ManagedCertificate nil, want %+v;
 					total number of certificates: %d, want 1`,
-					tc.wantManagedCertificate, len(managedCertificates))
-			} else if tc.wantManagedCertificate == nil &&
+					testCase.wantManagedCertificate, len(managedCertificates))
+			} else if testCase.wantManagedCertificate == nil &&
 				len(managedCertificates) != 0 {
 
 				t.Fatalf(`ManagedCertificate %+v, want nil;
 					total number of certificates: %d, want 0`,
 					managedCertificates[0], len(managedCertificates))
 			} else if len(managedCertificates) > 0 {
-				if diff := cmp.Diff(tc.wantManagedCertificate,
+				if diff := cmp.Diff(testCase.wantManagedCertificate,
 					managedCertificates[0]); diff != "" {
 
-					t.Fatalf("Diff ManagedCertificates (-want, +got): %s",
-						diff)
+					t.Fatalf("Diff ManagedCertificates (-want, +got): %s", diff)
 				}
 			}
 
-			if diff := cmp.Diff(tc.wantMetrics, metrics); diff != "" {
+			if diff := cmp.Diff(testCase.wantMetrics, metrics); diff != "" {
 				t.Fatalf("Diff metrics (-want, +got): %s", diff)
 			}
 		})

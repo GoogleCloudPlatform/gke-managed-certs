@@ -23,6 +23,8 @@ import (
 )
 
 func TestError_IsQuotaExceeded(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		in  *Error
 		out bool

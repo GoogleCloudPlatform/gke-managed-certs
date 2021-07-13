@@ -22,6 +22,8 @@ import (
 )
 
 func TestUpgradeCRD(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	for description, testCase := range map[string]struct {
@@ -38,6 +40,7 @@ func TestUpgradeCRD(t *testing.T) {
 			},
 		},
 	} {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
 			if err := testCase.createResource(ctx, "upgrade-crd", "upgrade-crd1.example.com"); err != nil {
 				t.Fatalf("Creation failed: %v", err)

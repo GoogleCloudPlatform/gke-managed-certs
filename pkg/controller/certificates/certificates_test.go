@@ -54,6 +54,8 @@ func mcrt(status string, domains []v1.DomainStatus) *v1.ManagedCertificate {
 }
 
 func TestCopyStatus(t *testing.T) {
+	t.Parallel()
+
 	testCases := map[string]struct {
 		sslCertIn   computev1.SslCertificate
 		wantSuccess bool // translation should succeed
@@ -82,7 +84,10 @@ func TestCopyStatus(t *testing.T) {
 	}
 
 	for description, testCase := range testCases {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			var mcrt v1.ManagedCertificate
 			err := CopyStatus(testCase.sslCertIn, &mcrt, config.NewFake())
 
@@ -104,6 +109,8 @@ func TestCopyStatus(t *testing.T) {
 }
 
 func TestDiff(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		mcrtDomains    []string
 		sslCertDomains []string
@@ -120,7 +127,10 @@ func TestDiff(t *testing.T) {
 	}
 
 	for description, testCase := range testCases {
+		testCase := testCase
 		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			mcrt := v1.ManagedCertificate{
 				Spec: v1.ManagedCertificateSpec{
 					Domains: testCase.mcrtDomains,
