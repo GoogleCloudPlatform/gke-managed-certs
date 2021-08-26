@@ -19,5 +19,5 @@ ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
 
 RUN apt-get update && apt-get --yes install libseccomp-dev && go version \
-	&& go get github.com/jstemmer/go-junit-report
+	&& go install github.com/jstemmer/go-junit-report@v0.9.1
 CMD ["/bin/bash"]
