@@ -22,6 +22,9 @@ kind: ClusterRole
 metadata:
   name: managed-certificate-role
 rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["*"]
 - apiGroups: ["networking.gke.io"]
   resources: ["managedcertificates"]
   verbs: ["*"]

@@ -84,7 +84,7 @@ func main() {
 		LeaseDuration: metav1.Duration{Duration: config.MasterElection.LeaseDuration},
 		RenewDeadline: metav1.Duration{Duration: config.MasterElection.RenewDeadline},
 		RetryPeriod:   metav1.Duration{Duration: config.MasterElection.RetryPeriod},
-		ResourceLock:  resourcelock.EndpointsResourceLock,
+		ResourceLock:  resourcelock.EndpointsLeasesResourceLock,
 	}
 	id, err := os.Hostname()
 	if err != nil {
