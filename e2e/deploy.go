@@ -281,6 +281,11 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 		Rules: []rbacv1.PolicyRule{
 			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"*"},
+			},
+			{
 				APIGroups: []string{"networking.gke.io"},
 				Resources: []string{"managedcertificates"},
 				Verbs:     []string{"*"},
