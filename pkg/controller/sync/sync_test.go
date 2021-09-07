@@ -90,8 +90,8 @@ func TestIngress(t *testing.T) {
 			state: map[types.Id]state.Entry{
 				types.NewId("in-a-different-namespace", "in-a-different-namespace"): state.Entry{SslCertificateName: "in-a-different-namespace"},
 			},
-			ingress:     ingress.New(types.NewId("default", "foo"), "in-a-different-namespace", ""),
-			wantIngress: ingress.New(types.NewId("default", "foo"), "in-a-different-namespace", ""),
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("in-a-different-namespace")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("in-a-different-namespace")),
 			wantEvent:   event.Fake{MissingCertificateCnt: 1},
 			wantErr:     utilserrors.NotFound,
 		},
@@ -99,10 +99,15 @@ func TestIngress(t *testing.T) {
 			// A not existing ManagedCertificate is attached to an Ingress
 			// from the same namespace. Ingress is not processed.
 			state:       map[types.Id]state.Entry{},
-			ingress:     ingress.New(types.NewId("default", "foo"), "not-existing-certificate", ""),
-			wantIngress: ingress.New(types.NewId("default", "foo"), "not-existing-certificate", ""),
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("not-existing-certificate")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("not-existing-certificate")),
 			wantEvent:   event.Fake{MissingCertificateCnt: 1},
 			wantErr:     utilserrors.NotFound,
+		},
+		"ingress with nil annotations": {
+			state:       map[types.Id]state.Entry{},
+			ingress:     ingress.New(types.NewId("default", "foo")),
+			wantIngress: ingress.New(types.NewId("default", "foo")),
 		},
 		"happy path": {
 			state: map[types.Id]state.Entry{
@@ -111,8 +116,8 @@ func TestIngress(t *testing.T) {
 				types.NewId("default", "deleted1"): state.Entry{SslCertificateName: "deleted1", SoftDeleted: true},
 				types.NewId("default", "deleted2"): state.Entry{SslCertificateName: "deleted2", SoftDeleted: true},
 			},
-			ingress:     ingress.New(types.NewId("default", "foo"), "regular1,regular2,deleted1,deleted2", "regular1,deleted1"),
-			wantIngress: ingress.New(types.NewId("default", "foo"), "regular1,regular2,deleted1,deleted2", "regular1,regular2"),
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("regular1,regular2,deleted1,deleted2"), ingress.AnnotationPreSharedCert("regular1,deleted1")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("regular1,regular2,deleted1,deleted2"), ingress.AnnotationPreSharedCert("regular1,regular2")),
 			wantMetrics: metrics.Fake{BindingCnt: 2},
 		},
 		"metrics: excluded from SLO calculation": {
@@ -121,8 +126,8 @@ func TestIngress(t *testing.T) {
 				types.NewId("default", "regular"):      state.Entry{SslCertificateName: "regular"},
 				types.NewId("default", "excludedSLO2"): state.Entry{SslCertificateName: "excludedSLO2", ExcludedFromSLO: true},
 			},
-			ingress:     ingress.New(types.NewId("default", "foo"), "excludedSLO1,excludedSLO2,regular", "excludedSLO1"),
-			wantIngress: ingress.New(types.NewId("default", "foo"), "excludedSLO1,excludedSLO2,regular", "excludedSLO1,excludedSLO2,regular"),
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("excludedSLO1,excludedSLO2,regular"), ingress.AnnotationPreSharedCert("excludedSLO1")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("excludedSLO1,excludedSLO2,regular"), ingress.AnnotationPreSharedCert("excludedSLO1,excludedSLO2,regular")),
 			wantMetrics: metrics.Fake{BindingCnt: 1},
 		},
 		"metrics: binding already reported": {
@@ -131,8 +136,8 @@ func TestIngress(t *testing.T) {
 				types.NewId("default", "regular"):          state.Entry{SslCertificateName: "regular"},
 				types.NewId("default", "bindingReported2"): state.Entry{SslCertificateName: "bindingReported2", SslCertificateBindingReported: true},
 			},
-			ingress:     ingress.New(types.NewId("default", "foo"), "bindingReported1,bindingReported2,regular", "bindingReported1"),
-			wantIngress: ingress.New(types.NewId("default", "foo"), "bindingReported1,bindingReported2,regular", "bindingReported1,bindingReported2,regular"),
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("bindingReported1,bindingReported2,regular"), ingress.AnnotationPreSharedCert("bindingReported1")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("bindingReported1,bindingReported2,regular"), ingress.AnnotationPreSharedCert("bindingReported1,bindingReported2,regular")),
 			wantMetrics: metrics.Fake{BindingCnt: 1},
 		},
 	} {

@@ -18,7 +18,9 @@ package ingress
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/evanphx/json-patch"
 	"k8s.io/api/networking/v1"
 	"k8s.io/client-go/util/workqueue"
 
@@ -54,14 +56,24 @@ func (f *Fake) List() ([]*v1.Ingress, error) {
 	return f.ingresses, nil
 }
 
-func (f *Fake) Update(ctx context.Context, ingress *v1.Ingress) error {
+func (f *Fake) Patch(ctx context.Context, id types.Id, diff []byte) error {
 	for i, ing := range f.ingresses {
-		if ing.Namespace == ingress.Namespace && ing.Name == ingress.Name {
-			f.ingresses[i] = ingress
+		if ing.Namespace == id.Namespace && ing.Name == id.Name {
+			ingressBytes, err := json.Marshal(f.ingresses[i])
+			if err != nil {
+				return err
+			}
+			ingressBytes, err = jsonpatch.MergePatch(ingressBytes, diff)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(ingressBytes, f.ingresses[i])
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 	}
-
 	return errors.NotFound
 }
 

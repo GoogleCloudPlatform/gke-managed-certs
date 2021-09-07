@@ -18,7 +18,9 @@ package managedcertificate
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/evanphx/json-patch"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
@@ -54,16 +56,24 @@ func (f *Fake) List() ([]*v1.ManagedCertificate, error) {
 	return f.managedCertificates, nil
 }
 
-func (f *Fake) Update(ctx context.Context, managedCertificate *v1.ManagedCertificate) error {
+func (f *Fake) Patch(ctx context.Context, id types.Id, diff []byte) error {
 	for i, cert := range f.managedCertificates {
-		if cert.Namespace == managedCertificate.Namespace &&
-			cert.Name == managedCertificate.Name {
-
-			f.managedCertificates[i] = managedCertificate
+		if cert.Namespace == id.Namespace && cert.Name == id.Name {
+			mcrtBytes, err := json.Marshal(f.managedCertificates[i])
+			if err != nil {
+				return err
+			}
+			mcrtBytes, err = jsonpatch.MergePatch(mcrtBytes, diff)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(mcrtBytes, f.managedCertificates[i])
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 	}
-
 	return errors.NotFound
 }
 

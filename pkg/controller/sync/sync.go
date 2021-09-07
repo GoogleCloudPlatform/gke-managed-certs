@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/patch"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
@@ -198,7 +199,7 @@ func (s impl) reportManagedCertificatesAttached(ctx context.Context, managedCert
 }
 
 func (s impl) Ingress(ctx context.Context, id types.Id) error {
-	ingress, err := s.ingress.Get(id)
+	originalIngress, err := s.ingress.Get(id)
 	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -207,28 +208,38 @@ func (s impl) Ingress(ctx context.Context, id types.Id) error {
 
 	klog.Infof("Syncing Ingress %s", id.String())
 
-	sslCertificates, managedCertificates, err := s.getCertificatesToAttach(ingress)
+	sslCertificates, managedCertificates, err := s.getCertificatesToAttach(originalIngress)
 	if err != nil {
 		return fmt.Errorf("getCertificatesToAttach(): %w", err)
 	}
 
 	preSharedCertValue := buildPreSharedCertAnnotation(sslCertificates)
 
-	if preSharedCertValue == ingress.Annotations[config.AnnotationPreSharedCertKey] {
+	if preSharedCertValue == originalIngress.Annotations[config.AnnotationPreSharedCertKey] {
 		return nil
 	}
 
 	klog.Infof("Annotation %s on Ingress %s was %s, set to %s",
 		config.AnnotationPreSharedCertKey, id.String(),
-		ingress.Annotations[config.AnnotationPreSharedCertKey], preSharedCertValue)
+		originalIngress.Annotations[config.AnnotationPreSharedCertKey], preSharedCertValue)
 
-	if ingress.Annotations == nil {
-		ingress.Annotations = make(map[string]string, 0)
+	modifiedIngress := originalIngress.DeepCopy()
+
+	if modifiedIngress.Annotations == nil {
+		modifiedIngress.Annotations = make(map[string]string, 0)
 	}
-	ingress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
+	modifiedIngress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
 
-	if err := s.ingress.Update(ctx, ingress); err != nil {
-		return fmt.Errorf("Failed to update Ingress %s: %v", id.String(), err)
+	patchBytes, modified, err := patch.CreateMergePatch(originalIngress, modifiedIngress)
+	if err != nil {
+		return fmt.Errorf("patch.CreateMergePatch(): %w", err)
+	}
+
+	if modified {
+		err = s.ingress.Patch(ctx, id, patchBytes)
+		if err != nil {
+			return fmt.Errorf("s.ingress.Patch(): %w", err)
+		}
 	}
 
 	if err := s.reportManagedCertificatesAttached(ctx, managedCertificates); err != nil {
@@ -351,7 +362,7 @@ func (s impl) createSslCertificate(ctx context.Context, sslCertificateName strin
 }
 
 func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
-	managedCertificate, err := s.managedCertificate.Get(id)
+	originalMcrt, err := s.managedCertificate.Get(id)
 	if errors.IsNotFound(err) {
 		entry, err := s.state.Get(id)
 		if errors.IsNotFound(err) {
@@ -373,22 +384,32 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
 		return err
 	}
 
+	modifiedMcrt := originalMcrt.DeepCopy()
+
 	if entry, err := s.state.Get(id); err != nil {
 		return err
 	} else if entry.SoftDeleted {
 		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s",
 			id.String(), sslCertificateName)
-		return s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName)
+		return s.deleteSslCertificate(ctx, modifiedMcrt, id, sslCertificateName)
 	}
 
-	sslCert, err := s.createSslCertificate(ctx, sslCertificateName, id, managedCertificate)
+	sslCert, err := s.createSslCertificate(ctx, sslCertificateName, id, modifiedMcrt)
 	if err != nil {
 		return err
 	}
 
-	if err := certificates.CopyStatus(*sslCert, managedCertificate, s.config); err != nil {
+	if err := certificates.CopyStatus(*sslCert, modifiedMcrt, s.config); err != nil {
 		return err
 	}
 
-	return s.managedCertificate.Update(ctx, managedCertificate)
+	patchBytes, modified, err := patch.CreateMergePatch(originalMcrt, modifiedMcrt)
+	if err != nil {
+		return fmt.Errorf("patch.CreateMergePatch(): %w", err)
+	}
+
+	if modified {
+		err = s.managedCertificate.Patch(ctx, id, patchBytes)
+	}
+	return err
 }

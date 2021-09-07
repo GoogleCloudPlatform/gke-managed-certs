@@ -112,7 +112,7 @@ func TestController(t *testing.T) {
 
 			var ingresses []*netv1.Ingress
 			for _, id := range testCase.ingresses {
-				ingresses = append(ingresses, ingress.New(id, "", ""))
+				ingresses = append(ingresses, ingress.New(id))
 			}
 
 			var mcrts []*v1.ManagedCertificate

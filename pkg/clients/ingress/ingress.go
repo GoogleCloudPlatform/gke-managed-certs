@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	informersv1 "k8s.io/client-go/informers/networking/v1"
 	"k8s.io/client-go/kubernetes"
@@ -34,22 +35,22 @@ import (
 
 	ingressutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/ingress"
 	queueutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/queue"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
+	typesutils "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 // Interface defines the interface the controller needs to operate
 // on Ingress resources.
 type Interface interface {
 	// Get fetches the resource identified by id.
-	Get(id types.Id) (*v1.Ingress, error)
+	Get(id typesutils.Id) (*v1.Ingress, error)
 	// HasSynced is true after first batch of Ingress resources
 	// defined in the cluster has been synchronized with
 	// the local storage.
 	HasSynced() bool
 	// List returns all Ingress resources.
 	List() ([]*v1.Ingress, error)
-	// Update updates the given Ingress resource.
-	Update(ctx context.Context, ingress *v1.Ingress) error
+	// Patch patches `patchBytes` changes to the ingress resource with the given id.
+	Patch(ctx context.Context, id typesutils.Id, patchBytes []byte) error
 	// Run initializes the object exposing the Ingress API.
 	Run(ctx context.Context, queue workqueue.RateLimitingInterface)
 }
@@ -70,7 +71,7 @@ func New(clientset *kubernetes.Clientset) Interface {
 	}
 }
 
-func (ing impl) Get(id types.Id) (*v1.Ingress, error) {
+func (ing impl) Get(id typesutils.Id) (*v1.Ingress, error) {
 	return ing.informer.Lister().Ingresses(id.Namespace).Get(id.Name)
 }
 
@@ -82,8 +83,9 @@ func (ing impl) List() ([]*v1.Ingress, error) {
 	return ing.informer.Lister().List(labels.Everything())
 }
 
-func (ing impl) Update(ctx context.Context, ingress *v1.Ingress) error {
-	_, err := ing.client.Ingresses(ingress.Namespace).Update(ctx, ingress, metav1.UpdateOptions{})
+func (ing impl) Patch(ctx context.Context, id typesutils.Id, diff []byte) error {
+	_, err := ing.client.Ingresses(id.Namespace).Patch(ctx, id.Name,
+		types.MergePatchType, diff, metav1.PatchOptions{})
 	return err
 }
 
