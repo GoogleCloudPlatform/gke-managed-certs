@@ -297,7 +297,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"configmaps", "endpoints", "events"},
+				Resources: []string{"configmaps", "events"},
 				Verbs:     []string{"*"},
 			},
 		},

@@ -32,7 +32,7 @@ rules:
   resources: ["ingresses"]
   verbs: ["*"]
 - apiGroups: [""]
-  resources: ["configmaps", "endpoints", "events"]
+  resources: ["configmaps", "events"]
   verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
