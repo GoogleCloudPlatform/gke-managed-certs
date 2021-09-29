@@ -26,8 +26,6 @@ import (
 
 	computev1 "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 const (
@@ -67,9 +65,6 @@ type Interface interface {
 	Create(ctx context.Context, name string, domains []string) error
 	// Delete deletes an SslCertificate resource.
 	Delete(ctx context.Context, name string) error
-	// Exists returns true if an SslCertificate exists, false if it is deleted.
-	// Error is not nil if an error has occurred.
-	Exists(name string) (bool, error)
 	// Get fetches an SslCertificate resource.
 	Get(name string) (*computev1.SslCertificate, error)
 	// List fetches all SslCertificate resources.
@@ -119,21 +114,6 @@ func (s impl) Delete(ctx context.Context, name string) error {
 	}
 
 	return s.waitFor(ctx, operation.Name)
-}
-
-// Exists returns true if an SslCertificate exists, false if it is deleted.
-// Error is not nil if an error has occurred.
-func (s impl) Exists(name string) (bool, error) {
-	_, err := s.Get(name)
-	if err == nil {
-		return true, nil
-	}
-
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-
-	return false, err
 }
 
 // Get fetches an SslCertificate resource.

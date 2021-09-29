@@ -26,8 +26,7 @@ import (
 )
 
 var (
-	NotFound  = errors.New("Not found")
-	OutOfSync = errors.New("SslCertificate got out of sync with ManagedCertificate")
+	NotFound = errors.New("Not found")
 )
 
 // IsNotFound checks if err is a not found error.

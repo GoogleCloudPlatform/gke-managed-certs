@@ -270,89 +270,6 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestExists(t *testing.T) {
-	t.Parallel()
-
-	for description, testCase := range map[string]struct {
-		ssl                ssl.Interface
-		name               string
-		managedCertificate *v1.ManagedCertificate
-
-		wantExists  bool
-		wantErr     error
-		wantEvent   event.Fake
-		wantMetrics metrics.Fake
-	}{
-		"happy path with ManagedCertificate": {
-			ssl:                ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
-			name:               "foo",
-			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
-
-			wantExists: true,
-		},
-		"happy path without ManagedCertificate": {
-			ssl:  ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
-			name: "foo",
-
-			wantExists: true,
-		},
-		"not found with ManagedCertificate": {
-			ssl:                ssl.NewFake().Build(),
-			name:               "foo",
-			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
-
-			wantExists: false,
-		},
-		"not found without ManagedCertificate": {
-			ssl:  ssl.NewFake().Build(),
-			name: "foo",
-
-			wantExists: false,
-		},
-		"other error with ManagedCertificate": {
-			ssl:                &sslError{err: errFake, exists: false},
-			name:               "foo",
-			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
-
-			wantExists:  false,
-			wantErr:     errFake,
-			wantEvent:   event.Fake{BackendErrorCnt: 1},
-			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
-		},
-		"other error without ManagedCertificate": {
-			ssl:  &sslError{err: errFake, exists: false},
-			name: "foo",
-
-			wantExists:  false,
-			wantErr:     errFake,
-			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
-		},
-	} {
-		testCase := testCase
-		t.Run(description, func(t *testing.T) {
-			t.Parallel()
-
-			event := event.Fake{}
-			metrics := metrics.NewFake()
-			manager := New(&event, metrics, testCase.ssl, state.NewFake())
-
-			exists, err := manager.Exists(testCase.name, testCase.managedCertificate)
-
-			if exists != testCase.wantExists || err != testCase.wantErr {
-				t.Fatalf("Exists(): %t, %v, want %t, %v", exists, err, testCase.wantExists, testCase.wantErr)
-			}
-
-			if diff := cmp.Diff(testCase.wantEvent, event); diff != "" {
-				t.Fatalf("Diff event (-want, +got): %s", diff)
-			}
-
-			if diff := cmp.Diff(&testCase.wantMetrics, metrics); diff != "" {
-				t.Fatalf("Diff metrics (-want, +got): %s", diff)
-			}
-		})
-	}
-}
-
 func TestGet(t *testing.T) {
 	t.Parallel()
 
@@ -384,18 +301,15 @@ func TestGet(t *testing.T) {
 			name:               "foo",
 			managedCertificate: managedcertificate.New(types.NewId("default", "foo"), "example.com").Build(),
 
-			wantCert:    nil,
-			wantErr:     utilserrors.NotFound,
-			wantEvent:   event.Fake{BackendErrorCnt: 1},
-			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+			wantCert: nil,
+			wantErr:  utilserrors.NotFound,
 		},
 		"not found without ManagedCertificate": {
 			ssl:  ssl.NewFake().Build(),
 			name: "foo",
 
-			wantCert:    nil,
-			wantErr:     utilserrors.NotFound,
-			wantMetrics: metrics.Fake{BackendErrorCnt: 1},
+			wantCert: nil,
+			wantErr:  utilserrors.NotFound,
 		},
 		"other error with ManagedCertificate": {
 			ssl:                &sslError{err: errFake},
