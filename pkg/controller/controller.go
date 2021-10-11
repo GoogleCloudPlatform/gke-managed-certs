@@ -163,7 +163,7 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 	}
 
 	for id := range c.state.List() {
-		queue.AddId(c.managedCertificateQueue, id)
+		queue.AddId(c.managedCertificateResyncQueue, id)
 	}
 }
 
