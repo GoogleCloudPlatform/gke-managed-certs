@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,9 +30,11 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	clientsingress "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/liveness"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sync"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/testhelper/managedcertificate"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
@@ -67,7 +70,8 @@ func (f *fakeSync) ManagedCertificate(ctx context.Context, id types.Id) error {
 func TestController(t *testing.T) {
 	t.Parallel()
 
-	testCases := map[string]struct {
+	testCases := []struct {
+		description                  string
 		ingresses                    []types.Id
 		managedCertificatesInCluster []types.Id
 		managedCertificatesInState   []types.Id
@@ -76,8 +80,11 @@ func TestController(t *testing.T) {
 		wantManagedCertificates map[types.Id]bool
 		wantMetrics             map[string]int
 	}{
-		"No items": {},
-		"Items": {
+		{
+			description: "No items",
+		},
+		{
+			description: "Items",
 			ingresses: []types.Id{
 				types.NewId("default", "a1"),
 				types.NewId("default", "a2"),
@@ -103,9 +110,10 @@ func TestController(t *testing.T) {
 		},
 	}
 
-	for description, testCase := range testCases {
-		testCase := testCase
-		t.Run(description, func(t *testing.T) {
+	flags.Register()
+	for i, testCase := range testCases {
+		i, testCase := i, testCase
+		t.Run(testCase.description, func(t *testing.T) {
 			t.Parallel()
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -128,6 +136,8 @@ func TestController(t *testing.T) {
 				stateEntries[id] = state.Entry{}
 			}
 
+			healthCheck := liveness.NewHealthCheck(time.Minute, time.Minute)
+			healthCheckAddress := fmt.Sprintf(":%d", 8910+i)
 			metrics := metrics.NewFake()
 			sync := &fakeSync{
 				ingresses:           make(map[types.Id]bool),
@@ -139,13 +149,14 @@ func TestController(t *testing.T) {
 					ManagedCertificate: clientsmcrt.NewFake(mcrts),
 				},
 				metrics:      metrics,
+				healthCheck:  healthCheck,
 				resyncPeriod: time.Minute,
 				state:        state.NewFakeWithEntries(stateEntries),
 				sync:         sync,
 			})
 
 			// Trigger resources queuing.
-			go ctrl.Run(ctx)
+			go ctrl.Run(ctx, healthCheckAddress)
 
 			// Loop until all expected resources are processed.
 			go func() {
