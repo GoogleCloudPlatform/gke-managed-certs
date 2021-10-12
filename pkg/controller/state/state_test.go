@@ -185,7 +185,7 @@ func TestState(t *testing.T) {
 			}
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSoftDeleted(ctx, missingId); !utilserrors.IsNotFound(err) {
+			if err := state.SetSoftDeleted(ctx, missingId, true); !utilserrors.IsNotFound(err) {
 				t.Fatalf("SetSoftDeleted(%s): %v, want %v",
 					missingId.String(), err, utilserrors.NotFound)
 			}
@@ -230,8 +230,28 @@ func TestState(t *testing.T) {
 			changeCount++
 			testCase.configmap.check(changeCount)
 
-			if err := state.SetSoftDeleted(ctx, id); err != nil {
+			if err := state.SetSoftDeleted(ctx, id, true); err != nil {
 				t.Fatalf("SetSoftDeleted(%s): %v, want nil", id.String(), err)
+			}
+			entry, err = state.Get(id)
+			if err != nil {
+				t.Fatalf("state.Get(%s): %v, want nil", id.String(), err)
+			}
+			if !entry.SoftDeleted {
+				t.Fatalf("entry.SoftDeleted(%s): %t, want true", id.String(), entry.SoftDeleted)
+			}
+			changeCount++
+			testCase.configmap.check(changeCount)
+
+			if err := state.SetSoftDeleted(ctx, id, false); err != nil {
+				t.Fatalf("SetSoftDeleted(%s): %v, want nil", id.String(), err)
+			}
+			entry, err = state.Get(id)
+			if err != nil {
+				t.Fatalf("state.Get(%s): %v, want nil", id.String(), err)
+			}
+			if entry.SoftDeleted {
+				t.Fatalf("entry.SoftDeleted(%s): %t, want false", id.String(), entry.SoftDeleted)
 			}
 			changeCount++
 			testCase.configmap.check(changeCount)

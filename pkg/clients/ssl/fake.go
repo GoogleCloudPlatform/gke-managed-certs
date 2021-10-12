@@ -72,7 +72,7 @@ func (f *Fake) Create(ctx context.Context, name string, domains []string) error 
 }
 
 func (f *Fake) Delete(ctx context.Context, name string) error {
-	if e, _ := f.Exists(name); !e {
+	if _, e := f.mapping[name]; !e {
 		return errors.NotFound
 	}
 
@@ -80,13 +80,8 @@ func (f *Fake) Delete(ctx context.Context, name string) error {
 	return nil
 }
 
-func (f *Fake) Exists(name string) (bool, error) {
-	_, exists := f.mapping[name]
-	return exists, nil
-}
-
 func (f *Fake) Get(name string) (*computev1.SslCertificate, error) {
-	if e, _ := f.Exists(name); !e {
+	if _, e := f.mapping[name]; !e {
 		return nil, errors.NotFound
 	}
 

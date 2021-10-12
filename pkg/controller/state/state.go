@@ -52,7 +52,7 @@ type Interface interface {
 	Insert(ctx context.Context, id types.Id, sslCertificateName string)
 	List() map[types.Id]Entry
 	SetExcludedFromSLO(ctx context.Context, id types.Id) error
-	SetSoftDeleted(ctx context.Context, id types.Id) error
+	SetSoftDeleted(ctx context.Context, id types.Id, value bool) error
 	SetSslCertificateBindingReported(ctx context.Context, id types.Id) error
 	SetSslCertificateCreationReported(ctx context.Context, id types.Id) error
 }
@@ -154,9 +154,9 @@ func (state *impl) SetExcludedFromSLO(ctx context.Context, id types.Id) error {
 	return nil
 }
 
-// SetSoftDeleted sets to true a flag indicating that entry associated
+// SetSoftDeleted sets `value` to a flag indicating that entry associated
 // with given ManagedCertificate id has been deleted.
-func (state *impl) SetSoftDeleted(ctx context.Context, id types.Id) error {
+func (state *impl) SetSoftDeleted(ctx context.Context, id types.Id, value bool) error {
 	state.Lock()
 	defer state.Unlock()
 
@@ -165,7 +165,7 @@ func (state *impl) SetSoftDeleted(ctx context.Context, id types.Id) error {
 		return errors.NotFound
 	}
 
-	v.SoftDeleted = true
+	v.SoftDeleted = value
 
 	state.mapping[id] = v
 	state.persist(ctx)

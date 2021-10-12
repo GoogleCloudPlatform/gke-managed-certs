@@ -45,10 +45,6 @@ type Interface interface {
 	// it generates a BackendError event. If the SslCertificate object exists
 	// and is successfully deleted, a Delete event is generated.
 	Delete(ctx context.Context, sslCertificateName string, managedCertificate *v1.ManagedCertificate) error
-	// Exists returns true if an SslCertificate exists, false if it is deleted.
-	// Error is not nil if an error has occurred and in such case
-	// a BackendError event is generated.
-	Exists(sslCertificateName string, managedCertificate *v1.ManagedCertificate) (bool, error)
 	// Get fetches an SslCertificate object. On error a BackendError event is generated.
 	Get(sslCertificateName string, managedCertificate *v1.ManagedCertificate) (*computev1.SslCertificate, error)
 }
@@ -133,31 +129,15 @@ func (s impl) Delete(ctx context.Context, sslCertificateName string,
 	return nil
 }
 
-// Exists returns true if an SslCertificate exists, false if it is deleted.
-// Error is not nil if an error has occurred and in such case
+// Get fetches an SslCertificate object. On errors other than the not found error
 // a BackendError event is generated.
-func (s impl) Exists(sslCertificateName string,
-	managedCertificate *v1.ManagedCertificate) (bool, error) {
-
-	exists, err := s.ssl.Exists(sslCertificateName)
-	if err != nil {
-		s.metrics.ObserveSslCertificateBackendError()
-
-		if managedCertificate != nil {
-			s.event.BackendError(*managedCertificate, err)
-		}
-
-		return false, err
-	}
-
-	return exists, nil
-}
-
-// Get fetches an SslCertificate object. On error a BackendError event is generated.
 func (s impl) Get(sslCertificateName string,
 	managedCertificate *v1.ManagedCertificate) (*computev1.SslCertificate, error) {
 
 	sslCert, err := s.ssl.Get(sslCertificateName)
+	if utilserrors.IsNotFound(err) {
+		return nil, err
+	}
 	if err != nil {
 		s.metrics.ObserveSslCertificateBackendError()
 

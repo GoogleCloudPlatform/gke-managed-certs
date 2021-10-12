@@ -241,7 +241,7 @@ func TestManagedCertificate(t *testing.T) {
 			wantSsl:     ssl.NewFake().Build(),
 			wantMetrics: metrics.NewFake(),
 		},
-		"API server: not found, state: found soft deleted, GCP: found": {
+		"API server: not found, state: found soft-deleted, GCP: found": {
 			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
 				types.NewId("default", "foo"): state.Entry{
 					SslCertificateName: "foo",
@@ -254,6 +254,34 @@ func TestManagedCertificate(t *testing.T) {
 
 			wantState:   state.NewFake(),
 			wantSsl:     ssl.NewFake().Build(),
+			wantMetrics: metrics.NewFake(),
+		},
+		"API server: found, state: found soft-deleted, GCP: found": {
+			managedCertificate: managedcertificate.
+				New(types.NewId("default", "foo"), "example.com").Build(),
+			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+					SoftDeleted:        true,
+				},
+			}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
+			random: random.New(""),
+
+			wantManagedCertificate: managedcertificate.
+				New(types.NewId("default", "foo"), "example.com").
+				WithStatus("Active", "Active").
+				WithCertificateName("foo").
+				Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+					SoftDeleted:        false,
+				},
+			}),
+			wantSsl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			wantMetrics: metrics.NewFake(),
 		},
 		"API server: found, state: not found, GCP: not found": {
@@ -283,19 +311,21 @@ func TestManagedCertificate(t *testing.T) {
 			state: state.NewFake(),
 			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
 				map[string]string{"example.com": "ACTIVE"}).Build(),
-			random: random.NewFake("foo"),
+			random: random.NewFake("bar"),
 
 			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
-				types.NewId("default", "foo"): state.Entry{SslCertificateName: "foo"},
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName:             "bar",
+					SslCertificateCreationReported: true,
+				},
 			}),
-			wantSsl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
-				map[string]string{"example.com": "ACTIVE"}).Build(),
+			wantSsl: ssl.NewFake().AddEntry("bar", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
-				WithStatus("Active", "Active").
-				WithCertificateName("foo").
+				WithStatus("", "").
+				WithCertificateName("bar").
 				Build(),
-			wantMetrics: metrics.NewFake(),
+			wantMetrics: &metrics.Fake{CreationCnt: 1},
 		},
 		"API server: found, state: found soft deleted, GCP: found": {
 			managedCertificate: managedcertificate.
@@ -310,10 +340,19 @@ func TestManagedCertificate(t *testing.T) {
 				map[string]string{"example.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
-			wantState: state.NewFake(),
-			wantSsl:   ssl.NewFake().Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName: "foo",
+					SoftDeleted:        false,
+				},
+			}),
+			wantSsl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"example.com": "ACTIVE"}).Build(),
 			wantManagedCertificate: managedcertificate.
-				New(types.NewId("default", "foo"), "example.com").Build(),
+				New(types.NewId("default", "foo"), "example.com").
+				WithStatus("Active", "Active").
+				WithCertificateName("foo").
+				Build(),
 			wantMetrics: metrics.NewFake(),
 		},
 		"API server: found, state: found, GCP: found": {
@@ -356,11 +395,20 @@ func TestManagedCertificate(t *testing.T) {
 			ssl:    ssl.NewFake().Build(),
 			random: random.NewFake("foo"),
 
-			wantState: state.NewFake(),
-			wantSsl:   ssl.NewFake().Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName:             "foo",
+					SoftDeleted:                    false,
+					SslCertificateCreationReported: true,
+				},
+			}),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
-				New(types.NewId("default", "foo"), "example.com").Build(),
-			wantMetrics: metrics.NewFake(),
+				New(types.NewId("default", "foo"), "example.com").
+				WithStatus("", "").
+				WithCertificateName("foo").
+				Build(),
+			wantMetrics: &metrics.Fake{CreationCnt: 1},
 		},
 		"API server: found, state: found reported, GCP: not found": {
 			managedCertificate: managedcertificate.
@@ -450,13 +498,48 @@ func TestManagedCertificate(t *testing.T) {
 				map[string]string{"different-domain.com": "ACTIVE"}).Build(),
 			random: random.NewFake("foo"),
 
-			wantState: state.NewFake(),
-			wantSsl:   ssl.NewFake().Build(),
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName:             "foo",
+					SslCertificateCreationReported: true,
+				},
+			}),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
 			wantManagedCertificate: managedcertificate.
 				New(types.NewId("default", "foo"), "example.com").
+				WithCertificateName("foo").
+				WithStatus("", "").
 				Build(),
 			wantMetrics: metrics.NewFake(),
-			wantError:   utilserrors.OutOfSync,
+		},
+		"API server: found, state: found soft-deleted, GCP: found; certificates different": {
+			managedCertificate: managedcertificate.
+				New(types.NewId("default", "foo"), "example.com").Build(),
+			state: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName:             "foo",
+					SslCertificateCreationReported: true,
+					SoftDeleted:                    true,
+				},
+			}),
+			ssl: ssl.NewFake().AddEntryWithStatus("foo", "ACTIVE",
+				map[string]string{"different-domain.com": "ACTIVE"}).Build(),
+			random: random.NewFake("bar"),
+
+			wantState: state.NewFakeWithEntries(map[types.Id]state.Entry{
+				types.NewId("default", "foo"): state.Entry{
+					SslCertificateName:             "foo",
+					SslCertificateCreationReported: true,
+					SoftDeleted:                    false,
+				},
+			}),
+			wantSsl: ssl.NewFake().AddEntry("foo", []string{"example.com"}).Build(),
+			wantManagedCertificate: managedcertificate.
+				New(types.NewId("default", "foo"), "example.com").
+				WithCertificateName("foo").
+				WithStatus("", "").
+				Build(),
+			wantMetrics: metrics.NewFake(),
 		},
 	} {
 		testCase := testCase
