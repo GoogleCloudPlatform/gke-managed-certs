@@ -29,6 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/liveness"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/metrics"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
@@ -44,6 +45,7 @@ type params struct {
 	clients      *clients.Clients
 	config       *config.Config
 	metrics      metrics.Interface
+	healthCheck  *liveness.HealthCheck
 	resyncPeriod time.Duration
 	state        state.Interface
 	sync         sync.Interface
@@ -56,12 +58,15 @@ type controller struct {
 	managedCertificateQueue       workqueue.RateLimitingInterface
 	managedCertificateResyncQueue workqueue.RateLimitingInterface
 	metrics                       metrics.Interface
+	healthCheck                   *liveness.HealthCheck
 	resyncPeriod                  time.Duration
 	state                         state.Interface
 	sync                          sync.Interface
 }
 
 func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config) *params {
+	resyncPeriod := 10 * time.Minute
+	healthCheck := liveness.NewHealthCheck(2*resyncPeriod, 2*resyncPeriod)
 	metrics := metrics.New(config)
 	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
@@ -71,7 +76,8 @@ func NewParams(ctx context.Context, clients *clients.Clients, config *config.Con
 		clients:      clients,
 		config:       config,
 		metrics:      metrics,
-		resyncPeriod: 10 * time.Minute,
+		healthCheck:  healthCheck,
+		resyncPeriod: resyncPeriod,
 		state:        state,
 		sync: sync.New(config, clients.Event, clients.Ingress,
 			clients.ManagedCertificate, metrics, random, ssl, state),
@@ -80,8 +86,9 @@ func NewParams(ctx context.Context, clients *clients.Clients, config *config.Con
 
 func New(ctx context.Context, p *params) *controller {
 	return &controller{
-		clients: p.clients,
-		metrics: p.metrics,
+		clients:     p.clients,
+		metrics:     p.metrics,
+		healthCheck: p.healthCheck,
 		ingressQueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(), "ingressQueue"),
 		ingressResyncQueue: workqueue.NewNamedRateLimitingQueue(
@@ -96,17 +103,21 @@ func New(ctx context.Context, p *params) *controller {
 	}
 }
 
-func (c *controller) Run(ctx context.Context) error {
+func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 	defer runtime.HandleCrash()
 	defer c.ingressQueue.ShutDown()
 	defer c.ingressResyncQueue.ShutDown()
 	defer c.managedCertificateQueue.ShutDown()
 	defer c.managedCertificateResyncQueue.ShutDown()
+	defer c.healthCheck.StopServer()
 
 	klog.Info("Controller.Run()")
 
 	klog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
+
+	klog.Info("Start liveness probe")
+	go c.healthCheck.StartServer(healthCheckAddress)
 
 	c.clients.Run(ctx, c.ingressQueue, c.managedCertificateQueue)
 
@@ -141,6 +152,11 @@ func (c *controller) Run(ctx context.Context) error {
 }
 
 func (c *controller) synchronizeAll(ctx context.Context) {
+	// TODO(khamed): Add a metric to measure how long syncAll takes.
+	// loopStart := time.Now()
+	// metrics.UpdateLastTime(metrics.Main, loopStart)
+	c.healthCheck.UpdateLastSync(time.Now())
+
 	if ingresses, err := c.clients.Ingress.List(); err != nil {
 		runtime.HandleError(err)
 	} else {
@@ -165,6 +181,10 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 	for id := range c.state.List() {
 		queue.AddId(c.managedCertificateResyncQueue, id)
 	}
+
+	c.healthCheck.UpdateLastSuccessfulSync(time.Now())
+	// TODO(khamed): Add a metric to measure how long syncAll takes.
+	// metrics.UpdateDurationFromStart(metrics.Main, loopStart)
 }
 
 func (c *controller) reportMetrics() {

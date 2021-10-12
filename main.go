@@ -117,7 +117,7 @@ func main() {
 					cancel()
 				}()
 
-				if err = controller.Run(ctx); err != nil {
+				if err = controller.Run(ctx, flags.F.HealthCheckAddress); err != nil {
 					klog.Fatalf("Error running controller: %s", err)
 				}
 			},

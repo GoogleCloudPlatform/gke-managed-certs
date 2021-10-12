@@ -27,6 +27,8 @@ var (
 		GCEConfigFilePath  string
 		KubeConfigFilePath string
 		PrometheusAddress  string
+		HealthCheckAddress string
+		HealthCheckPath    string
 	}{}
 )
 
@@ -43,6 +45,10 @@ discovery is attempted.`)
 		"Path to kubeconfig file with authorization and master location information.")
 	flag.StringVar(&F.PrometheusAddress, "prometheus-address", ":8910",
 		"The address to expose Prometheus metrics")
+	flag.StringVar(&F.HealthCheckAddress, "health-check-address", ":8089",
+		"The address to expose health check endpoint.")
+	flag.StringVar(&F.HealthCheckPath, "health-check-path", "/health-check",
+		"The path to expose health check endpoint.")
 
 	flag.Parse()
 }
