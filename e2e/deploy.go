@@ -47,6 +47,8 @@ func deployCRD(ctx context.Context) error {
 	var maxDomains1 int64 = 1
 	var maxDomains100 int64 = 100
 	var maxDomainLength int64 = 63
+	deprecationWarningV1beta1 := "networking.gke.io/v1beta1 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate"
+	deprecationWarningV1beta2 := "networking.gke.io/v1beta2 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate"
 	crd := apiextv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -59,9 +61,11 @@ func deployCRD(ctx context.Context) error {
 			Group: "networking.gke.io",
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
-					Served:  true,
-					Storage: false,
+					Name:               "v1beta1",
+					Deprecated:         true,
+					DeprecationWarning: &deprecationWarningV1beta1,
+					Served:             true,
+					Storage:            false,
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 							Type: "object",
@@ -108,9 +112,11 @@ func deployCRD(ctx context.Context) error {
 					},
 				},
 				{
-					Name:    "v1beta2",
-					Served:  true,
-					Storage: false,
+					Name:               "v1beta2",
+					Deprecated:         true,
+					DeprecationWarning: &deprecationWarningV1beta2,
+					Served:             true,
+					Storage:            false,
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 							Type: "object",
