@@ -19,16 +19,18 @@ package flags
 
 import (
 	"flag"
+	"time"
 )
 
 var (
 	F = struct {
-		APIServerHost      string
-		GCEConfigFilePath  string
-		KubeConfigFilePath string
-		PrometheusAddress  string
-		HealthCheckAddress string
-		HealthCheckPath    string
+		APIServerHost       string
+		GCEConfigFilePath   string
+		KubeConfigFilePath  string
+		PrometheusAddress   string
+		HealthCheckAddress  string
+		HealthCheckPath     string
+		HealthCheckInterval time.Duration
 	}{}
 )
 
@@ -49,6 +51,8 @@ discovery is attempted.`)
 		"The address to expose health check endpoint.")
 	flag.StringVar(&F.HealthCheckPath, "health-check-path", "/health-check",
 		"The path to expose health check endpoint.")
+	flag.DurationVar(&F.HealthCheckInterval, "health-check-interval", 5*time.Second,
+		"How often to run the health checks.")
 
 	flag.Parse()
 }

@@ -136,7 +136,8 @@ func TestController(t *testing.T) {
 				stateEntries[id] = state.Entry{}
 			}
 
-			healthCheck := liveness.NewHealthCheck(time.Minute, time.Minute)
+			healthCheck := liveness.NewHealthCheck(time.Second,
+				5*time.Second, 5*time.Second)
 			healthCheckAddress := fmt.Sprintf(":%d", 8910+i)
 			metrics := metrics.NewFake()
 			sync := &fakeSync{

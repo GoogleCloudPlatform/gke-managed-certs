@@ -66,7 +66,8 @@ type controller struct {
 
 func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config) *params {
 	resyncPeriod := 10 * time.Minute
-	healthCheck := liveness.NewHealthCheck(2*resyncPeriod, 2*resyncPeriod)
+	healthCheck := liveness.NewHealthCheck(flags.F.HealthCheckInterval,
+		2*resyncPeriod, 2*resyncPeriod)
 	metrics := metrics.New(config)
 	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
@@ -109,15 +110,15 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 	defer c.ingressResyncQueue.ShutDown()
 	defer c.managedCertificateQueue.ShutDown()
 	defer c.managedCertificateResyncQueue.ShutDown()
-	defer c.healthCheck.StopServer()
+	defer c.healthCheck.Stop()
 
 	klog.Info("Controller.Run()")
 
 	klog.Info("Start reporting metrics")
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
-	klog.Info("Start liveness probe")
-	go c.healthCheck.StartServer(healthCheckAddress)
+	klog.Info("Start liveness probe health checks")
+	c.healthCheck.Start(healthCheckAddress, flags.F.HealthCheckPath)
 
 	c.clients.Run(ctx, c.ingressQueue, c.managedCertificateQueue)
 
@@ -130,16 +131,18 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 	klog.Info("Cache synced")
 
 	go wait.Until(
-		func() { processNext(ctx, c.ingressQueue, c.sync.Ingress) },
+		func() { c.processNext(ctx, c.ingressQueue, liveness.Undefined, c.sync.Ingress) },
 		time.Second, ctx.Done())
 	go wait.Until(
-		func() { processNext(ctx, c.ingressResyncQueue, c.sync.Ingress) },
+		func() { c.processNext(ctx, c.ingressResyncQueue, liveness.IngressResyncProcess, c.sync.Ingress) },
 		time.Second, ctx.Done())
 	go wait.Until(
-		func() { processNext(ctx, c.managedCertificateQueue, c.sync.ManagedCertificate) },
+		func() { c.processNext(ctx, c.managedCertificateQueue, liveness.Undefined, c.sync.ManagedCertificate) },
 		time.Second, ctx.Done())
 	go wait.Until(
-		func() { processNext(ctx, c.managedCertificateResyncQueue, c.sync.ManagedCertificate) },
+		func() {
+			c.processNext(ctx, c.managedCertificateResyncQueue, liveness.McrtResyncProcess, c.sync.ManagedCertificate)
+		},
 		time.Second, ctx.Done())
 	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncPeriod, ctx.Done())
 	go wait.Until(func() { c.reportMetrics() }, time.Minute, ctx.Done())
@@ -152,10 +155,12 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 }
 
 func (c *controller) synchronizeAll(ctx context.Context) {
-	// TODO(khamed): Add a metric to measure how long syncAll takes.
+	// TODO(b/204546048): Add a metric to measure how long syncAll takes.
 	// loopStart := time.Now()
 	// metrics.UpdateLastTime(metrics.Main, loopStart)
-	c.healthCheck.UpdateLastSync(time.Now())
+	c.healthCheck.UpdateLastActivity(liveness.SynchronizeAll, time.Now())
+	ingressScheduled := false
+	mcrtScheduled := false
 
 	if ingresses, err := c.clients.Ingress.List(); err != nil {
 		runtime.HandleError(err)
@@ -166,6 +171,7 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 					ingress.Namespace, ingress.Name, *ingress)
 			} else {
 				queue.Add(c.ingressResyncQueue, ingress)
+				ingressScheduled = true
 			}
 		}
 	}
@@ -175,15 +181,17 @@ func (c *controller) synchronizeAll(ctx context.Context) {
 	} else {
 		for _, managedCertificate := range managedCertificates {
 			queue.Add(c.managedCertificateResyncQueue, managedCertificate)
+			mcrtScheduled = true
 		}
 	}
 
 	for id := range c.state.List() {
 		queue.AddId(c.managedCertificateResyncQueue, id)
+		mcrtScheduled = true
 	}
 
-	c.healthCheck.UpdateLastSuccessfulSync(time.Now())
-	// TODO(khamed): Add a metric to measure how long syncAll takes.
+	c.healthCheck.UpdateLastSuccessSync(time.Now(), ingressScheduled, mcrtScheduled)
+	// TODO(b/204546048): Add a metric to measure how long syncAll takes.
 	// metrics.UpdateDurationFromStart(metrics.Main, loopStart)
 }
 
@@ -207,8 +215,8 @@ func (c *controller) reportMetrics() {
 	c.metrics.ObserveManagedCertificateLowPriorityQueueLength(c.managedCertificateResyncQueue.Len())
 }
 
-func processNext(ctx context.Context, queue workqueue.RateLimitingInterface,
-	handle func(ctx context.Context, id types.Id) error) {
+func (c *controller) processNext(ctx context.Context, queue workqueue.RateLimitingInterface,
+	activityName liveness.ActivityName, handle func(ctx context.Context, id types.Id) error) {
 
 	obj, shutdown := queue.Get()
 
@@ -237,6 +245,9 @@ func processNext(ctx context.Context, queue workqueue.RateLimitingInterface,
 
 		err = handle(ctx, types.NewId(namespace, name))
 		if err == nil {
+			if activityName != liveness.Undefined {
+				c.healthCheck.UpdateLastActivity(activityName, time.Now())
+			}
 			queue.Forget(obj)
 			return
 		}
