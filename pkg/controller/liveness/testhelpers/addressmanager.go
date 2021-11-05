@@ -31,9 +31,9 @@ type AddressManager struct {
 }
 
 // NewAddressManager creates and returns an AddressManager with the
-// starting port number 8910
+// starting port number 27100
 func NewAddressManager() AddressManager {
-	return AddressManager{port: 8910}
+	return AddressManager{port: 27100}
 }
 
 // getNextAddress creates an http server address in the form ":[healthCheckServerPort]"

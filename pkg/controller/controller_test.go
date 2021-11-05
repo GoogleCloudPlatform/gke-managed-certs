@@ -138,7 +138,7 @@ func TestController(t *testing.T) {
 
 			healthCheck := liveness.NewHealthCheck(time.Second,
 				5*time.Second, 5*time.Second)
-			healthCheckAddress := fmt.Sprintf(":%d", 8910+i)
+			healthCheckAddress := fmt.Sprintf(":%d", 27500+i)
 			metrics := metrics.NewFake()
 			sync := &fakeSync{
 				ingresses:           make(map[types.Id]bool),
