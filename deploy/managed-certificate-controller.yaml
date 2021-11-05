@@ -74,6 +74,14 @@ spec:
         - name: usrsharecacerts
           mountPath: "/usr/share/ca-certificates"
           readOnly: true
+        args:
+        - --health-check-address=:8089
+        livenessProbe:
+          httpGet:
+            path: /health-check
+            port: 8089
+          initialDelaySecond: 600
+          periodSeconds: 60
       volumes:
       - name: ssl-certs
         hostPath:

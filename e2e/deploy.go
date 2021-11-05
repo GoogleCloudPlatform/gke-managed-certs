@@ -26,9 +26,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
@@ -343,6 +345,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	saKeyVolume := "sa-key-volume"
 	saKeyVolumePath := "/etc/gcp"
 
+	healthCheckPort := 8089
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
 		Spec: appsv1.DeploymentSpec{
@@ -383,12 +386,23 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 								"--logtostderr=false",
 								"--alsologtostderr",
 								fmt.Sprintf("--log_file=%s", logFileVolumePath),
+								fmt.Sprintf("--health-check-address=:%d", healthCheckPort),
 							},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
 									Value: fmt.Sprintf("%s/%s", saKeyVolumePath, secretKey),
 								},
+							},
+							LivenessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: flags.F.HealthCheckPath,
+										Port: intstr.FromInt(healthCheckPort),
+									},
+								},
+								InitialDelaySeconds: 30,
+								PeriodSeconds:       15,
 							},
 						},
 					},
