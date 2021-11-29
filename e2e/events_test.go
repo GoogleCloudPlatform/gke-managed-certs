@@ -28,14 +28,13 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
-// This test creates more certificates than the quota allows and checks if there is at least one with
-// an event communicating the Created event, and at least one with an event communicating TooManyCertificates.
-// Normally every certificate should either receive Created or TooManyCertificates, however rarely BackendError
-// can be reported as well, and events are reported on a best-effort basis, so the test does not require
-// every event to be present.
+// This test creates more certificates than the quota allows and checks
+// if there is at least one with an event communicating the Created event,
+// and at least one with an event communicating TooManyCertificates. Normally
+// every certificate should either receive Created or TooManyCertificates,
+// however rarely BackendError can be reported as well, and events are reported
+// on a best-effort basis, so the test does not require every event to be present.
 func TestEvents_ManagedCertificate(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	numCerts := 400 // Should be bigger than allowed quota.
 

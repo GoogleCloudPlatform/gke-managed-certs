@@ -111,8 +111,6 @@ func TestHTTPServer(t *testing.T) {
 func TestCheckSyncAllTimeOut(t *testing.T) {
 	t.Parallel()
 
-	healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
-
 	testCases := []struct {
 		description          string
 		lastSyncDelta        time.Duration
@@ -162,6 +160,7 @@ func TestCheckSyncAllTimeOut(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
+			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			now := time.Now()
 			lastSync := now.Add(tc.lastSyncDelta)
 			lastSuccessSync := now.Add(tc.lastSuccessSyncDelta)
@@ -180,8 +179,6 @@ func TestCheckSyncAllTimeOut(t *testing.T) {
 
 func TestCheckIngressQueueHealth(t *testing.T) {
 	t.Parallel()
-
-	healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 
 	testCases := []struct {
 		description             string
@@ -262,6 +259,7 @@ func TestCheckIngressQueueHealth(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
+			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			now := time.Now()
 			healthCheck.prevSuccessSync.ingressScheduled = tc.prevIngressScheduled
 			healthCheck.prevSuccessSync.runTime = now.Add(tc.prevSuccessSyncDelta)
@@ -280,8 +278,6 @@ func TestCheckIngressQueueHealth(t *testing.T) {
 
 func TestCheckMcrtQueueHealth(t *testing.T) {
 	t.Parallel()
-
-	healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 
 	testCases := []struct {
 		description          string
@@ -362,6 +358,7 @@ func TestCheckMcrtQueueHealth(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
+			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			now := time.Now()
 			healthCheck.prevSuccessSync.mcrtScheduled = tc.prevMcrtScheduled
 			healthCheck.prevSuccessSync.runTime = now.Add(tc.prevSuccessSyncDelta)
@@ -380,8 +377,6 @@ func TestCheckMcrtQueueHealth(t *testing.T) {
 
 func TestUpdateLastActivity(t *testing.T) {
 	t.Parallel()
-
-	healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 
 	testCases := []struct {
 		description           string
@@ -408,6 +403,7 @@ func TestUpdateLastActivity(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
+			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			now := time.Now()
 			activityName := IngressResyncProcess // The other activities should behave in the same way
 			healthCheck.lastActivity[activityName] = now.Add(tc.lastActivityDelta)
@@ -426,7 +422,6 @@ func TestUpdateLastActivity(t *testing.T) {
 func TestUpdateLastSuccessSync(t *testing.T) {
 	t.Parallel()
 
-	healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 	now := time.Now()
 
 	testCases := []struct {
@@ -501,6 +496,7 @@ func TestUpdateLastSuccessSync(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
+			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			healthCheck.prevSuccessSync = tc.prevSuccessSync
 			healthCheck.lastSuccessSync = tc.lastSuccessSync
 			healthCheck.lastActivity[SynchronizeAll] = tc.lastSync
