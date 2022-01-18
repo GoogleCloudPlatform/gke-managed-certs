@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	utilserrors "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
@@ -345,7 +344,9 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	saKeyVolume := "sa-key-volume"
 	saKeyVolumePath := "/etc/gcp"
 
+	healthCheckPath := "/health-check"
 	healthCheckPort := 8089
+
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
 		Spec: appsv1.DeploymentSpec{
@@ -387,6 +388,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 								"--alsologtostderr",
 								fmt.Sprintf("--log_file=%s", logFileVolumePath),
 								fmt.Sprintf("--health-check-address=:%d", healthCheckPort),
+								fmt.Sprintf("--health-check-path=%s", healthCheckPath),
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -397,7 +399,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
 									HTTPGet: &corev1.HTTPGetAction{
-										Path: flags.F.HealthCheckPath,
+										Path: healthCheckPath,
 										Port: intstr.FromInt(healthCheckPort),
 									},
 								},
