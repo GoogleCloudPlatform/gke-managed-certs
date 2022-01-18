@@ -48,8 +48,12 @@ func deployCRD(ctx context.Context) error {
 	var maxDomains1 int64 = 1
 	var maxDomains100 int64 = 100
 	var maxDomainLength int64 = 63
-	deprecationWarningV1beta1 := "networking.gke.io/v1beta1 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate"
-	deprecationWarningV1beta2 := "networking.gke.io/v1beta2 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate"
+	deprecationWarningV1beta1 := "networking.gke.io/v1beta1 ManagedCertificate is " +
+		"deprecated; please migrate to networking.gke.io/v1 " +
+		"ManagedCertificate"
+	deprecationWarningV1beta2 := "networking.gke.io/v1beta2 ManagedCertificate is " +
+		"deprecated; please migrate to networking.gke.io/v1 " +
+		"ManagedCertificate"
 	crd := apiextv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -316,14 +320,18 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 
 	clusterRoleBinding := rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
-		Subjects:   []rbacv1.Subject{{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"}},
+		Subjects: []rbacv1.Subject{
+			{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"},
+		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     clusterRoleName,
 		},
 	}
-	if _, err := clients.ClusterRoleBinding.Create(ctx, &clusterRoleBinding, metav1.CreateOptions{}); err != nil {
+	if _, err := clients.ClusterRoleBinding.Create(ctx, &clusterRoleBinding,
+		metav1.CreateOptions{}); err != nil {
+
 		return err
 	}
 	klog.Infof("Created cluster role binding %s", clusterRoleBindingName)
@@ -454,7 +462,9 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 			},
 		},
 	}
-	if _, err := clients.Deployment.Create(ctx, &deployment, metav1.CreateOptions{}); err != nil {
+	if _, err := clients.Deployment.Create(ctx, &deployment,
+		metav1.CreateOptions{}); err != nil {
+
 		return err
 	}
 	klog.Infof("Created deployment %s", deploymentName)

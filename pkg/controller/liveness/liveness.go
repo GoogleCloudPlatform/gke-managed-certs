@@ -30,18 +30,22 @@ import (
 	"k8s.io/klog"
 )
 
-// ActivityName represents the actions of the controller which are monitored by the health checks.
+// ActivityName represents the actions of the controller which are monitored
+// by the health checks.
 type ActivityName int
 
 const (
-	Undefined      ActivityName = iota // indicates a default action
-	SynchronizeAll                     // indicates a Controller.SynchronizeAll() call
+	// Undefined indicates a default action.
+	Undefined ActivityName = iota
 
-	// McrtResyncProcess indicates a ManagedCertificate object is being processed by
-	// the lower priority queue in the controller.
+	// SynchronizeAll indicates a Controller.SynchronizeAll() call.
+	SynchronizeAll
+
+	// McrtResyncProcess indicates a ManagedCertificate object is
+	// processed by the lower priority queue in the controller.
 	McrtResyncProcess
 
-	// IngressResyncProcess indicates an Ingress object is being processed by
+	// IngressResyncProcess indicates an Ingress object is processed by
 	// the lower priority queue in the controller.
 	IngressResyncProcess
 )
@@ -66,37 +70,52 @@ const (
 type HealthCheck struct {
 	mutex sync.RWMutex
 
-	lastSuccessSync syncDetails // details of the latest Controller.synchronizeAll successful run
-	prevSuccessSync syncDetails // details of the second latest Controller.synchronizeAll successful run
+	// lastSuccessSync contains details of the latest Controller.synchronizeAll
+	// successful run.
+	lastSuccessSync syncDetails
+	// prevSuccessSync contains details of the second latest Controller.synchronizeAll
+	// successful run.
+	prevSuccessSync syncDetails
 
 	// lastActivity contains the last time each activity ran.
-	//
 	// Activities are accessed through the ActivityName enum.
 	lastActivity map[ActivityName]time.Time
 
-	syncActivityTimeout time.Duration // max time allowed after last activity to consider the controller alive
-	syncSuccessTimeout  time.Duration // max time allowed after last successful activity to consider the controller alive
+	// syncActivityTimeout is the max time allowed after last activity
+	// to consider the controller alive.
+	syncActivityTimeout time.Duration
+	// syncSuccessTimeout is the max time allowed after last successful
+	// activity to consider the controller alive.
+	syncSuccessTimeout time.Duration
 
-	syncMonitoringEnabled bool          // whether to do synchronizeAll health checks or not
-	healthCheckInterval   time.Duration // how often will the health-checks run
-	alive                 bool          // whether the latest health-check found any errors or not, true if no errors
-	syncAllErr            error
-	ingressQueueErr       error
-	mcrtQueueErr          error
+	// syncMonitoringEnabled is true if synchronizeAll health checks are enabled.
+	syncMonitoringEnabled bool
+	// healthCheckInterval configures how often the health-checks run.
+	healthCheckInterval time.Duration
+	// alive is true if the latest health-check found no errors, false otherwise.
+	alive           bool
+	syncAllErr      error
+	ingressQueueErr error
+	mcrtQueueErr    error
 
-	isRunning  bool
-	httpServer http.Server // the endpoint handling liveness probe calls
+	isRunning bool
+	// httpServer handles HTTP liveness probe calls.
+	httpServer http.Server
 }
 
 // syncDetails contains details about a single Conroller.SynchronizeAll() call.
 type syncDetails struct {
-	runTime          time.Time
-	ingressScheduled bool // whether or not it scheduled an Ingress object to be processed
-	mcrtScheduled    bool // whether or not it scheduled a ManagedCertificate object to be processed
+	runTime time.Time
+	// whether or not it scheduled an Ingress object to be processed
+	ingressScheduled bool
+	// whether or not it scheduled a ManagedCertificate object to be processed
+	mcrtScheduled bool
 }
 
 // NewHealthCheck builds new HealthCheck object with given timeout.
-func NewHealthCheck(healthCheckInterval, activityTimeout, successTimeout time.Duration) *HealthCheck {
+func NewHealthCheck(healthCheckInterval, activityTimeout,
+	successTimeout time.Duration) *HealthCheck {
+
 	return &HealthCheck{
 		lastActivity:          make(map[ActivityName]time.Time),
 		syncActivityTimeout:   activityTimeout,
@@ -217,8 +236,8 @@ func (hc *HealthCheck) checkSyncAllTimeOut() error {
 	} else if successTimedOut {
 		timeoutDelta := now.Sub(hc.lastSuccessSync.runTime) - hc.syncSuccessTimeout
 		return fmt.Errorf(
-			`last synchronizeAll success activity %s ago, which exceeds
-			the %s timeout by %s`,
+			"last synchronizeAll success activity %s ago, which exceeds "+
+				"the %s timeout by %s",
 			now.Sub(hc.lastSuccessSync.runTime), hc.syncSuccessTimeout, timeoutDelta)
 	}
 	return nil
@@ -241,8 +260,8 @@ func (hc *HealthCheck) checkIngressQueueHealth() error {
 	lastIngressResync := hc.lastActivity[IngressResyncProcess]
 	if lastIngressResync.Before(hc.prevSuccessSync.runTime) {
 		return fmt.Errorf(
-			`previous synchronizeAll added Ingress objects to queue %s ago,
-			while last processed Ingress %s ago, %s before it`,
+			"previous synchronizeAll added Ingress objects to queue %s ago, "+
+				"while last processed Ingress %s ago, %s before",
 			now.Sub(hc.prevSuccessSync.runTime),
 			now.Sub(lastIngressResync),
 			hc.prevSuccessSync.runTime.Sub(lastIngressResync))
@@ -267,8 +286,8 @@ func (hc *HealthCheck) checkMcrtQueueHealth() error {
 	lastMcrtResync := hc.lastActivity[McrtResyncProcess]
 	if lastMcrtResync.Before(hc.prevSuccessSync.runTime) {
 		return fmt.Errorf(
-			`previous synchronizeAll added ManagedCertificate objects to queue %s ago,
-			while last processed ManagedCertificate %s ago, %s before it`,
+			"previous synchronizeAll added ManagedCertificate objects to queue %s "+
+				"ago, while last processed ManagedCertificate %s ago, %s before",
 			now.Sub(hc.prevSuccessSync.runTime),
 			now.Sub(lastMcrtResync),
 			hc.prevSuccessSync.runTime.Sub(lastMcrtResync))
@@ -289,14 +308,17 @@ func (hc *HealthCheck) UpdateLastActivity(activityName ActivityName, timestamp t
 // in error) Controller.synchronizeAll activity.
 func (hc *HealthCheck) UpdateLastSuccessSync(timestamp time.Time,
 	ingressScheduled, mcrtScheduled bool) {
+
 	hc.mutex.Lock()
 	defer hc.mutex.Unlock()
+
 	if timestamp.After(hc.lastSuccessSync.runTime) {
 		hc.prevSuccessSync = hc.lastSuccessSync
 		hc.lastSuccessSync.runTime = timestamp
 		hc.lastSuccessSync.ingressScheduled = ingressScheduled
 		hc.lastSuccessSync.mcrtScheduled = mcrtScheduled
 	}
+
 	// finishing successful run is also a sign of activity
 	if timestamp.After(hc.lastActivity[SynchronizeAll]) {
 		hc.lastActivity[SynchronizeAll] = timestamp

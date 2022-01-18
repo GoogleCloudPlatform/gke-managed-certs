@@ -130,17 +130,26 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 	klog.Info("Cache synced")
 
 	go wait.Until(
-		func() { c.processNext(ctx, c.ingressQueue, liveness.Undefined, c.sync.Ingress) },
-		time.Second, ctx.Done())
-	go wait.Until(
-		func() { c.processNext(ctx, c.ingressResyncQueue, liveness.IngressResyncProcess, c.sync.Ingress) },
-		time.Second, ctx.Done())
-	go wait.Until(
-		func() { c.processNext(ctx, c.managedCertificateQueue, liveness.Undefined, c.sync.ManagedCertificate) },
+		func() {
+			c.processNext(ctx, c.ingressQueue, liveness.Undefined, c.sync.Ingress)
+		},
 		time.Second, ctx.Done())
 	go wait.Until(
 		func() {
-			c.processNext(ctx, c.managedCertificateResyncQueue, liveness.McrtResyncProcess, c.sync.ManagedCertificate)
+			c.processNext(ctx, c.ingressResyncQueue, liveness.IngressResyncProcess,
+				c.sync.Ingress)
+		},
+		time.Second, ctx.Done())
+	go wait.Until(
+		func() {
+			c.processNext(ctx, c.managedCertificateQueue, liveness.Undefined,
+				c.sync.ManagedCertificate)
+		},
+		time.Second, ctx.Done())
+	go wait.Until(
+		func() {
+			c.processNext(ctx, c.managedCertificateResyncQueue,
+				liveness.McrtResyncProcess, c.sync.ManagedCertificate)
 		},
 		time.Second, ctx.Done())
 	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncInterval, ctx.Done())
@@ -211,7 +220,8 @@ func (c *controller) reportMetrics() {
 	c.metrics.ObserveIngressHighPriorityQueueLength(c.ingressQueue.Len())
 	c.metrics.ObserveIngressLowPriorityQueueLength(c.ingressResyncQueue.Len())
 	c.metrics.ObserveManagedCertificateHighPriorityQueueLength(c.managedCertificateQueue.Len())
-	c.metrics.ObserveManagedCertificateLowPriorityQueueLength(c.managedCertificateResyncQueue.Len())
+	c.metrics.ObserveManagedCertificateLowPriorityQueueLength(
+		c.managedCertificateResyncQueue.Len())
 }
 
 func (c *controller) processNext(ctx context.Context, queue workqueue.RateLimitingInterface,
