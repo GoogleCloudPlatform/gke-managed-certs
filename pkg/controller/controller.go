@@ -42,13 +42,13 @@ import (
 )
 
 type params struct {
-	clients      *clients.Clients
-	config       *config.Config
-	metrics      metrics.Interface
-	healthCheck  *liveness.HealthCheck
-	resyncPeriod time.Duration
-	state        state.Interface
-	sync         sync.Interface
+	clients        *clients.Clients
+	config         *config.Config
+	metrics        metrics.Interface
+	healthCheck    *liveness.HealthCheck
+	resyncInterval time.Duration
+	state          state.Interface
+	sync           sync.Interface
 }
 
 type controller struct {
@@ -59,27 +59,26 @@ type controller struct {
 	managedCertificateResyncQueue workqueue.RateLimitingInterface
 	metrics                       metrics.Interface
 	healthCheck                   *liveness.HealthCheck
-	resyncPeriod                  time.Duration
+	resyncInterval                time.Duration
 	state                         state.Interface
 	sync                          sync.Interface
 }
 
 func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config) *params {
-	resyncPeriod := 10 * time.Minute
 	healthCheck := liveness.NewHealthCheck(flags.F.HealthCheckInterval,
-		2*resyncPeriod, 2*resyncPeriod)
+		2*flags.F.ResyncInterval, 2*flags.F.ResyncInterval)
 	metrics := metrics.New(config)
 	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
 	random := random.New(config.SslCertificateNamePrefix)
 
 	return &params{
-		clients:      clients,
-		config:       config,
-		metrics:      metrics,
-		healthCheck:  healthCheck,
-		resyncPeriod: resyncPeriod,
-		state:        state,
+		clients:        clients,
+		config:         config,
+		metrics:        metrics,
+		healthCheck:    healthCheck,
+		resyncInterval: flags.F.ResyncInterval,
+		state:          state,
 		sync: sync.New(config, clients.Event, clients.Ingress,
 			clients.ManagedCertificate, metrics, random, ssl, state),
 	}
@@ -98,9 +97,9 @@ func New(ctx context.Context, p *params) *controller {
 			workqueue.DefaultControllerRateLimiter(), "managedCertificateQueue"),
 		managedCertificateResyncQueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(), "managedCertificateResyncQueue"),
-		resyncPeriod: p.resyncPeriod,
-		state:        p.state,
-		sync:         p.sync,
+		resyncInterval: p.resyncInterval,
+		state:          p.state,
+		sync:           p.sync,
 	}
 }
 
@@ -144,7 +143,7 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 			c.processNext(ctx, c.managedCertificateResyncQueue, liveness.McrtResyncProcess, c.sync.ManagedCertificate)
 		},
 		time.Second, ctx.Done())
-	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncPeriod, ctx.Done())
+	go wait.Until(func() { c.synchronizeAll(ctx) }, c.resyncInterval, ctx.Done())
 	go wait.Until(func() { c.reportMetrics() }, time.Minute, ctx.Done())
 
 	klog.Info("Waiting for stop signal or error")

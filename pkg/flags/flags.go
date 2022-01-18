@@ -28,6 +28,7 @@ var (
 		GCEConfigFilePath   string
 		KubeConfigFilePath  string
 		PrometheusAddress   string
+		ResyncInterval      time.Duration
 		HealthCheckAddress  string
 		HealthCheckPath     string
 		HealthCheckInterval time.Duration
@@ -47,6 +48,8 @@ discovery is attempted.`)
 		"Path to kubeconfig file with authorization and master location information.")
 	flag.StringVar(&F.PrometheusAddress, "prometheus-address", ":8910",
 		"The address to expose Prometheus metrics")
+	flag.DurationVar(&F.ResyncInterval, "resync-interval", 10*time.Minute,
+		"How often to synchronize the controller state with external world.")
 	flag.StringVar(&F.HealthCheckAddress, "health-check-address", ":8089",
 		"The address to expose health check endpoint.")
 	flag.StringVar(&F.HealthCheckPath, "health-check-path", "/health-check",

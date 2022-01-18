@@ -149,11 +149,11 @@ func TestController(t *testing.T) {
 					Ingress:            clientsingress.NewFake(ingresses),
 					ManagedCertificate: clientsmcrt.NewFake(mcrts),
 				},
-				metrics:      metrics,
-				healthCheck:  healthCheck,
-				resyncPeriod: time.Minute,
-				state:        state.NewFakeWithEntries(stateEntries),
-				sync:         sync,
+				metrics:        metrics,
+				healthCheck:    healthCheck,
+				resyncInterval: time.Minute,
+				state:          state.NewFakeWithEntries(stateEntries),
+				sync:           sync,
 			})
 
 			// Trigger resources queuing.
