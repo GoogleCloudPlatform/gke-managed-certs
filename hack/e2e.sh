@@ -27,7 +27,7 @@ DNS_ZONE=${DNS_ZONE:-"ingress-dev"}
 DOMAIN=${DOMAIN:-"dev.ing.gke.certsbridge.com"}
 KUBECONFIG=${KUBECONFIG:-"${HOME}/.kube/config"}
 KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gke"}
-PLATFORM=${PLATFORM:-"gcp"}
+PLATFORM=${PLATFORM:-"gce"}
 PROJECT=${PROJECT:-`gcloud config list --format="value(core.project)"`}
 PULL_NUMBER=${PULL_NUMBER:-""}
 REGISTRY=${REGISTRY:-"gcr.io/gke-managed-certs"}
@@ -52,7 +52,7 @@ then
 fi
 
 mkdir -p /tmp/gcp_service_account
-if [ $PLATFORM = "gcp" ]
+if [ $PLATFORM = "gce" ]
 then
   gsutil cp gs://${PROJECT}/key.json /tmp/gcp_service_account/key.json
 fi
