@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -41,7 +40,6 @@ import (
 )
 
 const (
-	cloudSdkRootEnv = "CLOUD_SDK_ROOT"
 	defaultHost     = ""
 	dnsZoneEnv      = "DNS_ZONE"
 	domainEnv       = "DOMAIN"
@@ -151,8 +149,7 @@ func getRestConfig() (*rest.Config, error) {
 }
 
 func gcloud(command ...string) (string, error) {
-	gcloudBin := fmt.Sprintf("%s/bin/gcloud", os.Getenv(cloudSdkRootEnv))
-	out, err := exec.Command(gcloudBin, command...).Output()
+	out, err := exec.Command("gcloud", command...).Output()
 	if err != nil {
 		return "", err
 	}

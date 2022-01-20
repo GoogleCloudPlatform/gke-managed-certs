@@ -23,7 +23,6 @@ SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 
 ARTIFACTS=${ARTIFACTS:-"/tmp/artifacts"}
 CLOUD_CONFIG=${CLOUD_CONFIG:-`gcloud info --format="value(config.paths.global_config_dir)"`}
-CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT:-`gcloud info --format="value(installation.sdk_root)"`}
 DNS_ZONE=${DNS_ZONE:-"ingress-dev"}
 DOMAIN=${DOMAIN:-"dev.ing.gke.certsbridge.com"}
 KUBECONFIG=${KUBECONFIG:-"${HOME}/.kube/config"}
@@ -71,7 +70,6 @@ test -f /etc/service-account/service-account.json && \
   gcloud auth configure-docker || true
 
 docker run -v ${SCRIPT_ROOT}:${runner_path} \
-  -v ${CLOUD_SDK_ROOT}:${CLOUD_SDK_ROOT} \
   -v ${CLOUD_CONFIG}:/root/.config/gcloud \
   -v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
   -v ${KUBECONFIG}:/root/.kube/config \
@@ -81,16 +79,15 @@ docker run -v ${SCRIPT_ROOT}:${runner_path} \
   "set -ex && cd ${runner_path} && dest=/tmp/artifacts; \
   rm -rf \${dest}/* && mkdir -p \${dest} && \
   { \
-    CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
+    DNS_ZONE=${DNS_ZONE} \
+    DOMAIN=${DOMAIN} \
     GCP_SERVICE_ACCOUNT_FILE=/tmp/gcp_service_account/key.json \
     KUBECONFIG=\${HOME}/.kube/config \
     KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
-    PROJECT=${PROJECT} \
-    DNS_ZONE=${DNS_ZONE} \
-    DOMAIN=${DOMAIN} \
     PLATFORM=${PLATFORM} \
-    TAG=${TAG} \
+    PROJECT=${PROJECT} \
     REGISTRY=${REGISTRY} \
+    TAG=${TAG} \
     go test ./e2e/... -test.timeout=60m -logtostderr=false -alsologtostderr=true -v -log_dir=\${dest} \
       > \${dest}/e2e.out.txt && exitcode=\${?} || exitcode=\${?} ; \
   } && cat \${dest}/e2e.out.txt | go-junit-report > \${dest}/junit_01.xml && exit \${exitcode}"
