@@ -32,6 +32,7 @@ var (
 		HealthCheckAddress  string
 		HealthCheckPath     string
 		HealthCheckInterval time.Duration
+		ServiceAccount      string
 	}{}
 )
 
@@ -56,6 +57,8 @@ discovery is attempted.`)
 		"The path to expose health check endpoint.")
 	flag.DurationVar(&F.HealthCheckInterval, "health-check-interval", 5*time.Second,
 		"How often to run the health checks.")
+	flag.StringVar(&F.ServiceAccount, "service-account", "",
+		"Service account to use for fetching access tokens from GCE metadata server.")
 
 	flag.Parse()
 }

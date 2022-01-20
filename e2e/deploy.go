@@ -34,12 +34,10 @@ import (
 )
 
 const (
-	clusterRoleBindingName = "managed-certificate-role-binding"
-	clusterRoleName        = "managed-certificate-role"
+	clusterRoleBindingName = "managed-certificate-controller"
+	clusterRoleName        = "managed-certificate-controller"
 	deploymentName         = "managed-certificate-controller"
-	gcpSecretName          = "managed-certificate-gcp-sa"
-	secretKey              = "key.json"
-	serviceAccountName     = "managed-certificate-account"
+	serviceAccountName     = "managed-certificate-controller"
 )
 
 // Deploys Managed Certificate CRD
@@ -268,19 +266,10 @@ func deployCRD(ctx context.Context) error {
 }
 
 // Deploys Managed Certificate controller with all related objects
-func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag string) error {
+func deployController(ctx context.Context, registry, tag, gceServiceAccount string) error {
 	if err := deleteController(ctx); err != nil {
 		return err
 	}
-
-	secret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: gcpSecretName},
-		StringData: map[string]string{secretKey: gcpServiceAccountJson},
-	}
-	if _, err := clients.Secret.Create(ctx, &secret, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-	klog.Infof("Created secret %s", gcpSecretName)
 
 	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
 	if _, err := clients.ServiceAccount.Create(ctx, &serviceAccount, metav1.CreateOptions{}); err != nil {
@@ -349,9 +338,6 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	logFileVolume := "logfile"
 	logFileVolumePath := "/var/log/managed_certificate_controller.log"
 
-	saKeyVolume := "sa-key-volume"
-	saKeyVolumePath := "/etc/gcp"
-
 	healthCheckPath := "/health-check"
 	healthCheckPort := 8089
 
@@ -385,11 +371,6 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 									MountPath: logFileVolumePath,
 									ReadOnly:  false,
 								},
-								{
-									Name:      saKeyVolume,
-									MountPath: saKeyVolumePath,
-									ReadOnly:  true,
-								},
 							},
 							Args: []string{
 								"--logtostderr=false",
@@ -398,12 +379,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 								"--resync-interval=600s",
 								fmt.Sprintf("--health-check-address=:%d", healthCheckPort),
 								fmt.Sprintf("--health-check-path=%s", healthCheckPath),
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: fmt.Sprintf("%s/%s", saKeyVolumePath, secretKey),
-								},
+								fmt.Sprintf("--service-account=%s", gceServiceAccount),
 							},
 							LivenessProbe: &corev1.Probe{
 								Handler: corev1.Handler{
@@ -443,20 +419,6 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 								},
 							},
 						},
-						{
-							Name: saKeyVolume,
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: gcpSecretName,
-									Items: []corev1.KeyToPath{
-										{
-											Key:  secretKey,
-											Path: secretKey,
-										},
-									},
-								},
-							},
-						},
 					},
 				},
 			},
@@ -474,30 +436,33 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 
 // Deletes Managed Certificate controller and all related objects
 func deleteController(ctx context.Context) error {
-	if err := utilserrors.IgnoreNotFound(clients.Secret.Delete(ctx, gcpSecretName, metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(ctx, deploymentName,
+		metav1.DeleteOptions{})); err != nil {
+
 		return err
 	}
-	klog.Infof("Deleted secret %s", gcpSecretName)
+	klog.Infof("Deleted deployment %s", deploymentName)
 
-	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx, serviceAccountName, metav1.DeleteOptions{})); err != nil {
-		return err
-	}
-	klog.Infof("Deleted service account %s", serviceAccountName)
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(ctx,
+		clusterRoleBindingName, metav1.DeleteOptions{})); err != nil {
 
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(ctx, clusterRoleName, metav1.DeleteOptions{})); err != nil {
-		return err
-	}
-	klog.Infof("Deleted cluster role %s", clusterRoleName)
-
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
 
-	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(ctx, deploymentName, metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(ctx, clusterRoleName,
+		metav1.DeleteOptions{})); err != nil {
+
 		return err
 	}
-	klog.Infof("Deleted deployment %s", deploymentName)
+	klog.Infof("Deleted cluster role %s", clusterRoleName)
+
+	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx,
+		serviceAccountName, metav1.DeleteOptions{})); err != nil {
+
+		return err
+	}
+	klog.Infof("Deleted service account %s", serviceAccountName)
 
 	return nil
 }

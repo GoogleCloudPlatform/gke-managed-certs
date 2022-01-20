@@ -19,18 +19,19 @@ set -o nounset
 set -o pipefail
 set -x
 
-export NODE_SA_NAME=mcrt-controller-sa
-gcloud iam service-accounts create $NODE_SA_NAME --display-name "managed-certificate-controller service account"
-export NODE_SA_EMAIL=`gcloud iam service-accounts list --format='value(email)' --filter='displayName:managed-certificate-controller'`
-
 export PROJECT=`gcloud config get-value project`
+export NODE_SA_NAME=managed-certificate-controller
+export NODE_SA_EMAIL=${NODE_SA_NAME}@${PROJECT}.iam.gserviceaccount.com
+
+gcloud iam service-accounts create $NODE_SA_NAME --display-name "GKE Managed Certs controller"
+until gcloud iam service-accounts describe $NODE_SA_EMAIL; do \
+  echo "Fetching service account ${NODE_SA_EMAIL} failed, retrying in 10 seconds..." && sleep 10; \
+done
+
+gcloud projects add-iam-policy-binding gke-managed-certs --member serviceAccount:$NODE_SA_EMAIL --role roles/storage.objectViewer
+
+gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/storage.objectViewer
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/monitoring.metricWriter
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/monitoring.viewer
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/logging.logWriter
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/compute.loadBalancerAdmin
-
-gcloud iam service-accounts keys create ./key.json --iam-account $NODE_SA_EMAIL
-
-gsutil mb -b on gs://${PROJECT}
-gsutil cp key.json gs://${PROJECT}/key.json
-rm key.json

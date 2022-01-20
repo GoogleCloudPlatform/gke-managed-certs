@@ -69,7 +69,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config, err := config.New(ctx, flags.F.GCEConfigFilePath)
+	config, err := config.New(ctx, flags.F.GCEConfigFilePath, flags.F.ServiceAccount)
 	if err != nil {
 		klog.Fatal(err)
 	}
