@@ -40,10 +40,10 @@ import (
 )
 
 const (
-	defaultHost     = ""
-	dnsZoneEnv      = "DNS_ZONE"
-	domainEnv       = "DOMAIN"
-	projectIDEnv    = "PROJECT"
+	defaultHost  = ""
+	dnsZoneEnv   = "DNS_ZONE"
+	domainEnv    = "DOMAIN"
+	projectIDEnv = "PROJECT"
 )
 
 type Clients struct {
