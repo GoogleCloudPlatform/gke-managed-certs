@@ -64,9 +64,9 @@ type controller struct {
 	sync                          sync.Interface
 }
 
-func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config) *params {
-	healthCheck := liveness.NewHealthCheck(flags.F.HealthCheckInterval,
-		2*flags.F.ResyncInterval, 2*flags.F.ResyncInterval)
+func NewParams(ctx context.Context, clients *clients.Clients, config *config.Config,
+	healthCheck *liveness.HealthCheck) *params {
+
 	metrics := metrics.New(config)
 	state := state.New(ctx, clients.ConfigMap)
 	ssl := sslcertificatemanager.New(clients.Event, metrics, clients.Ssl, state)
@@ -103,7 +103,7 @@ func New(ctx context.Context, p *params) *controller {
 	}
 }
 
-func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
+func (c *controller) Run(ctx context.Context) error {
 	defer runtime.HandleCrash()
 	defer c.ingressQueue.ShutDown()
 	defer c.ingressResyncQueue.ShutDown()
@@ -117,7 +117,7 @@ func (c *controller) Run(ctx context.Context, healthCheckAddress string) error {
 	go c.metrics.Start(flags.F.PrometheusAddress)
 
 	klog.Info("Start liveness probe health checks")
-	c.healthCheck.Start(healthCheckAddress, flags.F.HealthCheckPath)
+	c.healthCheck.StartMonitoring()
 
 	c.clients.Run(ctx, c.ingressQueue, c.managedCertificateQueue)
 

@@ -67,6 +67,20 @@ const (
 // elapses, HealthCheck will respond that the controller is dead.
 // - If health checking is not running, it always responds that the controller is
 // alive. It is not running by default.
+//
+// ## Usage
+//
+// # Create health check with
+// h := liveness.NewHealthCheck()
+//
+// # Begin serving the liveness status
+// h.StartServing()
+//
+// # When ready, after the instance elected as a master, begin monitoring
+// h.StartMonitoring()
+//
+// # End monitoring and shut down
+// h.Stop()
 type HealthCheck struct {
 	mutex sync.RWMutex
 
@@ -98,7 +112,9 @@ type HealthCheck struct {
 	ingressQueueErr error
 	mcrtQueueErr    error
 
-	isRunning bool
+	// monitoringRunning is true if the healthiness is monitored and affects
+	// the liveness status.
+	monitoringRunning bool
 	// httpServer handles HTTP liveness probe calls.
 	httpServer http.Server
 }
@@ -123,23 +139,40 @@ func NewHealthCheck(healthCheckInterval, activityTimeout,
 		syncMonitoringEnabled: false,
 		healthCheckInterval:   healthCheckInterval,
 		alive:                 false,
-		isRunning:             false,
+		monitoringRunning:     false,
 	}
 }
 
-// Start starts controller health checks and the liveness probe http server.
-// It runs the health checks every healthCheckInterval until Stop() is called.
-func (hc *HealthCheck) Start(endpointAddress, endpointPath string) {
+// StartServing starts the liveness probe http server.
+// After StartServing is called, the probe starts reporting its status to Kubelet
+// on the endpoint `address`/`path`.
+func (hc *HealthCheck) StartServing(address, path string) {
+	mux := http.NewServeMux()
+	hc.httpServer = http.Server{Addr: address, Handler: mux}
+	mux.HandleFunc(path, hc.serveHTTP)
+
+	go func() {
+		err := hc.httpServer.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			klog.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+}
+
+// StartMonitoring starts controller health checks.
+// After StartMonitoring is called, the probe starts monitoring the healthiness
+// of the controller and may report that it is dead. Monitoring runs every
+// healthCheckInterval until Stop() is called.
+func (hc *HealthCheck) StartMonitoring() {
 	hc.mutex.Lock()
 	hc.syncMonitoringEnabled = true
-	go hc.startServer(endpointAddress, endpointPath)
-	hc.isRunning = true
+	hc.monitoringRunning = true
 	hc.mutex.Unlock()
 
 	go func() {
 		for {
 			hc.mutex.RLock()
-			if !hc.isRunning {
+			if !hc.monitoringRunning {
 				hc.mutex.RUnlock()
 				break
 			}
@@ -159,24 +192,13 @@ func (hc *HealthCheck) Start(endpointAddress, endpointPath string) {
 // Stop stops controller health checks and the liveness probe http server.
 func (hc *HealthCheck) Stop() error {
 	hc.mutex.Lock()
-	hc.isRunning = false
+	hc.monitoringRunning = false
 	hc.mutex.Unlock()
 	if err := hc.httpServer.Shutdown(context.Background()); err != nil {
 		klog.Errorf("Failed to stop server: %v", err)
 		return err
 	}
 	return nil
-}
-
-func (hc *HealthCheck) startServer(healthCheckAddress, healthCheckPath string) {
-	mux := http.NewServeMux()
-	hc.httpServer = http.Server{Addr: healthCheckAddress, Handler: mux}
-	mux.HandleFunc(healthCheckPath, hc.serveHTTP)
-
-	err := hc.httpServer.ListenAndServe()
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		klog.Fatalf("Failed to start server: %v", err)
-	}
 }
 
 // serveHTTP implements http.Handler interface to provide a health-check endpoint.

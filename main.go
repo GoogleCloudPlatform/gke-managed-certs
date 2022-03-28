@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/liveness"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/version"
 )
@@ -79,6 +80,11 @@ func main() {
 		klog.Fatal(err)
 	}
 
+	healthCheck := liveness.NewHealthCheck(flags.F.HealthCheckInterval,
+		2*flags.F.ResyncInterval, 2*flags.F.ResyncInterval)
+	klog.Infof("Start serving liveness probe")
+	healthCheck.StartServing(flags.F.HealthCheckAddress, flags.F.HealthCheckPath)
+
 	leaderElection := componentbaseconfig.LeaderElectionConfiguration{
 		LeaderElect:   true,
 		LeaseDuration: metav1.Duration{Duration: config.MasterElection.LeaseDuration},
@@ -109,7 +115,7 @@ func main() {
 		RetryPeriod:   leaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				params := controller.NewParams(ctx, clients, config)
+				params := controller.NewParams(ctx, clients, config, healthCheck)
 				controller := controller.New(ctx, params)
 
 				go func() {
@@ -117,7 +123,7 @@ func main() {
 					cancel()
 				}()
 
-				if err = controller.Run(ctx, flags.F.HealthCheckAddress); err != nil {
+				if err = controller.Run(ctx); err != nil {
 					klog.Fatalf("Error running controller: %s", err)
 				}
 			},

@@ -100,8 +100,9 @@ func TestHTTPServer(t *testing.T) {
 
 			if tc.enabled {
 				address := addressManager.GetNextAddress()
-				healthCheck.Start(address, healthCheckPath)
-				defer healthCheck.Stop()
+				healthCheck.StartServing(address, healthCheckPath)
+				healthCheck.StartMonitoring()
+				t.Cleanup(func() { healthCheck.Stop() })
 			}
 			assertServeHttpResponseCode(t, healthCheck, tc.wantResponseCode)
 		})
@@ -536,8 +537,10 @@ func TestUpdateLastSyncHttp(t *testing.T) {
 	// Make last success sync in the future because we are not testing it now.
 	healthCheck.lastSuccessSync.runTime = future
 
-	healthCheck.Start(address, healthCheckPath)
-	defer healthCheck.Stop()
+	healthCheck.StartServing(address, healthCheckPath)
+	healthCheck.StartMonitoring()
+	t.Cleanup(func() { healthCheck.Stop() })
+
 	assertServeHttpResponseCode(t, healthCheck, 500)
 	healthCheck.UpdateLastActivity(SynchronizeAll, now)
 	assertServeHttpResponseCode(t, healthCheck, 200)
@@ -554,8 +557,10 @@ func TestUpdateLastSuccessSyncHttp(t *testing.T) {
 	healthCheck.lastActivity[SynchronizeAll] = past
 	healthCheck.lastSuccessSync.runTime = past
 
-	healthCheck.Start(address, healthCheckPath)
-	defer healthCheck.Stop()
+	healthCheck.StartServing(address, healthCheckPath)
+	healthCheck.StartMonitoring()
+	t.Cleanup(func() { healthCheck.Stop() })
+
 	assertServeHttpResponseCode(t, healthCheck, 500)
 	healthCheck.UpdateLastSuccessSync(now, false, false)
 	assertServeHttpResponseCode(t, healthCheck, 200)
@@ -572,8 +577,10 @@ func TestUpdateFutureTime(t *testing.T) {
 	healthCheck.lastActivity[SynchronizeAll] = future
 	healthCheck.lastSuccessSync.runTime = future
 
-	healthCheck.Start(address, healthCheckPath)
-	defer healthCheck.Stop()
+	healthCheck.StartServing(address, healthCheckPath)
+	healthCheck.StartMonitoring()
+	t.Cleanup(func() { healthCheck.Stop() })
+
 	assertServeHttpResponseCode(t, healthCheck, 200)
 	healthCheck.UpdateLastSuccessSync(now, false, false)
 	assertServeHttpResponseCode(t, healthCheck, 200)
@@ -673,8 +680,9 @@ func TestProcessQueueHealthCheckHttp(t *testing.T) {
 			healthCheck := NewHealthCheck(healthCheckInterval, timeout, timeout)
 			address := addressManager.GetNextAddress()
 
-			healthCheck.Start(address, healthCheckPath)
-			defer healthCheck.Stop()
+			healthCheck.StartServing(address, healthCheckPath)
+			healthCheck.StartMonitoring()
+			t.Cleanup(func() { healthCheck.Stop() })
 
 			healthCheck.UpdateLastSuccessSync(now.Add(-30*time.Millisecond), tc.ingressScheduled, tc.mcrtScheduled)
 			for _, activityName := range tc.processActivity {
