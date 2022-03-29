@@ -327,6 +327,7 @@ func deployController(ctx context.Context, registry, tag, gceServiceAccount stri
 
 	appCtrl := map[string]string{"app": deploymentName}
 	image := fmt.Sprintf("%s/managed-certificate-controller:%s", registry, tag)
+	directory := corev1.HostPathDirectory
 	fileOrCreate := corev1.HostPathFileOrCreate
 
 	sslCertsVolume := "ssl-certs"
@@ -399,6 +400,7 @@ func deployController(ctx context.Context, registry, tag, gceServiceAccount stri
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: sslCertsVolumePath,
+									Type: &directory,
 								},
 							},
 						},
@@ -407,6 +409,7 @@ func deployController(ctx context.Context, registry, tag, gceServiceAccount stri
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: usrShareCaCertsVolumePath,
+									Type: &directory,
 								},
 							},
 						},

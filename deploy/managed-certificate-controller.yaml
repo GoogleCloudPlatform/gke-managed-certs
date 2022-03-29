@@ -86,6 +86,8 @@ spec:
       - name: ssl-certs
         hostPath:
           path: "/etc/ssl/certs"
+          type: Directory
       - name: usrsharecacerts
         hostPath:
           path: "/usr/share/ca-certificates"
+          type: Directory
