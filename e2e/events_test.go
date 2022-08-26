@@ -43,7 +43,7 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 		if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
 			t.Fatal(err)
 		}
-		if err := clients.ManagedCertificate.Create(ctx, name, []string{fmt.Printf("quota%d.example.com", i)}); err != nil {
+		if err := clients.ManagedCertificate.Create(ctx, name, []string{fmt.Sprintf("quota%d.example.com", i)}); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
