@@ -39,16 +39,20 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 	numCerts := 400 // Should be bigger than allowed quota.
 
 	for i := 0; i < numCerts; i++ {
-		name := fmt.Sprintf("quota-%d", i)
-		if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
-			t.Fatal(err)
-		}
-		if err := clients.ManagedCertificate.Create(ctx, name, []string{fmt.Sprintf("quota%d.example.com", i)}); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			clients.ManagedCertificate.Delete(ctx, name)
-		})
+		i := i
+		go func() {
+			name := fmt.Sprintf("quota-%d", i)
+			if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
+				t.Fatal(err)
+			}
+			domains := []string{fmt.Sprintf("quota%d.example.com", i)}
+			if err := clients.ManagedCertificate.Create(ctx, name, domains); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				clients.ManagedCertificate.Delete(ctx, name)
+			})
+		}()
 	}
 
 	if err := utils.Retry(func() error {

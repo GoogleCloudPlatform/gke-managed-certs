@@ -34,4 +34,4 @@ gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/monitoring.metricWriter
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/monitoring.viewer
 gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/logging.logWriter
-gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/compute.loadBalancerAdmin
+gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:$NODE_SA_EMAIL --role roles/compute.securityAdmin
