@@ -45,7 +45,7 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 			if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
 				t.Fatal(err)
 			}
-			domains := []string{fmt.Sprintf("quota%d.example.com", i)}
+			domains := []string{fmt.Sprintf("quota%d.quota-test.com", i)}
 			if err := clients.ManagedCertificate.Create(ctx, name, domains); err != nil {
 				t.Fatal(err)
 			}
