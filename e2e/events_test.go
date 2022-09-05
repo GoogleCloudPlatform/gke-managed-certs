@@ -36,7 +36,7 @@ import (
 // on a best-effort basis, so the test does not require every event to be present.
 func TestEvents_ManagedCertificate(t *testing.T) {
 	ctx := context.Background()
-	numCerts := 400 // Should be bigger than allowed quota.
+	numCerts := 150 // Should be bigger than allowed quota.
 
 	for i := 0; i < numCerts; i++ {
 		i := i
