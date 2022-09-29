@@ -38,21 +38,34 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 	ctx := context.Background()
 	numCerts := 150 // Should be bigger than allowed quota.
 
+	errs := make(chan error, 1)
+
 	for i := 0; i < numCerts; i++ {
 		i := i
-		go func() {
+		go func(errs chan<- error) {
 			name := fmt.Sprintf("quota-%d", i)
 			if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
-				t.Fatal(err)
+				errs <- err
+				return
 			}
 			domains := []string{fmt.Sprintf("quota%d.quota-test.com", i)}
 			if err := clients.ManagedCertificate.Create(ctx, name, domains); err != nil {
-				t.Fatal(err)
+				errs <- err
+				return
 			}
 			t.Cleanup(func() {
 				clients.ManagedCertificate.Delete(ctx, name)
 			})
-		}()
+
+			errs <- nil
+		}(errs)
+	}
+
+	for i := 0; i < numCerts; i++ {
+		err := <-errs
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if err := utils.Retry(func() error {
