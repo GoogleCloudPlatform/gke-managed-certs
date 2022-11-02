@@ -41,7 +41,7 @@ const (
 
 // Interface exposes operations for manipulating Event resources.
 type Interface interface {
-	// BackendError creates an event when a transient error occurrs when calling GCP API.
+	// BackendError creates an event when a transient error occurs when calling GCP API.
 	BackendError(mcrt v1.ManagedCertificate, err error)
 	// Create creates an event when an SslCertificate associated with ManagedCertificate is created.
 	Create(mcrt v1.ManagedCertificate, sslCertificateName string)
@@ -81,7 +81,7 @@ func New(client kubernetes.Interface) (Interface, error) {
 	}, nil
 }
 
-// BackendError creates an event when a transient error occurrs when calling GCP API.
+// BackendError creates an event when a transient error occurs when calling GCP API.
 func (e impl) BackendError(mcrt v1.ManagedCertificate, err error) {
 	e.recorder.Event(&mcrt, corev1.EventTypeWarning, reasonBackendError, err.Error())
 }

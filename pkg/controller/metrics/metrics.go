@@ -200,7 +200,7 @@ func (m impl) ObserveSslCertificateQuotaError() {
 }
 
 // ObserveSslCertificateBindingLatency reports the time it took to bind
-// an SslCertficate resource with Ingress after a valid ManagedCertficate
+// an SslCertificate resource with Ingress after a valid ManagedCertificate
 // resource was created.
 func (m impl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
@@ -208,7 +208,7 @@ func (m impl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
 }
 
 // ObserveSslCertificateCreationLatency reports the time it took to create
-// an SslCertficate resource after a valid ManagedCertficate resource
+// an SslCertificate resource after a valid ManagedCertificate resource
 // was created.
 func (m impl) ObserveSslCertificateCreationLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
