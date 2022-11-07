@@ -24,10 +24,8 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
-
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
 const (
@@ -37,7 +35,7 @@ const (
 )
 
 type Error struct {
-	operation *compute.Operation
+	operation *computev1.Operation
 }
 
 func (e *Error) Error() string {
@@ -67,22 +65,19 @@ type Interface interface {
 	Create(ctx context.Context, name string, domains []string) error
 	// Delete deletes an SslCertificate resource.
 	Delete(ctx context.Context, name string) error
-	// Exists returns true if an SslCertificate exists, false if it is deleted.
-	// Error is not nil if an error has occurred.
-	Exists(name string) (bool, error)
 	// Get fetches an SslCertificate resource.
-	Get(name string) (*compute.SslCertificate, error)
+	Get(name string) (*computev1.SslCertificate, error)
 	// List fetches all SslCertificate resources.
-	List() ([]*compute.SslCertificate, error)
+	List() ([]*computev1.SslCertificate, error)
 }
 
 type impl struct {
-	service   *compute.Service
+	service   *computev1.Service
 	projectID string
 }
 
 func New(client *http.Client, projectID string) (Interface, error) {
-	service, err := compute.New(client)
+	service, err := computev1.New(client)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +90,8 @@ func New(client *http.Client, projectID string) (Interface, error) {
 
 // Create creates a new SslCertificate resource.
 func (s impl) Create(ctx context.Context, name string, domains []string) error {
-	sslCertificate := &compute.SslCertificate{
-		Managed: &compute.SslCertificateManagedSslCertificate{
+	sslCertificate := &computev1.SslCertificate{
+		Managed: &computev1.SslCertificateManagedSslCertificate{
 			Domains: domains,
 		},
 		Name: name,
@@ -121,28 +116,13 @@ func (s impl) Delete(ctx context.Context, name string) error {
 	return s.waitFor(ctx, operation.Name)
 }
 
-// Exists returns true if an SslCertificate exists, false if it is deleted.
-// Error is not nil if an error has occurred.
-func (s impl) Exists(name string) (bool, error) {
-	_, err := s.Get(name)
-	if err == nil {
-		return true, nil
-	}
-
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-
-	return false, err
-}
-
 // Get fetches an SslCertificate resource.
-func (s impl) Get(name string) (*compute.SslCertificate, error) {
+func (s impl) Get(name string) (*computev1.SslCertificate, error) {
 	return s.service.SslCertificates.Get(s.projectID, name).Do()
 }
 
 // List fetches all SslCertificate resources.
-func (s impl) List() ([]*compute.SslCertificate, error) {
+func (s impl) List() ([]*computev1.SslCertificate, error) {
 	sslCertificates, err := s.service.SslCertificates.List(s.projectID).Do()
 	if err != nil {
 		return nil, err

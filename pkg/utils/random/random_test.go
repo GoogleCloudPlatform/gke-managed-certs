@@ -37,6 +37,8 @@ func newName(r Interface, t *testing.T) string {
 }
 
 func TestName_NonEmptyNameShorterThanLimit(t *testing.T) {
+	t.Parallel()
+
 	sut := New(sslCertificateNamePrefix)
 	if name := newName(sut, t); len(name) <= 0 || len(name) >= 64 {
 		t.Errorf("Name %s has %d characters, want between 0 and 63", name, len(name))
@@ -44,6 +46,8 @@ func TestName_NonEmptyNameShorterThanLimit(t *testing.T) {
 }
 
 func TestName_TwiceReturnsDifferent(t *testing.T) {
+	t.Parallel()
+
 	sut := New(sslCertificateNamePrefix)
 	if name := newName(sut, t); name == newName(sut, t) {
 		t.Errorf("Name called twice returned the same name %s, want different", name)
@@ -61,6 +65,10 @@ func (*fakeReader) Read(p []byte) (int, error) {
 
 func TestName_OnRandomNumberGeneratorError(t *testing.T) {
 	uuid.SetRand(&fakeReader{})
+	t.Cleanup(func() {
+		uuid.SetRand(nil)
+	})
+
 	sut := New(sslCertificateNamePrefix)
 	name, err := sut.Name()
 

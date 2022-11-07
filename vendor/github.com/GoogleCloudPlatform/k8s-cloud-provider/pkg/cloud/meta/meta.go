@@ -103,6 +103,14 @@ var AllServices = []*ServiceInfo{
 		Object:      "Address",
 		Service:     "GlobalAddresses",
 		Resource:    "addresses",
+		version:     VersionBeta,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&beta.GlobalAddressesService{}),
+	},
+	{
+		Object:      "Address",
+		Service:     "GlobalAddresses",
+		Resource:    "addresses",
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&ga.GlobalAddressesService{}),
 	},
@@ -116,6 +124,7 @@ var AllServices = []*ServiceInfo{
 			"GetHealth",
 			"Patch",
 			"Update",
+			"SetSecurityPolicy",
 		},
 	},
 	{
@@ -197,6 +206,28 @@ var AllServices = []*ServiceInfo{
 		serviceType: reflect.TypeOf(&ga.RegionDisksService{}),
 		additionalMethods: []string{
 			"Resize",
+		},
+	},
+	{
+		Object:      "Firewall",
+		Service:     "Firewalls",
+		Resource:    "firewalls",
+		version:     VersionAlpha,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&alpha.FirewallsService{}),
+		additionalMethods: []string{
+			"Update",
+		},
+	},
+	{
+		Object:      "Firewall",
+		Service:     "Firewalls",
+		Resource:    "firewalls",
+		version:     VersionBeta,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&beta.FirewallsService{}),
+		additionalMethods: []string{
+			"Update",
 		},
 	},
 	{
@@ -323,6 +354,17 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.RegionHealthChecksService{}),
+		additionalMethods: []string{
+			"Update",
+		},
+	},
+	{
+		Object:      "HealthCheck",
+		Service:     "RegionHealthChecks",
+		Resource:    "healthChecks",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionHealthChecksService{}),
 		additionalMethods: []string{
 			"Update",
 		},
@@ -503,6 +545,14 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
+		Object:      "ServiceAttachment",
+		Service:     "ServiceAttachments",
+		Resource:    "serviceAttachments",
+		version:     VersionAlpha,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&alpha.ServiceAttachmentsService{}),
+	},
+	{
 		Object:      "SslCertificate",
 		Service:     "SslCertificates",
 		Resource:    "sslCertificates",
@@ -540,6 +590,22 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.RegionSslCertificatesService{}),
+	},
+	{
+		Object:      "SslCertificate",
+		Service:     "RegionSslCertificates",
+		Resource:    "sslCertificates",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionSslCertificatesService{}),
+	},
+	{
+		Object:      "SslPolicy",
+		Service:     "SslPolicies",
+		Resource:    "sslPolicies",
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&ga.SslPoliciesService{}),
+		options:     NoList, // List() naming convention is different in GCE API for this resource
 	},
 	{
 		Object:      "Subnetwork",
@@ -620,6 +686,17 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
+		Object:      "TargetHttpProxy",
+		Service:     "RegionTargetHttpProxies",
+		Resource:    "targetHttpProxies",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionTargetHttpProxiesService{}),
+		additionalMethods: []string{
+			"SetUrlMap",
+		},
+	},
+	{
 		Object:      "TargetHttpsProxy",
 		Service:     "TargetHttpsProxies",
 		Resource:    "targetHttpsProxies",
@@ -627,6 +704,7 @@ var AllServices = []*ServiceInfo{
 		serviceType: reflect.TypeOf(&ga.TargetHttpsProxiesService{}),
 		additionalMethods: []string{
 			"SetSslCertificates",
+			"SetSslPolicy",
 			"SetUrlMap",
 		},
 	},
@@ -639,6 +717,7 @@ var AllServices = []*ServiceInfo{
 		serviceType: reflect.TypeOf(&alpha.TargetHttpsProxiesService{}),
 		additionalMethods: []string{
 			"SetSslCertificates",
+			"SetSslPolicy",
 			"SetUrlMap",
 		},
 	},
@@ -651,6 +730,7 @@ var AllServices = []*ServiceInfo{
 		serviceType: reflect.TypeOf(&beta.TargetHttpsProxiesService{}),
 		additionalMethods: []string{
 			"SetSslCertificates",
+			"SetSslPolicy",
 			"SetUrlMap",
 		},
 	},
@@ -679,6 +759,18 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
+		Object:      "TargetHttpsProxy",
+		Service:     "RegionTargetHttpsProxies",
+		Resource:    "targetHttpsProxies",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionTargetHttpsProxiesService{}),
+		additionalMethods: []string{
+			"SetSslCertificates",
+			"SetUrlMap",
+		},
+	},
+	{
 		Object:      "TargetPool",
 		Service:     "TargetPools",
 		Resource:    "targetPools",
@@ -687,6 +779,28 @@ var AllServices = []*ServiceInfo{
 		additionalMethods: []string{
 			"AddInstance",
 			"RemoveInstance",
+		},
+	},
+	{
+		Object:      "TargetTcpProxy",
+		Service:     "TargetTcpProxies",
+		Resource:    "targetTcpProxies",
+		version:     VersionAlpha,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&alpha.TargetTcpProxiesService{}),
+		additionalMethods: []string{
+			"SetBackendService",
+		},
+	},
+	{
+		Object:      "TargetTcpProxy",
+		Service:     "TargetTcpProxies",
+		Resource:    "targetTcpProxies",
+		version:     VersionBeta,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&beta.TargetTcpProxiesService{}),
+		additionalMethods: []string{
+			"SetBackendService",
 		},
 	},
 	{
@@ -739,6 +853,17 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.RegionUrlMapsService{}),
+		additionalMethods: []string{
+			"Update",
+		},
+	},
+	{
+		Object:      "UrlMap",
+		Service:     "RegionUrlMaps",
+		Resource:    "urlMaps",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionUrlMapsService{}),
 		additionalMethods: []string{
 			"Update",
 		},

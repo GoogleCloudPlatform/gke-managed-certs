@@ -23,15 +23,15 @@ SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 
 ARTIFACTS=${ARTIFACTS:-"/tmp/artifacts"}
 CLOUD_CONFIG=${CLOUD_CONFIG:-`gcloud info --format="value(config.paths.global_config_dir)"`}
-CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT:-`gcloud info --format="value(installation.sdk_root)"`}
-DNS_ZONE=${DNS_ZONE:-"gkemanagedcerts-dev"}
-DOMAIN=${DOMAIN:-"dev.gkemanagedcerts.certsbridge.com"}
+DNS_ZONE=${DNS_ZONE:-"ingress-dev"}
+DOMAIN=${DOMAIN:-"dev.ing.gke.certsbridge.com"}
 KUBECONFIG=${KUBECONFIG:-"${HOME}/.kube/config"}
 KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gke"}
-PLATFORM=${PLATFORM:-"gcp"}
+PLATFORM=${PLATFORM:-"gce"}
 PROJECT=${PROJECT:-`gcloud config list --format="value(core.project)"`}
 PULL_NUMBER=${PULL_NUMBER:-""}
 REGISTRY=${REGISTRY:-"gcr.io/gke-managed-certs"}
+SERVICE_ACCOUNT="managed-certificate-controller@${PROJECT}.iam.gserviceaccount.com"
 TAG=${TAG:-"ci_latest"}
 
 while getopts "p:r:t:z:" opt; do
@@ -52,12 +52,6 @@ then
   TAG="pr_${PULL_NUMBER}"
 fi
 
-mkdir /tmp/gcp_service_account
-if [ $PLATFORM = "gcp" ]
-then
-  gsutil cp gs://${PROJECT}/key.json /tmp/gcp_service_account/key.json
-fi
-
 name=managed-certificate-controller
 runner_image=${name}-runner
 runner_path=/gopath/src/github.com/GoogleCloudPlatform/gke-managed-certs/
@@ -71,28 +65,23 @@ test -f /etc/service-account/service-account.json && \
   gcloud auth configure-docker || true
 
 docker run -v ${SCRIPT_ROOT}:${runner_path} \
-  -v ${CLOUD_SDK_ROOT}:${CLOUD_SDK_ROOT} \
   -v ${CLOUD_CONFIG}:/root/.config/gcloud \
   -v ${CLOUD_CONFIG}:/root/.config/gcloud-staging \
   -v ${KUBECONFIG}:/root/.kube/config \
   -v ${ARTIFACTS}:/tmp/artifacts \
-  -v /tmp/gcp_service_account:/tmp/gcp_service_account \
   ${runner_image}:latest bash -c \
   "set -ex && cd ${runner_path} && dest=/tmp/artifacts; \
   rm -rf \${dest}/* && mkdir -p \${dest} && \
   { \
-    CLOUD_SDK_ROOT=${CLOUD_SDK_ROOT} \
-    GCP_SERVICE_ACCOUNT_FILE=/tmp/gcp_service_account/key.json \
-    KUBECONFIG=\${HOME}/.kube/config \
-    KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
-    PROJECT=${PROJECT} \
     DNS_ZONE=${DNS_ZONE} \
     DOMAIN=${DOMAIN} \
+    KUBECONFIG=\${HOME}/.kube/config \
+    KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER} \
     PLATFORM=${PLATFORM} \
-    TAG=${TAG} \
+    PROJECT=${PROJECT} \
     REGISTRY=${REGISTRY} \
+    SERVICE_ACCOUNT=${SERVICE_ACCOUNT} \
+    TAG=${TAG} \
     go test ./e2e/... -test.timeout=60m -logtostderr=false -alsologtostderr=true -v -log_dir=\${dest} \
       > \${dest}/e2e.out.txt && exitcode=\${?} || exitcode=\${?} ; \
   } && cat \${dest}/e2e.out.txt | go-junit-report > \${dest}/junit_01.xml && exit \${exitcode}"
-
-rm -r /tmp/gcp_service_account

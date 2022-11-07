@@ -22,14 +22,14 @@ import (
 	"sort"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
 // CopyStatus sets ManagedCertificate status based on SslCertificate object.
-func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1.ManagedCertificate,
+func CopyStatus(sslCert computev1.SslCertificate, mcrt *v1.ManagedCertificate,
 	config *config.Config) error {
 
 	certificateStatus, err := translateStatus(config.CertificateStatus.Certificate,
@@ -41,14 +41,14 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1.ManagedCertificate,
 	mcrt.Status.CertificateStatus = certificateStatus
 
 	// Initialize with non-nil value to avoid ManagedCertificate CRD validation warnings
-	domainStatuses := make([]apisv1.DomainStatus, 0)
+	domainStatuses := make([]v1.DomainStatus, 0)
 	for domain, status := range sslCert.Managed.DomainStatus {
 		domainStatus, err := translateStatus(config.CertificateStatus.Domain, status)
 		if err != nil {
 			return err
 		}
 
-		domainStatuses = append(domainStatuses, apisv1.DomainStatus{
+		domainStatuses = append(domainStatuses, v1.DomainStatus{
 			Domain: domain,
 			Status: domainStatus,
 		})
@@ -62,7 +62,7 @@ func CopyStatus(sslCert compute.SslCertificate, mcrt *apisv1.ManagedCertificate,
 }
 
 // Diff returns the diff of the set of domains of ManagedCertificate and SslCertificate.
-func Diff(mcrt apisv1.ManagedCertificate, sslCert compute.SslCertificate) string {
+func Diff(mcrt v1.ManagedCertificate, sslCert computev1.SslCertificate) string {
 	mcrtDomains := make([]string, len(mcrt.Spec.Domains))
 	copy(mcrtDomains, mcrt.Spec.Domains)
 	sort.Strings(mcrtDomains)

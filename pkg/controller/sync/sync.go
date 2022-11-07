@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v1"
-	apiv1beta1 "k8s.io/api/networking/v1beta1"
+	computev1 "google.golang.org/api/compute/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/klog"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/sslcertificatemanager"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/state"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/patch"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/random"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
@@ -103,7 +104,7 @@ func parse(annotation string) map[string]bool {
 // 2. a slice of ManagedCertificate ids that are attached to Ingress
 // via annotation managed-certificates.
 // 3. an error on failure.
-func (s impl) getCertificatesToAttach(ingress *apiv1beta1.Ingress) (map[string]bool, []types.Id, error) {
+func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) (map[string]bool, []types.Id, error) {
 	// If a ManagedCertificate attached to Ingress does not exist, add an event to Ingress
 	// and return an error.
 	boundManagedCertificates := parse(ingress.Annotations[config.AnnotationManagedCertificatesKey])
@@ -198,7 +199,7 @@ func (s impl) reportManagedCertificatesAttached(ctx context.Context, managedCert
 }
 
 func (s impl) Ingress(ctx context.Context, id types.Id) error {
-	ingress, err := s.ingress.Get(id)
+	originalIngress, err := s.ingress.Get(id)
 	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -207,28 +208,38 @@ func (s impl) Ingress(ctx context.Context, id types.Id) error {
 
 	klog.Infof("Syncing Ingress %s", id.String())
 
-	sslCertificates, managedCertificates, err := s.getCertificatesToAttach(ingress)
+	sslCertificates, managedCertificates, err := s.getCertificatesToAttach(originalIngress)
 	if err != nil {
 		return fmt.Errorf("getCertificatesToAttach(): %w", err)
 	}
 
 	preSharedCertValue := buildPreSharedCertAnnotation(sslCertificates)
 
-	if preSharedCertValue == ingress.Annotations[config.AnnotationPreSharedCertKey] {
+	if preSharedCertValue == originalIngress.Annotations[config.AnnotationPreSharedCertKey] {
 		return nil
 	}
 
 	klog.Infof("Annotation %s on Ingress %s was %s, set to %s",
 		config.AnnotationPreSharedCertKey, id.String(),
-		ingress.Annotations[config.AnnotationPreSharedCertKey], preSharedCertValue)
+		originalIngress.Annotations[config.AnnotationPreSharedCertKey], preSharedCertValue)
 
-	if ingress.Annotations == nil {
-		ingress.Annotations = make(map[string]string, 0)
+	modifiedIngress := originalIngress.DeepCopy()
+
+	if modifiedIngress.Annotations == nil {
+		modifiedIngress.Annotations = make(map[string]string, 0)
 	}
-	ingress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
+	modifiedIngress.Annotations[config.AnnotationPreSharedCertKey] = preSharedCertValue
 
-	if err := s.ingress.Update(ctx, ingress); err != nil {
-		return fmt.Errorf("Failed to update Ingress %s: %v", id.String(), err)
+	patchBytes, modified, err := patch.CreateMergePatch(originalIngress, modifiedIngress)
+	if err != nil {
+		return fmt.Errorf("patch.CreateMergePatch(): %w", err)
+	}
+
+	if modified {
+		err = s.ingress.Patch(ctx, id, patchBytes)
+		if err != nil {
+			return fmt.Errorf("s.ingress.Patch(): %w", err)
+		}
 	}
 
 	if err := s.reportManagedCertificatesAttached(ctx, managedCertificates); err != nil {
@@ -238,25 +249,30 @@ func (s impl) Ingress(ctx context.Context, id types.Id) error {
 	return nil
 }
 
-func (s impl) insertSslCertificateName(ctx context.Context, id types.Id) (string, error) {
-	if entry, err := s.state.Get(id); err == nil {
-		return entry.SslCertificateName, nil
+// createStateEntry creates a new state entry for given ManagedCertificate id with a random
+// name for the SslCertificate. Returns existing state entry for that id if it already exists.
+func (s impl) createStateEntry(ctx context.Context, id types.Id) (state.Entry, error) {
+	entry, err := s.state.Get(id)
+	if err == nil {
+		return entry, nil
+	} else if !errors.IsNotFound(err) {
+		return state.Entry{}, err
 	}
 
 	sslCertificateName, err := s.random.Name()
 	if err != nil {
-		return "", err
+		return state.Entry{}, err
 	}
 
 	klog.Infof("Add to state SslCertificate name %s for ManagedCertificate %s",
 		sslCertificateName, id.String())
 
 	s.state.Insert(ctx, id, sslCertificateName)
-	return sslCertificateName, nil
+	return s.state.Get(id)
 }
 
 func (s impl) observeSslCertificateCreationLatency(ctx context.Context, sslCertificateName string,
-	id types.Id, managedCertificate apisv1.ManagedCertificate) error {
+	id types.Id, managedCertificate v1.ManagedCertificate) error {
 
 	entry, err := s.state.Get(id)
 	if err != nil {
@@ -291,67 +307,72 @@ func (s impl) observeSslCertificateCreationLatency(ctx context.Context, sslCerti
 	return nil
 }
 
+// deleteSslCertificate marks the state entry for the ManagedCertificate id as
+// soft-deleted then deletes the SslCertificate. It does not delete the state entry.
 func (s impl) deleteSslCertificate(ctx context.Context,
-	managedCertificate *apisv1.ManagedCertificate,
+	managedCertificate *v1.ManagedCertificate,
 	id types.Id, sslCertificateName string) error {
 
 	klog.Infof("Mark entry for ManagedCertificate %s as soft deleted", id.String())
-	if err := s.state.SetSoftDeleted(ctx, id); err != nil {
+	if err := s.state.SetSoftDeleted(ctx, id, true); err != nil {
 		return err
 	}
 
 	klog.Infof("Delete SslCertificate %s for ManagedCertificate %s",
 		sslCertificateName, id.String())
 
-	if err := errors.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, managedCertificate)); err != nil {
-		return err
-	}
-
-	klog.Infof("Remove entry for ManagedCertificate %s from state", id.String())
-	s.state.Delete(ctx, id)
-	return nil
+	return errors.IgnoreNotFound(s.ssl.Delete(ctx, sslCertificateName, managedCertificate))
 }
 
+// createSslCertificate creates an SslCertificate and returns it. If the same
+// SslCertificate already exists (i.e same domains and name), it returns the
+// existing one.
+// Returns an error if there is no entry for given ManagedCertificate in the state.
 func (s impl) createSslCertificate(ctx context.Context, sslCertificateName string,
-	id types.Id, managedCertificate *apisv1.ManagedCertificate) (*compute.SslCertificate, error) {
-
-	exists, err := s.ssl.Exists(sslCertificateName, managedCertificate)
-	if err != nil {
-		return nil, err
-	}
-
-	if !exists {
-		if err := s.ssl.Create(ctx, sslCertificateName, *managedCertificate); err != nil {
-			return nil, err
-		}
-
-		if err := s.observeSslCertificateCreationLatency(ctx, sslCertificateName,
-			id, *managedCertificate); err != nil {
-			return nil, err
-		}
-	}
+	id types.Id, managedCertificate *v1.ManagedCertificate) (*computev1.SslCertificate, error) {
 
 	sslCert, err := s.ssl.Get(sslCertificateName, managedCertificate)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
 
-	if diff := certificates.Diff(*managedCertificate, *sslCert); diff != "" {
+	if err == nil { // Exists
+		diff := certificates.Diff(*managedCertificate, *sslCert)
+		if diff == "" {
+			klog.Infof(`SslCertificate: %+v already exists, restoring it if it
+				is soft-deleted`, sslCert)
+			if err = s.state.SetSoftDeleted(ctx, id, false); err != nil {
+				return nil, err
+			}
+			return sslCert, nil
+		}
+
 		klog.Infof(`Certificates out of sync: certificates.Diff(%s, %s): %s,
-			ManagedCertificate: %+v, SslCertificate: %+v. Deleting SslCertificate %s`,
+			ManagedCertificate: %+v, SslCertificate: %+v. Deleting SslCertificate %s
+			and recreating it.`,
 			id, sslCert.Name, diff, managedCertificate, sslCert, sslCert.Name)
+
 		if err := s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName); err != nil {
 			return nil, err
 		}
-
-		return nil, errors.OutOfSync
 	}
 
-	return sslCert, nil
+	if err = s.state.SetSoftDeleted(ctx, id, false); err != nil {
+		return nil, err
+	}
+	if err = s.ssl.Create(ctx, sslCertificateName, *managedCertificate); err != nil {
+		return nil, err
+	}
+	if err = s.observeSslCertificateCreationLatency(ctx, sslCertificateName,
+		id, *managedCertificate); err != nil {
+		return nil, err
+	}
+
+	return s.ssl.Get(sslCertificateName, managedCertificate)
 }
 
 func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
-	managedCertificate, err := s.managedCertificate.Get(id)
+	originalMcrt, err := s.managedCertificate.Get(id)
 	if errors.IsNotFound(err) {
 		entry, err := s.state.Get(id)
 		if errors.IsNotFound(err) {
@@ -360,35 +381,44 @@ func (s impl) ManagedCertificate(ctx context.Context, id types.Id) error {
 			return err
 		}
 
-		klog.Infof("ManagedCertificate %s already deleted", id.String())
-		return s.deleteSslCertificate(ctx, nil, id, entry.SslCertificateName)
+		klog.Infof(`ManagedCertificate %s already deleted. Deleting its
+			SslCertificate %s`, id.String(), entry.SslCertificateName)
+		if err = s.deleteSslCertificate(ctx, nil, id, entry.SslCertificateName); err != nil {
+			return err
+		}
+
+		klog.Infof("Remove entry for ManagedCertificate %s from state", id.String())
+		s.state.Delete(ctx, id)
+		return nil
 	} else if err != nil {
 		return err
 	}
 
 	klog.Infof("Syncing ManagedCertificate %s", id.String())
 
-	sslCertificateName, err := s.insertSslCertificateName(ctx, id)
+	stateEntry, err := s.createStateEntry(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	if entry, err := s.state.Get(id); err != nil {
-		return err
-	} else if entry.SoftDeleted {
-		klog.Infof("ManagedCertificate %s is soft deleted, deleting SslCertificate %s",
-			id.String(), sslCertificateName)
-		return s.deleteSslCertificate(ctx, managedCertificate, id, sslCertificateName)
-	}
+	modifiedMcrt := originalMcrt.DeepCopy()
 
-	sslCert, err := s.createSslCertificate(ctx, sslCertificateName, id, managedCertificate)
+	sslCert, err := s.createSslCertificate(ctx, stateEntry.SslCertificateName, id, modifiedMcrt)
 	if err != nil {
 		return err
 	}
 
-	if err := certificates.CopyStatus(*sslCert, managedCertificate, s.config); err != nil {
+	if err := certificates.CopyStatus(*sslCert, modifiedMcrt, s.config); err != nil {
 		return err
 	}
 
-	return s.managedCertificate.Update(ctx, managedCertificate)
+	patchBytes, modified, err := patch.CreateMergePatch(originalMcrt, modifiedMcrt)
+	if err != nil {
+		return fmt.Errorf("patch.CreateMergePatch(): %w", err)
+	}
+
+	if modified {
+		err = s.managedCertificate.Patch(ctx, id, patchBytes)
+	}
+	return err
 }

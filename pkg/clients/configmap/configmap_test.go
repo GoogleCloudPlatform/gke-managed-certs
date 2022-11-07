@@ -54,36 +54,58 @@ func buildCreateFunc(called *bool) cgotesting.ReactionFunc {
 }
 
 func TestUpdateOrCreate(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	testCases := []struct {
+		desc          string
 		updateError   error
 		createCalled  bool
 		returnedError error
-		description   string
 	}{
-		{generic, false, generic, "Failure to update a ConfigMap b/c of a generic error"},
-		{k8sNotFound, true, nil, "Failure to update a ConfigMap b/c it does not exist"},
-		{nil, false, nil, "ConfigMap updated successfully"},
+		{
+			desc:          "Failure to update a ConfigMap b/c of a generic error",
+			updateError:   generic,
+			createCalled:  false,
+			returnedError: generic,
+		},
+		{
+			desc:          "Failure to update a ConfigMap b/c it does not exist",
+			updateError:   k8sNotFound,
+			createCalled:  true,
+			returnedError: nil,
+		},
+		{
+			desc:          "ConfigMap updated successfully",
+			updateError:   nil,
+			createCalled:  false,
+			returnedError: nil,
+		},
 	}
 
 	for _, testCase := range testCases {
-		fakeClient := &fakev1.FakeCoreV1{Fake: &cgotesting.Fake{}}
-		fakeClient.AddReactor("update", resource, buildUpdateFunc(testCase.updateError))
-		createCalled := false
-		fakeClient.AddReactor("create", resource, buildCreateFunc(&createCalled))
+		testCase := testCase
+		t.Run(testCase.desc, func(t *testing.T) {
+			t.Parallel()
 
-		configMap := impl{
-			client: fakeClient,
-		}
-		err := configMap.UpdateOrCreate(ctx, namespace, &api.ConfigMap{})
+			fakeClient := &fakev1.FakeCoreV1{Fake: &cgotesting.Fake{}}
+			fakeClient.AddReactor("update", resource, buildUpdateFunc(testCase.updateError))
+			createCalled := false
+			fakeClient.AddReactor("create", resource, buildCreateFunc(&createCalled))
 
-		if err != testCase.returnedError {
-			t.Errorf("UpdateOrCreate returned error %#v, want %#v", err, testCase.returnedError)
-		}
+			configMap := impl{
+				client: fakeClient,
+			}
+			err := configMap.UpdateOrCreate(ctx, namespace, &api.ConfigMap{})
 
-		if createCalled != testCase.createCalled {
-			t.Errorf("Create called is %t, want %t", createCalled, testCase.createCalled)
-		}
+			if err != testCase.returnedError {
+				t.Errorf("UpdateOrCreate returned error %#v, want %#v", err, testCase.returnedError)
+			}
+
+			if createCalled != testCase.createCalled {
+				t.Errorf("Create called is %t, want %t", createCalled, testCase.createCalled)
+			}
+		})
 	}
 }

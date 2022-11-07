@@ -12,12 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.14.4
+FROM golang:1.17
 LABEL maintainer="Krzysztof Kwaśniewski <krzyk@google.com>"
 
-ENV GOPATH /gopath/
+ENV GOPATH /gopath
 ENV PATH $GOPATH/bin:$PATH
 
-RUN apt-get update && apt-get --yes install libseccomp-dev && go version \
-	&& go get github.com/jstemmer/go-junit-report
+# Add Google Cloud repository
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+	&& curl https://packages.cloud.google.com/apt/doc/apt-key.gpg --output /usr/share/keyrings/cloud.google.gpg
+
+RUN apt-get update && apt-get --yes install google-cloud-sdk \
+	google-cloud-sdk-gke-gcloud-auth-plugin kubectl libseccomp-dev \
+	&& go version && go install github.com/jstemmer/go-junit-report@v0.9.1
+
+# Add link for the Google Cloud SDK as installed in Prow. Without the link,
+# Go client library fails to authenticate.
+RUN ln -s /usr/lib/google-cloud-sdk /google-cloud-sdk
+
 CMD ["/bin/bash"]

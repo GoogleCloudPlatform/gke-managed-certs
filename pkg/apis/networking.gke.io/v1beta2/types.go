@@ -36,7 +36,7 @@ type ManagedCertificateList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ManagedCertificate configures the domains for which client requests a managed certificate. It also provides the current status of the certficate.
+// ManagedCertificate configures the domains for which client requests a managed certificate. It also provides the current status of the certificate.
 type ManagedCertificate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata

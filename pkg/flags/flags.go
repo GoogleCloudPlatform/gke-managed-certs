@@ -19,14 +19,20 @@ package flags
 
 import (
 	"flag"
+	"time"
 )
 
 var (
 	F = struct {
-		APIServerHost      string
-		GCEConfigFilePath  string
-		KubeConfigFilePath string
-		PrometheusAddress  string
+		APIServerHost       string
+		GCEConfigFilePath   string
+		KubeConfigFilePath  string
+		PrometheusAddress   string
+		ResyncInterval      time.Duration
+		HealthCheckAddress  string
+		HealthCheckPath     string
+		HealthCheckInterval time.Duration
+		ServiceAccount      string
 	}{}
 )
 
@@ -43,6 +49,16 @@ discovery is attempted.`)
 		"Path to kubeconfig file with authorization and master location information.")
 	flag.StringVar(&F.PrometheusAddress, "prometheus-address", ":8910",
 		"The address to expose Prometheus metrics")
+	flag.DurationVar(&F.ResyncInterval, "resync-interval", 10*time.Minute,
+		"How often to synchronize the controller state with external world.")
+	flag.StringVar(&F.HealthCheckAddress, "health-check-address", ":8089",
+		"The address to expose health check endpoint.")
+	flag.StringVar(&F.HealthCheckPath, "health-check-path", "/health-check",
+		"The path to expose health check endpoint.")
+	flag.DurationVar(&F.HealthCheckInterval, "health-check-interval", 5*time.Second,
+		"How often to run the health checks.")
+	flag.StringVar(&F.ServiceAccount, "service-account", "",
+		"Service account to use for fetching access tokens from GCE metadata server.")
 
 	flag.Parse()
 }

@@ -19,29 +19,29 @@ package managedcertificate
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type Builder struct {
-	managedCertificate *apisv1.ManagedCertificate
+	managedCertificate *v1.ManagedCertificate
 }
 
 // New builds a ManagedCertificate for a given domain and id.
 func New(id types.Id, domain string) *Builder {
 	return &Builder{
-		&apisv1.ManagedCertificate{
+		&v1.ManagedCertificate{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Now().Rfc3339Copy(),
 				Namespace:         id.Namespace,
 				Name:              id.Name,
 			},
-			Spec: apisv1.ManagedCertificateSpec{
+			Spec: v1.ManagedCertificateSpec{
 				Domains: []string{domain},
 			},
-			Status: apisv1.ManagedCertificateStatus{
+			Status: v1.ManagedCertificateStatus{
 				CertificateStatus: "",
-				DomainStatus:      []apisv1.DomainStatus{},
+				DomainStatus:      []v1.DomainStatus{},
 			},
 		},
 	}
@@ -50,7 +50,7 @@ func New(id types.Id, domain string) *Builder {
 func (b *Builder) WithStatus(status string, domainStatus ...string) *Builder {
 	b.managedCertificate.Status.CertificateStatus = status
 	for i, domain := range b.managedCertificate.Spec.Domains {
-		b.managedCertificate.Status.DomainStatus = append(b.managedCertificate.Status.DomainStatus, apisv1.DomainStatus{
+		b.managedCertificate.Status.DomainStatus = append(b.managedCertificate.Status.DomainStatus, v1.DomainStatus{
 			Domain: domain,
 			Status: domainStatus[i],
 		})
@@ -63,6 +63,6 @@ func (b *Builder) WithCertificateName(certificateName string) *Builder {
 	return b
 }
 
-func (b *Builder) Build() *apisv1.ManagedCertificate {
+func (b *Builder) Build() *v1.ManagedCertificate {
 	return b.managedCertificate
 }

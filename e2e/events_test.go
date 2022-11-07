@@ -28,24 +28,44 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
-// This test creates more certificates than the quota allows and checks if there is at least one with
-// an event communicating the Created event, and at least one with an event communicating TooManyCertificates.
-// Normally every certificate should either receive Created or TooManyCertificates, however rarely BackendError
-// can be reported as well, and events are reported on a best-effort basis, so the test does not require
-// every event to be present.
+// This test creates more certificates than the quota allows and checks
+// if there is at least one with an event communicating the Created event,
+// and at least one with an event communicating TooManyCertificates. Normally
+// every certificate should either receive Created or TooManyCertificates,
+// however rarely BackendError can be reported as well, and events are reported
+// on a best-effort basis, so the test does not require every event to be present.
 func TestEvents_ManagedCertificate(t *testing.T) {
 	ctx := context.Background()
-	numCerts := 400 // Should be bigger than allowed quota.
+	numCerts := 150 // Should be bigger than allowed quota.
+
+	errs := make(chan error, 1)
 
 	for i := 0; i < numCerts; i++ {
-		name := fmt.Sprintf("quota-%d", i)
-		if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
+		i := i
+		go func(errs chan<- error) {
+			name := fmt.Sprintf("quota-%d", i)
+			if err := errors.IgnoreNotFound(clients.ManagedCertificate.Delete(ctx, name)); err != nil {
+				errs <- err
+				return
+			}
+			domains := []string{fmt.Sprintf("quota%d.quota-test.com", i)}
+			if err := clients.ManagedCertificate.Create(ctx, name, domains); err != nil {
+				errs <- err
+				return
+			}
+			t.Cleanup(func() {
+				clients.ManagedCertificate.Delete(ctx, name)
+			})
+
+			errs <- nil
+		}(errs)
+	}
+
+	for i := 0; i < numCerts; i++ {
+		err := <-errs
+		if err != nil {
 			t.Fatal(err)
 		}
-		if err := clients.ManagedCertificate.Create(ctx, name, []string{"quota.example.com"}); err != nil {
-			t.Fatal(err)
-		}
-		defer clients.ManagedCertificate.Delete(ctx, name)
 	}
 
 	if err := utils.Retry(func() error {
@@ -88,6 +108,8 @@ func TestEvents_ManagedCertificate(t *testing.T) {
 }
 
 func TestEvents_Ingress(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	ingressName := "test-events-ingress"
 

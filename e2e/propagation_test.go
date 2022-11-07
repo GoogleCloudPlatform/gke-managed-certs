@@ -51,6 +51,8 @@ func ensurePropagated(ctx context.Context, name string) error {
 }
 
 func TestPropagation(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	for i, tc := range []struct {
@@ -93,7 +95,9 @@ func TestPropagation(t *testing.T) {
 			if err := clients.ManagedCertificate.Create(ctx, name, []string{domain}); err != nil {
 				t.Fatalf("Creation failed: %s", err.Error())
 			}
-			defer clients.ManagedCertificate.Delete(ctx, name)
+			t.Cleanup(func() {
+				clients.ManagedCertificate.Delete(ctx, name)
+			})
 
 			if err := ensurePropagated(ctx, name); err != nil {
 				t.Fatalf("Propagation failed: %s", err.Error())
@@ -110,6 +114,8 @@ func TestPropagation(t *testing.T) {
 	}
 
 	t.Run("Deleting ManagedCertificate deletes SslCertificate", func(t *testing.T) {
+		t.Parallel()
+
 		name := "propagation-to-be-deleted"
 		domain := "propagation-to-be-deleted.example.com"
 		if err := clients.ManagedCertificate.Create(ctx, name, []string{domain}); err != nil {

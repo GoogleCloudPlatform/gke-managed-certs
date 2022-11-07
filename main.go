@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/controller/liveness"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/flags"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/version"
 )
@@ -69,7 +70,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config, err := config.New(ctx, flags.F.GCEConfigFilePath)
+	config, err := config.New(ctx, flags.F.GCEConfigFilePath, flags.F.ServiceAccount)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -79,12 +80,17 @@ func main() {
 		klog.Fatal(err)
 	}
 
+	healthCheck := liveness.NewHealthCheck(flags.F.HealthCheckInterval,
+		2*flags.F.ResyncInterval, 2*flags.F.ResyncInterval)
+	klog.Infof("Start serving liveness probe")
+	healthCheck.StartServing(flags.F.HealthCheckAddress, flags.F.HealthCheckPath)
+
 	leaderElection := componentbaseconfig.LeaderElectionConfiguration{
 		LeaderElect:   true,
 		LeaseDuration: metav1.Duration{Duration: config.MasterElection.LeaseDuration},
 		RenewDeadline: metav1.Duration{Duration: config.MasterElection.RenewDeadline},
 		RetryPeriod:   metav1.Duration{Duration: config.MasterElection.RetryPeriod},
-		ResourceLock:  resourcelock.EndpointsResourceLock,
+		ResourceLock:  resourcelock.LeasesResourceLock,
 	}
 	id, err := os.Hostname()
 	if err != nil {
@@ -109,7 +115,8 @@ func main() {
 		RetryPeriod:   leaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				controller := controller.New(ctx, config, clients)
+				params := controller.NewParams(ctx, clients, config, healthCheck)
+				controller := controller.New(ctx, params)
 
 				go func() {
 					<-setupSignalHandler()

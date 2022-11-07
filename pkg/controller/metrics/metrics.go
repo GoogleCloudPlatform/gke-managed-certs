@@ -37,6 +37,10 @@ const (
 
 type Interface interface {
 	Start(address string)
+	ObserveIngressHighPriorityQueueLength(length int)
+	ObserveIngressLowPriorityQueueLength(length int)
+	ObserveManagedCertificateHighPriorityQueueLength(length int)
+	ObserveManagedCertificateLowPriorityQueueLength(length int)
 	ObserveManagedCertificatesStatuses(statuses map[string]int)
 	ObserveSslCertificateBackendError()
 	ObserveSslCertificateQuotaError()
@@ -45,17 +49,49 @@ type Interface interface {
 }
 
 type impl struct {
-	config                          *config.Config
-	managedCertificateStatus        *prometheus.GaugeVec
-	sslCertificateBackendErrorTotal prometheus.Counter
-	sslCertificateQuotaErrorTotal   prometheus.Counter
-	sslCertificateBindingLatency    prometheus.Histogram
-	sslCertificateCreationLatency   prometheus.Histogram
+	config                                    *config.Config
+	ingressHighPriorityQueueLength            prometheus.Gauge
+	ingressLowPriorityQueueLength             prometheus.Gauge
+	managedCertificateHighPriorityQueueLength prometheus.Gauge
+	managedCertificateLowPriorityQueueLength  prometheus.Gauge
+	managedCertificateStatus                  *prometheus.GaugeVec
+	sslCertificateBackendErrorTotal           prometheus.Counter
+	sslCertificateQuotaErrorTotal             prometheus.Counter
+	sslCertificateBindingLatency              prometheus.Histogram
+	sslCertificateCreationLatency             prometheus.Histogram
 }
 
 func New(config *config.Config) Interface {
 	return impl{
 		config: config,
+		ingressHighPriorityQueueLength: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "ingress_highpriority_queue_length",
+				Help:      `The number of Ingress resources queued on the high priority controller queue`,
+			},
+		),
+		ingressLowPriorityQueueLength: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "ingress_lowpriority_queue_length",
+				Help:      `The number of Ingress resources queued on the low priority controller queue`,
+			},
+		),
+		managedCertificateHighPriorityQueueLength: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "managedcertificate_highpriority_queue_length",
+				Help:      `The number of ManagedCertificate resources queued on the high priority controller queue`,
+			},
+		),
+		managedCertificateLowPriorityQueueLength: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "managedcertificate_lowpriority_queue_length",
+				Help:      `The number of ManagedCertificate resources queued on the low priority controller queue`,
+			},
+		),
 		managedCertificateStatus: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -108,7 +144,33 @@ func (m impl) Start(address string) {
 	klog.Fatalf("Failed to expose metrics: %v", err)
 }
 
-// ObserveManagedCertificatesStatuses accepts a mapping from ManagedCertificate certificate status to number of occurences of this status among ManagedCertificate resources and records the data as a metric.
+// ObserveIngressHighPriorityQueueLength reports the number of Ingress
+// resources queued on the high priority controller queue.
+func (m impl) ObserveIngressHighPriorityQueueLength(length int) {
+	m.ingressHighPriorityQueueLength.Set(float64(length))
+}
+
+// ObserveIngressLowPriorityQueueLength reports the number of Ingress
+// resources queued on the high priority controller queue.
+func (m impl) ObserveIngressLowPriorityQueueLength(length int) {
+	m.ingressLowPriorityQueueLength.Set(float64(length))
+}
+
+// ObserveManagedCertificateHighPriorityQueueLength reports the number of Ingress
+// resources queued on the high priority controller queue.
+func (m impl) ObserveManagedCertificateHighPriorityQueueLength(length int) {
+	m.managedCertificateHighPriorityQueueLength.Set(float64(length))
+}
+
+// ObserveManagedCertificateLowPriorityQueueLength reports the number of Ingress
+// resources queued on the high priority controller queue.
+func (m impl) ObserveManagedCertificateLowPriorityQueueLength(length int) {
+	m.managedCertificateLowPriorityQueueLength.Set(float64(length))
+}
+
+// ObserveManagedCertificatesStatuses accepts a mapping from ManagedCertificate
+// certificate status to number of occurences of this status among
+// ManagedCertificate resources and records the data as a metric.
 func (m impl) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 	for mcrtStatus, occurences := range statuses {
 		label := statusUnknown
@@ -119,29 +181,35 @@ func (m impl) ObserveManagedCertificatesStatuses(statuses map[string]int) {
 			}
 		}
 
-		m.managedCertificateStatus.With(prometheus.Labels{labelStatus: label}).Set(float64(occurences))
+		m.managedCertificateStatus.
+			With(prometheus.Labels{labelStatus: label}).
+			Set(float64(occurences))
 	}
 }
 
-// ObserveSslCertificateBackendError observes an error when performing action on SslCertificate resource.
+// ObserveSslCertificateBackendError reports an error when performing
+// action on an SslCertificate resource.
 func (m impl) ObserveSslCertificateBackendError() {
 	m.sslCertificateBackendErrorTotal.Inc()
 }
 
-// ObserveSslCertificateQuotaError observes an out-of-quota error when performing action on SslCertificate resource.
+// ObserveSslCertificateQuotaError reports an out-of-quota error when
+// performing action on an SslCertificate resource.
 func (m impl) ObserveSslCertificateQuotaError() {
 	m.sslCertificateQuotaErrorTotal.Inc()
 }
 
-// ObserveSslCertificateBindingLatency observes the time it took to bind an SslCertficate resource with Ingress after
-// a valid ManagedCertficate resource was created.
+// ObserveSslCertificateBindingLatency reports the time it took to bind
+// an SslCertificate resource with Ingress after a valid ManagedCertificate
+// resource was created.
 func (m impl) ObserveSslCertificateBindingLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
 	m.sslCertificateBindingLatency.Observe(diff)
 }
 
-// ObserveSslCertificateCreationLatency observes the time it took to create an SslCertficate resource after a valid
-// ManagedCertficate resource was created.
+// ObserveSslCertificateCreationLatency reports the time it took to create
+// an SslCertificate resource after a valid ManagedCertificate resource
+// was created.
 func (m impl) ObserveSslCertificateCreationLatency(creationTime time.Time) {
 	diff := time.Now().UTC().Sub(creationTime).Seconds()
 	m.sslCertificateCreationLatency.Observe(diff)

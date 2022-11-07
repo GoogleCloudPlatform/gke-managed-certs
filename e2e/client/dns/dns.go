@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	projectID   = "certsbridge-dev"
+	projectID   = "gke-net-dns"
 	recordTypeA = "A"
 )
 

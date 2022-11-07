@@ -26,7 +26,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/gce"
@@ -56,6 +56,7 @@ const (
 	sslProvisioningFailedPermanently       = "PROVISIONING_FAILED_PERMANENTLY"
 	sslRenewalFailed                       = "RENEWAL_FAILED"
 
+	AnnotationIngressClassKey        = "kubernetes.io/ingress.class"
 	AnnotationManagedCertificatesKey = "networking.gke.io/managed-certificates"
 	AnnotationPreSharedCertKey       = "ingress.gcp.kubernetes.io/pre-shared-cert"
 	SslCertificateNamePrefix         = "mcrt-"
@@ -94,8 +95,8 @@ type Config struct {
 	SslCertificateNamePrefix string
 }
 
-func New(ctx context.Context, gceConfigFilePath string) (*Config, error) {
-	tokenSource, projectID, err := getTokenSourceAndProjectID(ctx, gceConfigFilePath)
+func New(ctx context.Context, gceConfigFilePath, gceServiceAccount string) (*Config, error) {
+	tokenSource, projectID, err := getTokenSourceAndProjectID(ctx, gceConfigFilePath, gceServiceAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func New(ctx context.Context, gceConfigFilePath string) (*Config, error) {
 	}, nil
 }
 
-func getTokenSourceAndProjectID(ctx context.Context, gceConfigFilePath string) (oauth2.TokenSource, string, error) {
+func getTokenSourceAndProjectID(ctx context.Context, gceConfigFilePath, gceServiceAccount string) (oauth2.TokenSource, string, error) {
 	if gceConfigFilePath != "" {
 		klog.V(1).Info("In a GKE cluster")
 
@@ -162,12 +163,12 @@ func getTokenSourceAndProjectID(ctx context.Context, gceConfigFilePath string) (
 		return nil, "", fmt.Errorf("Could not fetch project id: %v", err)
 	}
 
-	if len(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) > 0 {
-		klog.V(1).Info("In a GCP cluster")
-		tokenSource, err := google.DefaultTokenSource(ctx, compute.ComputeScope)
-		return tokenSource, projectID, err
-	} else {
-		klog.V(1).Info("Using default TokenSource")
-		return google.ComputeTokenSource(""), projectID, nil
+	if len(gceServiceAccount) != 0 {
+		klog.V(1).Infof("Using ComputeTokenSource(%q)", gceServiceAccount)
+		return google.ComputeTokenSource(gceServiceAccount, computev1.ComputeScope), projectID, nil
 	}
+
+	klog.V(1).Info("Using DefaultTokenSource")
+	tokenSource, err := google.DefaultTokenSource(ctx, computev1.ComputeScope)
+	return tokenSource, projectID, err
 }

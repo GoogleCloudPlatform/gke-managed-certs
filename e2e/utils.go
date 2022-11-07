@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	"k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 )
 
@@ -47,17 +47,17 @@ func createIngress(t *testing.T, ctx context.Context, name string, port int32, a
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: appHello},
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: appHello},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyAlways,
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{
 						{
 							Name:    "http-hello",
 							Image:   "node:11-slim",
 							Command: []string{"node"},
 							Args:    args,
-							Ports:   []corev1.ContainerPort{{ContainerPort: port}},
+							Ports:   []v1.ContainerPort{{ContainerPort: port}},
 						},
 					},
 				},
@@ -73,11 +73,11 @@ func createIngress(t *testing.T, ctx context.Context, name string, port int32, a
 		return err
 	}
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeNodePort,
-			Ports:    []corev1.ServicePort{{Port: port}},
+		Spec: v1.ServiceSpec{
+			Type:     v1.ServiceTypeNodePort,
+			Ports:    []v1.ServicePort{{Port: port}},
 			Selector: appHello,
 		},
 	}
@@ -90,17 +90,19 @@ func createIngress(t *testing.T, ctx context.Context, name string, port int32, a
 		return err
 	}
 
-	ingress := &networkingv1beta1.Ingress{
+	ingress := &netv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				"networking.gke.io/managed-certificates": annotationManagedCertificatesValue,
+				config.AnnotationManagedCertificatesKey: annotationManagedCertificatesValue,
 			},
 		},
-		Spec: networkingv1beta1.IngressSpec{
-			Backend: &networkingv1beta1.IngressBackend{
-				ServiceName: name,
-				ServicePort: intstr.FromInt(int(port)),
+		Spec: netv1.IngressSpec{
+			DefaultBackend: &netv1.IngressBackend{
+				Service: &netv1.IngressServiceBackend{
+					Name: name,
+					Port: netv1.ServiceBackendPort{Number: port},
+				},
 			},
 		},
 	}

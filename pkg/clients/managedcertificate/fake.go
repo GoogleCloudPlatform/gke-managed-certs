@@ -18,25 +18,27 @@ package managedcertificate
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/evanphx/json-patch"
 	"k8s.io/client-go/util/workqueue"
 
-	apisv1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/errors"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/utils/types"
 )
 
 type Fake struct {
-	managedCertificates []*apisv1.ManagedCertificate
+	managedCertificates []*v1.ManagedCertificate
 }
 
 var _ Interface = (*Fake)(nil)
 
-func NewFake(managedCertificates []*apisv1.ManagedCertificate) *Fake {
+func NewFake(managedCertificates []*v1.ManagedCertificate) *Fake {
 	return &Fake{managedCertificates: managedCertificates}
 }
 
-func (f *Fake) Get(id types.Id) (*apisv1.ManagedCertificate, error) {
+func (f *Fake) Get(id types.Id) (*v1.ManagedCertificate, error) {
 	for _, cert := range f.managedCertificates {
 		if cert.Namespace == id.Namespace && cert.Name == id.Name {
 			return cert, nil
@@ -50,20 +52,28 @@ func (f *Fake) HasSynced() bool {
 	return true
 }
 
-func (f *Fake) List() ([]*apisv1.ManagedCertificate, error) {
+func (f *Fake) List() ([]*v1.ManagedCertificate, error) {
 	return f.managedCertificates, nil
 }
 
-func (f *Fake) Update(ctx context.Context, managedCertificate *apisv1.ManagedCertificate) error {
+func (f *Fake) Patch(ctx context.Context, id types.Id, diff []byte) error {
 	for i, cert := range f.managedCertificates {
-		if cert.Namespace == managedCertificate.Namespace &&
-			cert.Name == managedCertificate.Name {
-
-			f.managedCertificates[i] = managedCertificate
+		if cert.Namespace == id.Namespace && cert.Name == id.Name {
+			mcrtBytes, err := json.Marshal(f.managedCertificates[i])
+			if err != nil {
+				return err
+			}
+			mcrtBytes, err = jsonpatch.MergePatch(mcrtBytes, diff)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(mcrtBytes, f.managedCertificates[i])
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 	}
-
 	return errors.NotFound
 }
 

@@ -74,6 +74,8 @@ func generateRandomNames(count int) []string {
 }
 
 func TestProvisioningWorkflow(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	mcrtCount := 2
@@ -95,7 +97,9 @@ func TestProvisioningWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clients.Dns.Delete(records)
+	t.Cleanup(func() {
+		clients.Dns.Delete(records)
+	})
 	klog.Infof("Generated random domains: %v", domains)
 
 	for i, mcrtName := range mcrtNames {
@@ -103,7 +107,9 @@ func TestProvisioningWorkflow(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer clients.ManagedCertificate.Delete(ctx, mcrtName)
+		t.Cleanup(func() {
+			clients.ManagedCertificate.Delete(ctx, mcrtName)
+		})
 	}
 
 	additionalSslCertificateName := fmt.Sprintf("additional-%s", generateRandomNames(1)[0])
@@ -111,10 +117,14 @@ func TestProvisioningWorkflow(t *testing.T) {
 		[]string{additionalSslCertificateDomain}); err != nil {
 		t.Fatalf("Failed to create additional SslCertificate %s: %v", additionalSslCertificateName, err)
 	}
-	defer clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
+	t.Cleanup(func() {
+		clients.SslCertificate.Delete(ctx, additionalSslCertificateName)
+	})
 	klog.Infof("Created additional SslCertificate resource: %s", additionalSslCertificateName)
 
 	t.Run("ManagedCertificate resources attached to Ingress become Active", func(t *testing.T) {
+		t.Parallel()
+
 		err := utils.Retry(func() error {
 			for _, mcrtName := range mcrtNames {
 				mcrt, err := clients.ManagedCertificate.Get(ctx, mcrtName)
@@ -134,6 +144,8 @@ func TestProvisioningWorkflow(t *testing.T) {
 		}
 
 		t.Run("HTTPS requests succeed", func(t *testing.T) {
+			t.Parallel()
+
 			err := utils.Retry(func() error {
 				for _, domain := range domains {
 					response, err := http.Get(fmt.Sprintf("https://%s", domain))
@@ -154,6 +166,8 @@ func TestProvisioningWorkflow(t *testing.T) {
 			}
 
 			t.Run("Additional SslCertificate is not modified", func(t *testing.T) {
+				t.Parallel()
+
 				sslCertificate, err := clients.SslCertificate.Get(additionalSslCertificateName)
 				if err != nil {
 					t.Fatal(err)

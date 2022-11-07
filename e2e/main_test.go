@@ -20,13 +20,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	compute "google.golang.org/api/compute/v1"
+	computev1 "google.golang.org/api/compute/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 
@@ -36,11 +35,11 @@ import (
 )
 
 const (
-	controllerImageTagEnv    = "TAG"
-	controllerRegistryEnv    = "REGISTRY"
-	gcpServiceAccountFileEnv = "GCP_SERVICE_ACCOUNT_FILE"
-	namespace                = "default"
-	platformEnv              = "PLATFORM"
+	controllerImageTagEnv = "TAG"
+	controllerRegistryEnv = "REGISTRY"
+	namespace             = "default"
+	platformEnv           = "PLATFORM"
+	serviceAccountEnv     = "SERVICE_ACCOUNT"
 )
 
 var clients *client.Clients
@@ -75,7 +74,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.SslCertificate, error) {
+func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*computev1.SslCertificate, error) {
 	klog.Info("setting up")
 
 	if !gke {
@@ -83,17 +82,14 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 			return nil, err
 		}
 
-		gcpServiceAccountFileName := os.Getenv(gcpServiceAccountFileEnv)
-		gcpServiceAccountJson, err := ioutil.ReadFile(gcpServiceAccountFileName)
-		if err != nil {
-			return nil, fmt.Errorf("can't read file %s: %w", gcpServiceAccountFileName, err)
-		}
-
 		registry := os.Getenv(controllerRegistryEnv)
 		tag := os.Getenv(controllerImageTagEnv)
 		klog.Infof("Controller image registry=%s, tag=%s", registry, tag)
 
-		if err := deployController(ctx, string(gcpServiceAccountJson), registry, tag); err != nil {
+		serviceAccount := os.Getenv(serviceAccountEnv)
+		klog.Infof("serviceAccount=%s", serviceAccount)
+
+		if err := deployController(ctx, registry, tag, serviceAccount); err != nil {
 			return nil, err
 		}
 	}
@@ -124,7 +120,7 @@ func setUp(ctx context.Context, clients *client.Clients, gke bool) ([]*compute.S
 	return sslCertificatesBegin, nil
 }
 
-func tearDown(ctx context.Context, clients *client.Clients, gke bool, sslCertificatesBegin []*compute.SslCertificate) error {
+func tearDown(ctx context.Context, clients *client.Clients, gke bool, sslCertificatesBegin []*computev1.SslCertificate) error {
 	klog.Infof("tearing down")
 
 	if err := clients.ManagedCertificate.DeleteAll(ctx); err != nil {

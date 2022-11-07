@@ -19,7 +19,9 @@ metadata:
 spec:
   group: networking.gke.io
   versions:
-  - name: v1beta1  # (Deprecated)
+  - name: v1beta1
+    deprecated: true
+    deprecationWarning: 'networking.gke.io/v1beta1 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate'
     served: true
     storage: false
     schema:
@@ -66,7 +68,9 @@ spec:
                   type: string
                   maxLength: 63
                   pattern: '^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$'
-  - name: v1beta2  # (Deprecated)
+  - name: v1beta2
+    deprecated: true
+    deprecationWarning: 'networking.gke.io/v1beta2 ManagedCertificate is deprecated; please migrate to networking.gke.io/v1 ManagedCertificate'
     served: true
     storage: false
     schema:

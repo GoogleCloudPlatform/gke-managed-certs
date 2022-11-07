@@ -36,6 +36,8 @@ var errK8sNotFound = k8serrors.NewNotFound(schema.GroupResource{
 }, "test_name")
 
 func TestIsNotFound(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		in  error
 		out bool
@@ -58,6 +60,8 @@ func TestIsNotFound(t *testing.T) {
 }
 
 func TestIgnoreNotFound(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		in  error
 		out error

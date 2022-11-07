@@ -23,9 +23,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/gke-managed-certs/e2e/utils"
@@ -33,12 +34,10 @@ import (
 )
 
 const (
-	clusterRoleBindingName = "managed-certificate-role-binding"
-	clusterRoleName        = "managed-certificate-role"
+	clusterRoleBindingName = "managed-certificate-controller"
+	clusterRoleName        = "managed-certificate-controller"
 	deploymentName         = "managed-certificate-controller"
-	gcpSecretName          = "managed-certificate-gcp-sa"
-	secretKey              = "key.json"
-	serviceAccountName     = "managed-certificate-account"
+	serviceAccountName     = "managed-certificate-controller"
 )
 
 // Deploys Managed Certificate CRD
@@ -47,6 +46,12 @@ func deployCRD(ctx context.Context) error {
 	var maxDomains1 int64 = 1
 	var maxDomains100 int64 = 100
 	var maxDomainLength int64 = 63
+	deprecationWarningV1beta1 := "networking.gke.io/v1beta1 ManagedCertificate is " +
+		"deprecated; please migrate to networking.gke.io/v1 " +
+		"ManagedCertificate"
+	deprecationWarningV1beta2 := "networking.gke.io/v1beta2 ManagedCertificate is " +
+		"deprecated; please migrate to networking.gke.io/v1 " +
+		"ManagedCertificate"
 	crd := apiextv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -59,9 +64,11 @@ func deployCRD(ctx context.Context) error {
 			Group: "networking.gke.io",
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
-					Served:  true,
-					Storage: false,
+					Name:               "v1beta1",
+					Deprecated:         true,
+					DeprecationWarning: &deprecationWarningV1beta1,
+					Served:             true,
+					Storage:            false,
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 							Type: "object",
@@ -108,9 +115,11 @@ func deployCRD(ctx context.Context) error {
 					},
 				},
 				{
-					Name:    "v1beta2",
-					Served:  true,
-					Storage: false,
+					Name:               "v1beta2",
+					Deprecated:         true,
+					DeprecationWarning: &deprecationWarningV1beta2,
+					Served:             true,
+					Storage:            false,
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 							Type: "object",
@@ -257,19 +266,10 @@ func deployCRD(ctx context.Context) error {
 }
 
 // Deploys Managed Certificate controller with all related objects
-func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag string) error {
+func deployController(ctx context.Context, registry, tag, gceServiceAccount string) error {
 	if err := deleteController(ctx); err != nil {
 		return err
 	}
-
-	secret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: gcpSecretName},
-		StringData: map[string]string{secretKey: gcpServiceAccountJson},
-	}
-	if _, err := clients.Secret.Create(ctx, &secret, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-	klog.Infof("Created secret %s", gcpSecretName)
 
 	serviceAccount := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName}}
 	if _, err := clients.ServiceAccount.Create(ctx, &serviceAccount, metav1.CreateOptions{}); err != nil {
@@ -277,9 +277,14 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	}
 	klog.Infof("Created service account %s", serviceAccountName)
 
-	clusterRole := rbacv1beta1.ClusterRole{
+	clusterRole := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-		Rules: []rbacv1beta1.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"*"},
+			},
 			{
 				APIGroups: []string{"networking.gke.io"},
 				Resources: []string{"managedcertificates"},
@@ -292,7 +297,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"configmaps", "endpoints", "events"},
+				Resources: []string{"configmaps", "events"},
 				Verbs:     []string{"*"},
 			},
 		},
@@ -302,22 +307,27 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	}
 	klog.Infof("Created cluster role %s", clusterRoleName)
 
-	clusterRoleBinding := rbacv1beta1.ClusterRoleBinding{
+	clusterRoleBinding := rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
-		Subjects:   []rbacv1beta1.Subject{{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"}},
-		RoleRef: rbacv1beta1.RoleRef{
+		Subjects: []rbacv1.Subject{
+			{Namespace: "default", Name: serviceAccountName, Kind: "ServiceAccount"},
+		},
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     clusterRoleName,
 		},
 	}
-	if _, err := clients.ClusterRoleBinding.Create(ctx, &clusterRoleBinding, metav1.CreateOptions{}); err != nil {
+	if _, err := clients.ClusterRoleBinding.Create(ctx, &clusterRoleBinding,
+		metav1.CreateOptions{}); err != nil {
+
 		return err
 	}
 	klog.Infof("Created cluster role binding %s", clusterRoleBindingName)
 
 	appCtrl := map[string]string{"app": deploymentName}
 	image := fmt.Sprintf("%s/managed-certificate-controller:%s", registry, tag)
+	directory := corev1.HostPathDirectory
 	fileOrCreate := corev1.HostPathFileOrCreate
 
 	sslCertsVolume := "ssl-certs"
@@ -329,8 +339,8 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 	logFileVolume := "logfile"
 	logFileVolumePath := "/var/log/managed_certificate_controller.log"
 
-	saKeyVolume := "sa-key-volume"
-	saKeyVolumePath := "/etc/gcp"
+	healthCheckPath := "/health-check"
+	healthCheckPort := 8089
 
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
@@ -362,22 +372,25 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 									MountPath: logFileVolumePath,
 									ReadOnly:  false,
 								},
-								{
-									Name:      saKeyVolume,
-									MountPath: saKeyVolumePath,
-									ReadOnly:  true,
-								},
 							},
 							Args: []string{
 								"--logtostderr=false",
 								"--alsologtostderr",
 								fmt.Sprintf("--log_file=%s", logFileVolumePath),
+								"--resync-interval=600s",
+								fmt.Sprintf("--health-check-address=:%d", healthCheckPort),
+								fmt.Sprintf("--health-check-path=%s", healthCheckPath),
+								fmt.Sprintf("--service-account=%s", gceServiceAccount),
 							},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: fmt.Sprintf("%s/%s", saKeyVolumePath, secretKey),
+							LivenessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: healthCheckPath,
+										Port: intstr.FromInt(healthCheckPort),
+									},
 								},
+								InitialDelaySeconds: 60,
+								PeriodSeconds:       60,
 							},
 						},
 					},
@@ -387,6 +400,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: sslCertsVolumePath,
+									Type: &directory,
 								},
 							},
 						},
@@ -395,6 +409,7 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: usrShareCaCertsVolumePath,
+									Type: &directory,
 								},
 							},
 						},
@@ -407,26 +422,14 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 								},
 							},
 						},
-						{
-							Name: saKeyVolume,
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: gcpSecretName,
-									Items: []corev1.KeyToPath{
-										{
-											Key:  secretKey,
-											Path: secretKey,
-										},
-									},
-								},
-							},
-						},
 					},
 				},
 			},
 		},
 	}
-	if _, err := clients.Deployment.Create(ctx, &deployment, metav1.CreateOptions{}); err != nil {
+	if _, err := clients.Deployment.Create(ctx, &deployment,
+		metav1.CreateOptions{}); err != nil {
+
 		return err
 	}
 	klog.Infof("Created deployment %s", deploymentName)
@@ -436,30 +439,33 @@ func deployController(ctx context.Context, gcpServiceAccountJson, registry, tag 
 
 // Deletes Managed Certificate controller and all related objects
 func deleteController(ctx context.Context) error {
-	if err := utilserrors.IgnoreNotFound(clients.Secret.Delete(ctx, gcpSecretName, metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(ctx, deploymentName,
+		metav1.DeleteOptions{})); err != nil {
+
 		return err
 	}
-	klog.Infof("Deleted secret %s", gcpSecretName)
+	klog.Infof("Deleted deployment %s", deploymentName)
 
-	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx, serviceAccountName, metav1.DeleteOptions{})); err != nil {
-		return err
-	}
-	klog.Infof("Deleted service account %s", serviceAccountName)
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(ctx,
+		clusterRoleBindingName, metav1.DeleteOptions{})); err != nil {
 
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(ctx, clusterRoleName, metav1.DeleteOptions{})); err != nil {
-		return err
-	}
-	klog.Infof("Deleted cluster role %s", clusterRoleName)
-
-	if err := utilserrors.IgnoreNotFound(clients.ClusterRoleBinding.Delete(ctx, clusterRoleBindingName, metav1.DeleteOptions{})); err != nil {
 		return err
 	}
 	klog.Infof("Deleted cluster role binding %s", clusterRoleBindingName)
 
-	if err := utilserrors.IgnoreNotFound(clients.Deployment.Delete(ctx, deploymentName, metav1.DeleteOptions{})); err != nil {
+	if err := utilserrors.IgnoreNotFound(clients.ClusterRole.Delete(ctx, clusterRoleName,
+		metav1.DeleteOptions{})); err != nil {
+
 		return err
 	}
-	klog.Infof("Deleted deployment %s", deploymentName)
+	klog.Infof("Deleted cluster role %s", clusterRoleName)
+
+	if err := utilserrors.IgnoreNotFound(clients.ServiceAccount.Delete(ctx,
+		serviceAccountName, metav1.DeleteOptions{})); err != nil {
+
+		return err
+	}
+	klog.Infof("Deleted service account %s", serviceAccountName)
 
 	return nil
 }
