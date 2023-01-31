@@ -195,15 +195,3 @@ You can do the below steps in any order to turn SSL off:
      pre-shared-cert annotation may not be available any more. Ingress has
      all-or-nothing semantics and will not work if a certificate it references
      is missing.
-
-# API changes
-
-Managed Certificates support the following versions of Managed Certificate CRD,
-the API: v1, v1beta2 and v1beta1.
-
-You should use the v1 version. v1beta2 and v1beta1 are deprecated and will be
-removed in the future.
-
-v1beta2 supports more than one domain name per certificate (multi-SAN).
-
-v1beta1 supports one domain name per certificate.

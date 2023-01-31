@@ -22,6 +22,6 @@ SCRIPT_ROOT=$(readlink -f $(dirname ${BASH_SOURCE})/..)
 
 REPOSITORY=github.com/GoogleCloudPlatform/gke-managed-certs
 bash ${SCRIPT_ROOT}/vendor/k8s.io/code-generator/generate-groups.sh all \
-  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1beta1,v1beta2,v1 \
+  $REPOSITORY/pkg/clientgen $REPOSITORY/pkg/apis networking.gke.io:v1 \
   --output-base ${SCRIPT_ROOT}/../../.. \
   --go-header-file ${SCRIPT_ROOT}/hack/header.go.txt

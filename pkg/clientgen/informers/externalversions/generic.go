@@ -22,8 +22,6 @@ import (
 	"fmt"
 
 	v1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
-	v1beta1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta1"
-	v1beta2 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1beta2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -57,14 +55,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=networking.gke.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("managedcertificates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().ManagedCertificates().Informer()}, nil
-
-		// Group=networking.gke.io, Version=v1beta1
-	case v1beta1.SchemeGroupVersion.WithResource("managedcertificates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta1().ManagedCertificates().Informer()}, nil
-
-		// Group=networking.gke.io, Version=v1beta2
-	case v1beta2.SchemeGroupVersion.WithResource("managedcertificates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta2().ManagedCertificates().Informer()}, nil
 
 	}
 

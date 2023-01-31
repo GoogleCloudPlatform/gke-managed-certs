@@ -26,8 +26,10 @@ import (
 )
 
 // ManagedCertificateLister helps list ManagedCertificates.
+// All objects returned here must be treated as read-only.
 type ManagedCertificateLister interface {
 	// List lists all ManagedCertificates in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ManagedCertificate, err error)
 	// ManagedCertificates returns an object that can list and get ManagedCertificates.
 	ManagedCertificates(namespace string) ManagedCertificateNamespaceLister
@@ -58,10 +60,13 @@ func (s *managedCertificateLister) ManagedCertificates(namespace string) Managed
 }
 
 // ManagedCertificateNamespaceLister helps list and get ManagedCertificates.
+// All objects returned here must be treated as read-only.
 type ManagedCertificateNamespaceLister interface {
 	// List lists all ManagedCertificates in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ManagedCertificate, err error)
 	// Get retrieves the ManagedCertificate from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ManagedCertificate, error)
 	ManagedCertificateNamespaceListerExpansion
 }
