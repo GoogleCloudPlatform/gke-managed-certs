@@ -43,15 +43,8 @@ const (
 // Deploys Managed Certificate CRD
 func deployCRD(ctx context.Context) error {
 	domainRegex := `^(([a-z0-9]+|[a-z0-9][-a-z0-9]*[a-z0-9])\.)+[a-z][-a-z0-9]*[a-z0-9]$`
-	var maxDomains1 int64 = 1
 	var maxDomains100 int64 = 100
 	var maxDomainLength int64 = 63
-	deprecationWarningV1beta1 := "networking.gke.io/v1beta1 ManagedCertificate is " +
-		"deprecated; please migrate to networking.gke.io/v1 " +
-		"ManagedCertificate"
-	deprecationWarningV1beta2 := "networking.gke.io/v1beta2 ManagedCertificate is " +
-		"deprecated; please migrate to networking.gke.io/v1 " +
-		"ManagedCertificate"
 	crd := apiextv1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -63,108 +56,6 @@ func deployCRD(ctx context.Context) error {
 		Spec: apiextv1.CustomResourceDefinitionSpec{
 			Group: "networking.gke.io",
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
-				{
-					Name:               "v1beta1",
-					Deprecated:         true,
-					DeprecationWarning: &deprecationWarningV1beta1,
-					Served:             true,
-					Storage:            false,
-					Schema: &apiextv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextv1.JSONSchemaProps{
-								"status": {
-									Type: "object",
-									Properties: map[string]apiextv1.JSONSchemaProps{
-										"certificateStatus": {Type: "string"},
-										"domainStatus": {
-											Type: "array",
-											Items: &apiextv1.JSONSchemaPropsOrArray{
-												Schema: &apiextv1.JSONSchemaProps{
-													Type:     "object",
-													Required: []string{"domain", "status"},
-													Properties: map[string]apiextv1.JSONSchemaProps{
-														"domain": {Type: "string"},
-														"status": {Type: "string"},
-													},
-												},
-											},
-										},
-										"certificateName": {Type: "string"},
-										"expireTime":      {Type: "string", Format: "date-time"},
-									},
-								},
-								"spec": {
-									Type: "object",
-									Properties: map[string]apiextv1.JSONSchemaProps{
-										"domains": {
-											Type:     "array",
-											MaxItems: &maxDomains1,
-											Items: &apiextv1.JSONSchemaPropsOrArray{
-												Schema: &apiextv1.JSONSchemaProps{
-													Type:      "string",
-													MaxLength: &maxDomainLength,
-													Pattern:   domainRegex,
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				{
-					Name:               "v1beta2",
-					Deprecated:         true,
-					DeprecationWarning: &deprecationWarningV1beta2,
-					Served:             true,
-					Storage:            false,
-					Schema: &apiextv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextv1.JSONSchemaProps{
-								"status": {
-									Type: "object",
-									Properties: map[string]apiextv1.JSONSchemaProps{
-										"certificateStatus": {Type: "string"},
-										"domainStatus": {
-											Type: "array",
-											Items: &apiextv1.JSONSchemaPropsOrArray{
-												Schema: &apiextv1.JSONSchemaProps{
-													Type:     "object",
-													Required: []string{"domain", "status"},
-													Properties: map[string]apiextv1.JSONSchemaProps{
-														"domain": {Type: "string"},
-														"status": {Type: "string"},
-													},
-												},
-											},
-										},
-										"certificateName": {Type: "string"},
-										"expireTime":      {Type: "string", Format: "date-time"},
-									},
-								},
-								"spec": {
-									Type: "object",
-									Properties: map[string]apiextv1.JSONSchemaProps{
-										"domains": {
-											Type:     "array",
-											MaxItems: &maxDomains100,
-											Items: &apiextv1.JSONSchemaPropsOrArray{
-												Schema: &apiextv1.JSONSchemaProps{
-													Type:      "string",
-													MaxLength: &maxDomainLength,
-													Pattern:   domainRegex,
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
 				{
 					Name:    "v1",
 					Served:  true,
