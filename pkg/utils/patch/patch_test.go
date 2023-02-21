@@ -30,14 +30,16 @@ import (
 func TestCreateMergePatch(t *testing.T) {
 	t.Parallel()
 
-	for description, testCase := range map[string]struct {
+	for _, tc := range []struct {
+		desc            string
 		originalIngress *v1.Ingress
 		modifiedIngress *v1.Ingress
 		wantModified    bool
 		wantDiff        []byte
 		wantErr         error
 	}{
-		"changes": {
+		{
+			desc: "changes",
 			originalIngress: ingress.New(types.NewId("default", "foo"),
 				ingress.AnnotationManagedCertificates("regular1,regular2"),
 				ingress.AnnotationPreSharedCert("regular3")),
@@ -47,7 +49,8 @@ func TestCreateMergePatch(t *testing.T) {
 			wantModified: true,
 			wantDiff:     []byte("{\"metadata\":{\"annotations\":{\"ingress.gcp.kubernetes.io/pre-shared-cert\":\"regular1,regular4\",\"networking.gke.io/managed-certificates\":\"regular1,regular2,regular3,regular4\"}}}"),
 		},
-		"no changes": {
+		{
+			desc: "no changes",
 			originalIngress: ingress.New(types.NewId("default", "foo"),
 				ingress.AnnotationManagedCertificates("regular1,regular2,deleted1,deleted2"),
 				ingress.AnnotationPreSharedCert("regular1,regular2")),
@@ -58,14 +61,14 @@ func TestCreateMergePatch(t *testing.T) {
 			wantDiff:     nil,
 		},
 	} {
-		tc := testCase
-		t.Run(description, func(t *testing.T) {
+		tc := tc
+		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
 			diff, modified, err := CreateMergePatch(tc.originalIngress, tc.modifiedIngress)
 
 			if err != nil && !errors.Is(err, tc.wantErr) {
-				t.Fatalf("CreateMergePatch() err: %v, want %v", err, testCase.wantErr)
+				t.Fatalf("CreateMergePatch() err: %v, want %v", err, tc.wantErr)
 			}
 			if modified != tc.wantModified {
 				t.Fatalf("CreateMergePatch() modified: %t, want: %t", modified, tc.wantModified)
