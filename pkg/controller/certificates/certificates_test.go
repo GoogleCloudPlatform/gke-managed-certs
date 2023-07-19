@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	computev1 "google.golang.org/api/compute/v1"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	v1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
@@ -79,7 +79,20 @@ func TestCopyStatus(t *testing.T) {
 		"Correct translation": {
 			sslCert("ACTIVE", map[string]string{"example.com": "ACTIVE"}),
 			true,
-			mcrt("Active", []v1.DomainStatus{v1.DomainStatus{Domain: "example.com", Status: "Active"}}),
+			mcrt("Active", []v1.DomainStatus{{Domain: "example.com", Status: "Active"}}),
+		},
+		"Correct translation, domainStatus in sorted order": {
+			sslCert("ACTIVE", map[string]string{
+				"a.example.com": "ACTIVE",
+				"c.example.com": "ACTIVE",
+				"b.example.com": "ACTIVE",
+			}),
+			true,
+			mcrt("Active", []v1.DomainStatus{
+				{Domain: "a.example.com", Status: "Active"},
+				{Domain: "b.example.com", Status: "Active"},
+				{Domain: "c.example.com", Status: "Active"},
+			}),
 		},
 	}
 

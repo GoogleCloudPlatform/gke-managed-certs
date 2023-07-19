@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	computev1 "google.golang.org/api/compute/v1"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	v1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/config"
 )
 
@@ -53,6 +53,9 @@ func CopyStatus(sslCert computev1.SslCertificate, mcrt *v1.ManagedCertificate,
 			Status: domainStatus,
 		})
 	}
+	sort.SliceStable(domainStatuses, func(i, j int) bool {
+		return domainStatuses[i].Domain < domainStatuses[j].Domain
+	})
 	mcrt.Status.DomainStatus = domainStatuses
 
 	mcrt.Status.CertificateName = sslCert.Name
