@@ -50,7 +50,7 @@ docker run -v ${SCRIPT_ROOT}:${runner_path} ${runner_image}:latest bash -c \
   go vet ./... && \
   pkg=github.com/GoogleCloudPlatform/gke-managed-certs; \
   ld_flags=\"-X \${pkg}/pkg/version.Version=${VERSION} -X \${pkg}/pkg/version.GitCommit=${GIT_COMMIT}\"; \
-  go build -o ${name} -ldflags \"\${ld_flags}\" && \
+  go build -o ${name} -ldflags \"\${ld_flags}\" -buildvcs=false && \
   go test ./pkg/... -cover"
 
 test -f /etc/service-account/service-account.json && \
