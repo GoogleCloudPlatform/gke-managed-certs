@@ -98,13 +98,28 @@ func parse(annotation string) map[string]bool {
 	return result
 }
 
+// parseList splits given comma separated string into an ordered slice of non-empty items,
+// preserving the original order and removing duplicates (keeping first occurrence).
+func parseList(annotation string) []string {
+	var result []string
+	seen := make(map[string]bool)
+	for _, item := range strings.Split(annotation, separator) {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" && !seen[trimmed] {
+			result = append(result, trimmed)
+			seen[trimmed] = true
+		}
+	}
+	return result
+}
+
 // Returns:
-// 1. a set of SslCertificate resources that should be attached to Ingress
-// via annotation pre-shared-cert.
+// 1. an ordered slice of SslCertificate resources that should be attached to Ingress
+// via annotation pre-shared-cert, preserving the original order.
 // 2. a slice of ManagedCertificate ids that are attached to Ingress
 // via annotation managed-certificates.
 // 3. an error on failure.
-func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) (map[string]bool, []types.Id, error) {
+func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) ([]string, []types.Id, error) {
 	// If a ManagedCertificate attached to Ingress does not exist, add an event to Ingress
 	// and return an error.
 	boundManagedCertificates := parse(ingress.Annotations[config.AnnotationManagedCertificatesKey])
@@ -123,15 +138,21 @@ func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) (map[string]bool, 
 		return nil, nil, fmt.Errorf("managedCertificate.Get(%s): %w", id.String(), err)
 	}
 
-	// Take already bound SslCertificate resources.
-	sslCertificates := make(map[string]bool, 0)
-	for sslCertificateName := range parse(ingress.Annotations[config.AnnotationPreSharedCertKey]) {
-		sslCertificates[sslCertificateName] = true
+	// Parse existing pre-shared-cert annotation preserving order
+	existingCerts := parseList(ingress.Annotations[config.AnnotationPreSharedCertKey])
+
+	// Track which certificates should be in the final list
+	certSet := make(map[string]bool)
+	for _, cert := range existingCerts {
+		certSet[cert] = true
 	}
 
-	// Slice of ManagedCertificate ids that are attached to Ingress via annotation
-	// managed-certificates.
+	// Collect managed certificate SSL names that need to be added
+	var newManagedCerts []string
 	var managedCertificates []types.Id
+
+	// Mark soft-deleted certificates for removal
+	softDeletedCerts := make(map[string]bool)
 
 	for id, entry := range s.state.List() {
 		if id.Namespace != ingress.Namespace {
@@ -139,26 +160,36 @@ func (s impl) getCertificatesToAttach(ingress *netv1.Ingress) (map[string]bool, 
 		}
 
 		if entry.SoftDeleted {
-			delete(sslCertificates, entry.SslCertificateName)
+			softDeletedCerts[entry.SslCertificateName] = true
 		} else if _, e := boundManagedCertificates[id.Name]; e {
-			sslCertificates[entry.SslCertificateName] = true
+			if !certSet[entry.SslCertificateName] {
+				newManagedCerts = append(newManagedCerts, entry.SslCertificateName)
+			}
+			certSet[entry.SslCertificateName] = true
 			managedCertificates = append(managedCertificates, id)
 		}
 	}
 
-	return sslCertificates, managedCertificates, nil
+	// Build final ordered list: existing certs (minus soft-deleted) + new managed certs (sorted)
+	var result []string
+	for _, cert := range existingCerts {
+		if !softDeletedCerts[cert] {
+			result = append(result, cert)
+		}
+	}
+
+	// Sort new managed certificates for deterministic ordering when adding multiple new certs
+	sort.Strings(newManagedCerts)
+	result = append(result, newManagedCerts...)
+
+	return result, managedCertificates, nil
 }
 
 // Builds the value of pre-shared-cert annotation
-// out of a set of SslCertificate resources' names.
-func buildPreSharedCertAnnotation(sslCertificates map[string]bool) string {
-	var result []string
-	for sslCertificate := range sslCertificates {
-		result = append(result, sslCertificate)
-	}
-
-	sort.Strings(result)
-	return strings.Join(result, separator)
+// from an ordered slice of SslCertificate resource names.
+// The order is preserved to respect GCP's primary certificate selection.
+func buildPreSharedCertAnnotation(sslCertificates []string) string {
+	return strings.Join(sslCertificates, separator)
 }
 
 func (s impl) reportManagedCertificatesAttached(ctx context.Context, managedCertificates []types.Id) error {
