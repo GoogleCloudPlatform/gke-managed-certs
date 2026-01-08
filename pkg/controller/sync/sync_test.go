@@ -27,7 +27,7 @@ import (
 	computev1 "google.golang.org/api/compute/v1"
 	netv1 "k8s.io/api/networking/v1"
 
-	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
+	v1 "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/apis/networking.gke.io/v1"
 	"github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/event"
 	clientsingress "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/ingress"
 	clientsmcrt "github.com/GoogleCloudPlatform/gke-managed-certs/pkg/clients/managedcertificate"
@@ -68,6 +68,35 @@ func TestParse(t *testing.T) {
 
 		if diff := cmp.Diff(tc.wantItems, items); diff != "" {
 			t.Fatalf("parse(%q): (-want, +got): %s", tc.annotation, diff)
+		}
+	}
+}
+
+func TestParseList(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		annotation string
+		wantItems  []string
+	}{
+		{"", nil},
+		{",", nil},
+		{"a", []string{"a"}},
+		{"a,", []string{"a"}},
+		{",a", []string{"a"}},
+		{" a ", []string{"a"}},
+		{"a,b", []string{"a", "b"}},
+		{" a , b ", []string{"a", "b"}},
+		{"b,a", []string{"b", "a"}},              // Order preserved
+		{"c,a,b", []string{"c", "a", "b"}},       // Order preserved
+		{"a,b,a", []string{"a", "b"}},            // Duplicates removed, first occurrence kept
+		{"a,b,c,b,a", []string{"a", "b", "c"}},   // Multiple duplicates
+		{" z , a , m ", []string{"z", "a", "m"}}, // Order preserved with spaces
+	} {
+		items := parseList(tc.annotation)
+
+		if diff := cmp.Diff(tc.wantItems, items); diff != "" {
+			t.Fatalf("parseList(%q): (-want, +got): %s", tc.annotation, diff)
 		}
 	}
 }
@@ -139,6 +168,86 @@ func TestIngress(t *testing.T) {
 			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("bindingReported1,bindingReported2,regular"), ingress.AnnotationPreSharedCert("bindingReported1")),
 			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("bindingReported1,bindingReported2,regular"), ingress.AnnotationPreSharedCert("bindingReported1,bindingReported2,regular")),
 			wantMetrics: metrics.Fake{BindingCnt: 1},
+		},
+		"certificate order preserved: primary cert first": {
+			// Tests that existing certificate order is preserved
+			// User wants "primary" as the primary (fallback) certificate
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "mcrt1"): state.Entry{SslCertificateName: "mcrt1-ssl"},
+				types.NewId("default", "mcrt2"): state.Entry{SslCertificateName: "mcrt2-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt1,mcrt2"), ingress.AnnotationPreSharedCert("primary,secondary")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt1,mcrt2"), ingress.AnnotationPreSharedCert("primary,secondary,mcrt1-ssl,mcrt2-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 2},
+		},
+		"certificate order preserved: reverse alphabetical": {
+			// Tests that non-alphabetical order is preserved
+			// "zebra" comes first even though it's last alphabetically
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "mcrt"): state.Entry{SslCertificateName: "mcrt-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt"), ingress.AnnotationPreSharedCert("zebra,apple")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt"), ingress.AnnotationPreSharedCert("zebra,apple,mcrt-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 1},
+		},
+		"certificate order preserved: new certs appended sorted": {
+			// When adding multiple new managed certs, they should be sorted among themselves
+			// but appended after existing certs
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "cert-z"): state.Entry{SslCertificateName: "cert-z-ssl"},
+				types.NewId("default", "cert-a"): state.Entry{SslCertificateName: "cert-a-ssl"},
+				types.NewId("default", "cert-m"): state.Entry{SslCertificateName: "cert-m-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("cert-z,cert-a,cert-m"), ingress.AnnotationPreSharedCert("existing")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("cert-z,cert-a,cert-m"), ingress.AnnotationPreSharedCert("existing,cert-a-ssl,cert-m-ssl,cert-z-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 3},
+		},
+		"certificate combination: pre-shared order preserved + managed sorted": {
+			// Demonstrates how certificates are combined:
+			// 1. Pre-shared certificates preserve user's order (zebra,apple)
+			// 2. Managed certificates are sorted alphabetically (cert-a-ssl,cert-m-ssl,cert-z-ssl)
+			// 3. Final result: pre-shared first + managed appended
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "cert-z"): state.Entry{SslCertificateName: "cert-z-ssl"},
+				types.NewId("default", "cert-a"): state.Entry{SslCertificateName: "cert-a-ssl"},
+				types.NewId("default", "cert-m"): state.Entry{SslCertificateName: "cert-m-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("cert-z,cert-a,cert-m"), ingress.AnnotationPreSharedCert("zebra,apple")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("cert-z,cert-a,cert-m"), ingress.AnnotationPreSharedCert("zebra,apple,cert-a-ssl,cert-m-ssl,cert-z-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 3},
+		},
+		"certificate combination: complex order preservation": {
+			// Tests complex scenario with multiple pre-shared certs in non-alphabetical order
+			// Shows that user's intended primary certificate (first in pre-shared) stays first
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "managed-b"): state.Entry{SslCertificateName: "managed-b-ssl"},
+				types.NewId("default", "managed-a"): state.Entry{SslCertificateName: "managed-a-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("managed-b,managed-a"), ingress.AnnotationPreSharedCert("primary,secondary,fallback")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("managed-b,managed-a"), ingress.AnnotationPreSharedCert("primary,secondary,fallback,managed-a-ssl,managed-b-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 2},
+		},
+		"certificate deduplication: same cert in pre-shared and managed": {
+			// Tests that when the same certificate appears in both pre-shared and managed,
+			// it's deduplicated and the pre-shared order is preserved
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "mcrt1"): state.Entry{SslCertificateName: "shared-cert"}, // Same name as pre-shared
+				types.NewId("default", "mcrt2"): state.Entry{SslCertificateName: "managed-only"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt1,mcrt2"), ingress.AnnotationPreSharedCert("shared-cert,other-pre-shared")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt1,mcrt2"), ingress.AnnotationPreSharedCert("shared-cert,other-pre-shared,managed-only")),
+			wantMetrics: metrics.Fake{BindingCnt: 2},
+		},
+		"certificate order unchanged when no changes needed": {
+			// Tests that when certificates are already correct, no update happens
+			// This validates the comparison logic that prevents spurious updates
+			// Note: BindingCnt is 0 because metrics are only reported when annotation is updated
+			state: map[types.Id]state.Entry{
+				types.NewId("default", "mcrt"): state.Entry{SslCertificateName: "mcrt-ssl"},
+			},
+			ingress:     ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt"), ingress.AnnotationPreSharedCert("primary,mcrt-ssl")),
+			wantIngress: ingress.New(types.NewId("default", "foo"), ingress.AnnotationManagedCertificates("mcrt"), ingress.AnnotationPreSharedCert("primary,mcrt-ssl")),
+			wantMetrics: metrics.Fake{BindingCnt: 0},
 		},
 	} {
 		testCase := testCase
